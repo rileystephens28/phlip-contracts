@@ -16,7 +16,7 @@ contract PhlipDAO is ERC20, ERC20Burnable, ERC20Permit, ERC20Votes, Ownable {
     /**
      * @notice Create contract with initial supply of 5,479,500,000 tokens
      */
-    constructor() ERC20("PhlipDAO", "PHLP") ERC20Permit("Phlip") {
+    constructor() ERC20("PhlipDAO", "PHLP") ERC20Permit("PhlipDAO") {
         _mint(msg.sender, 5479500000 * 10**decimals());
     }
 
