@@ -1,21 +1,23 @@
 {
-  "name": "phlip-contracts",
-  "version": "0.1.0",
-  "main": "truffle-config.js",
-  "author": "Riley Stephens",
-  "dependencies": {
-    "@openzeppelin/contracts": "^4.5.0",
-    "@truffle/hdwallet-provider": "^2.0.3",
-    "chai": "^4.3.4",
-    "dotenv": "^16.0.0",
-    "truffle-plugin-verify": "^0.5.20"
-  },
-  "scripts": {
-    "compile": "truffle compile --all",
-    "migrate": "truffle migrate",
-    "develop": "truffle develop",
-    "console": "truffle console",
-    "verify": "truffle run verify",
-    "test": "truffle test"
-  }
+    "name": "phlip-contracts",
+    "version": "0.1.0",
+    "main": "truffle-config.js",
+    "author": "Riley Stephens",
+    "dependencies": {
+        "@openzeppelin/contracts": "^4.5.0"
+    },
+    "devDependencies": {
+        "@truffle/hdwallet-provider": "^2.0.3",
+        "chai": "^4.3.4",
+        "dotenv": "^16.0.0",
+        "truffle-plugin-verify": "^0.5.20"
+    },
+    "scripts": {
+        "compile": "truffle compile --all",
+        "migrate": "truffle migrate",
+        "develop": "truffle develop",
+        "console": "truffle console",
+        "verify": "truffle run verify",
+        "test": "truffle test"
+    }
 }
