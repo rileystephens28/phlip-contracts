@@ -2,15 +2,16 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title PhlipP2E
  * @author Riley Stephens
  * @notice This is an ownable ERC20 token .
  */
-contract PhlipP2E is ERC20, ERC20Burnable, Ownable {
+contract PhlipP2E is ERC20, ERC20Burnable, Pausable, Ownable {
     /**
      * @notice Create contract with initial supply of 10,000,000,000 tokens
      */
