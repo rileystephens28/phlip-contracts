@@ -3,16 +3,24 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title PhlipDAO
  * @author Riley Stephens
  * @notice This is an ownable ERC20 token that implements features for external governance.
  */
-contract PhlipDAO is ERC20, ERC20Burnable, ERC20Permit, ERC20Votes, Ownable {
+contract PhlipDAO is
+    ERC20,
+    ERC20Burnable,
+    Pausable,
+    Ownable,
+    ERC20Permit,
+    ERC20Votes
+{
     /**
      * @notice Create contract with initial supply of 5,479,500,000 tokens
      */
