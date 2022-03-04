@@ -27,8 +27,10 @@ contract PhlipDAO is
 
     /**
      * @notice Create contract with initial supply of 5,479,500,000 tokens
+     * @dev Only DEFAULT_ADMIN_ROLE is assigned because other roles can be assigned later by admin
      */
     constructor() ERC20("PhlipDAO", "PHLP") ERC20Permit("PhlipDAO") {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _mint(msg.sender, 5479500000 * 10**decimals());
     }
 
