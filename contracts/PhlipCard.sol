@@ -4,7 +4,7 @@ pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./utils/Blacklistable.sol";
 import "./utils/Whitelistable.sol";
@@ -19,11 +19,15 @@ contract PhlipCard is
     ERC721,
     ERC721URIStorage,
     Pausable,
-    Ownable,
+    AccessControl,
     Blacklistable,
     Whitelistable,
     UpDownVote
 {
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant BLOCKER_ROLE = keccak256("BLOCKER_ROLE");
+
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIdCounter;
@@ -50,24 +54,91 @@ contract PhlipCard is
         string memory _symbol,
         string memory _baseUri
     ) ERC721(_name, _symbol) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         setBaseURI(_baseUri);
     }
 
-    function pause() public onlyOwner {
+    /**
+     * @notice Allow address with PAUSER role to pause token transfers
+     */
+    function pause() public onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
-    function unpause() public onlyOwner {
+    /**
+     * @notice Allow address with PAUSER role to unpause token transfers
+     */
+    function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-    function safeMint(address to, string memory uri) public onlyOwner {
+    /**
+     * @notice Allow address with BLOCKER role to add an address to the blacklist
+     * @param _address The address to add to the blacklist
+     */
+    function addToBlacklist(address _address) public onlyRole(BLOCKER_ROLE) {
+        _addToBlacklist(_address);
+    }
+
+    /**
+     * @notice Allow address with BLOCKER role to remove an address from the blacklist
+     * @param _address The address to remove from the blacklist
+     */
+    function removeFromBlacklist(address _address)
+        public
+        onlyRole(BLOCKER_ROLE)
+    {
+        _removeFromBlacklist(_address);
+    }
+
+    /**
+     * @notice Allow address with MINTER role to mint tokens to a given address
+     * @param to The address to mint tokens to
+     * @param uri The IPFS CID referencing the new tokens metadata
+     */
+    function safeMint(address to, string memory uri)
+        public
+        onlyRole(MINTER_ROLE)
+    {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
     }
 
+    /**
+     * @notice Set the base URI of all tokens created by this contract
+     * @param _newBaseURI New base URI
+     */
+    function setBaseURI(string memory _newBaseURI)
+        public
+        onlyRole(MINTER_ROLE)
+    {
+        baseURI = _newBaseURI;
+    }
+
+    /**
+     * @notice Getter method for getting token's URI from ID
+     * @dev Calls ERC721URIStorage.tokenURI function
+     * @param tokenId ID of token
+     */
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        virtual
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return super.tokenURI(tokenId);
+    }
+
+    /**
+     * @notice Function called before tokens are transferred
+     * @dev Override to make sure that token tranfers have not been paused
+     * @param from The address tokens will be transferred from
+     * @param to The address tokens will be transferred  to
+     * @param tokenId The ID of the token to transfer
+     */
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -92,22 +163,12 @@ contract PhlipCard is
         return baseURI;
     }
 
-    function setBaseURI(string memory _newBaseURI) public onlyOwner {
-        baseURI = _newBaseURI;
-    }
-
-    function tokenURI(uint256 tokenId)
+    function supportsInterface(bytes4 interfaceId)
         public
         view
-        virtual
-        override(ERC721, ERC721URIStorage)
-        returns (string memory)
+        override(ERC721, AccessControl)
+        returns (bool)
     {
-        return super.tokenURI(tokenId);
-    }
-
-    //only owner
-    function setCost(uint256 _newMintingFee) public onlyOwner {
-        mintingFee = _newMintingFee;
+        return super.supportsInterface(interfaceId);
     }
 }
