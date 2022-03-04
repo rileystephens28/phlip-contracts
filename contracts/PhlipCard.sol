@@ -28,8 +28,9 @@ contract PhlipCard is
 
     Counters.Counter private _tokenIdCounter;
 
+    string public baseURI;
     // cost of minting a token
-    uint256 public fee = 100;
+    uint256 public mintingFee = .001 ether;
 
     /**
      * @notice Ensure token has been minted by contract
@@ -44,9 +45,13 @@ contract PhlipCard is
         _;
     }
 
-    constructor(string memory _name, string memory _symbol)
-        ERC721(_name, _symbol)
-    {}
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        string memory _baseUri
+    ) ERC721(_name, _symbol) {
+        setBaseURI(_baseUri);
+    }
 
     function pause() public onlyOwner {
         _pause();
@@ -84,7 +89,11 @@ contract PhlipCard is
      * @dev Override of ERC721._baseURI to use ipfs base url
      */
     function _baseURI() internal view virtual override returns (string memory) {
-        return "https://ipfs.moralis.io:2053/ipfs/";
+        return baseURI;
+    }
+
+    function setBaseURI(string memory _newBaseURI) public onlyOwner {
+        baseURI = _newBaseURI;
     }
 
     function tokenURI(uint256 tokenId)
@@ -95,5 +104,10 @@ contract PhlipCard is
         returns (string memory)
     {
         return super.tokenURI(tokenId);
+    }
+
+    //only owner
+    function setCost(uint256 _newMintingFee) public onlyOwner {
+        mintingFee = _newMintingFee;
     }
 }
