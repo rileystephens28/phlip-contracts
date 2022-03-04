@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./utils/Blacklistable.sol";
-import "./utils/Whitelistable.sol";
 import "./utils/UpDownVote.sol";
 
 /**
@@ -21,7 +20,6 @@ contract PhlipCard is
     Pausable,
     AccessControl,
     Blacklistable,
-    Whitelistable,
     UpDownVote
 {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
