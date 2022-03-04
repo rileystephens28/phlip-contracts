@@ -20,7 +20,7 @@ contract Blacklistable {
      * @notice Prevent account from minting tokens and voting
      * @param _address The address to add to the blacklist
      */
-    function addToBlacklist(address _address) public {
+    function _addToBlacklist(address _address) internal virtual {
         _blacklist[_address] = true;
     }
 
@@ -28,7 +28,7 @@ contract Blacklistable {
      * @notice Allow account to mint tokens and vote again
      * @param _address The address to remove from the blacklist
      */
-    function removeFromBlacklist(address _address) public {
+    function _removeFromBlacklist(address _address) internal virtual {
         _blacklist[_address] = false;
     }
 }
