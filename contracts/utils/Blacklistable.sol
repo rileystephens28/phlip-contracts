@@ -17,6 +17,14 @@ contract Blacklistable {
     }
 
     /**
+     * @notice Returns true if address is blacklisted, false if not.
+     * @param _address The address to check.
+     */
+    function isBlacklisted(address _address) public view returns (bool) {
+        return _blacklist[_address];
+    }
+
+    /**
      * @notice Prevent account from minting tokens and voting
      * @param _address The address to add to the blacklist
      */
