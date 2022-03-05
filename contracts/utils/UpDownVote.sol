@@ -13,7 +13,21 @@ contract UpDownVote {
         mapping(address => bool) downVoters;
     }
 
+    mapping(uint256 => bool) internal _registeredBallots;
     mapping(uint256 => Ballot) internal _ballots;
+
+    /**
+     * @notice Returns true if _ballotID is registered, false if not.
+     * @param _ballotID The ID of a ballot
+     */
+    function ballotIsRegistered(uint256 _ballotID)
+        public
+        view
+        virtual
+        returns (bool)
+    {
+        return _registeredBallots[_ballotID];
+    }
 
     /**
      * @notice Returns the number of up votes for a given ballot.
@@ -42,12 +56,41 @@ contract UpDownVote {
     }
 
     /**
+     * @notice Requires _ballotID to be registered.
+     * @param _ballotID The ID of a ballot
+     */
+    modifier ballotExists(uint256 _ballotID) {
+        require(
+            _registeredBallots[_ballotID],
+            "UpDownVote: Ballot does not exists"
+        );
+        _;
+    }
+
+    /**
      * @notice Count msg.sender's upvote for a token
      * @dev Reverts if msg.send has already voted on token
-     * @param tokenID The ID of the token to upvote
+     * @param _newBallotID The ID of the token to upvote
      */
-    function _castUpVote(uint256 tokenID) internal virtual {
-        Ballot storage bal = _ballots[tokenID];
+    function _createBallot(uint256 _newBallotID) internal virtual {
+        require(
+            !_registeredBallots[_newBallotID],
+            "UpDownVote: Ballot already exists"
+        );
+        _registeredBallots[_newBallotID] = true;
+    }
+
+    /**
+     * @notice Count msg.sender's upvote for a token
+     * @dev Reverts if msg.send has already voted on token
+     * @param _ballotID The ID of the token to upvote
+     */
+    function _castUpVote(uint256 _ballotID)
+        internal
+        virtual
+        ballotExists(_ballotID)
+    {
+        Ballot storage bal = _ballots[_ballotID];
         require(
             !bal.upVoters[msg.sender],
             "UpDownVote: ACCOUNT_ALREADY_UPVOTED"
@@ -57,16 +100,20 @@ contract UpDownVote {
             "UpDownVotes: ACCOUNT_ALREADY_DOWNVOTED"
         );
         bal.upVoters[msg.sender] = true;
-        bal.upVoteCount = bal.upVoteCount + 1;
+        bal.upVoteCount += 1;
     }
 
     /**
      * @notice Count msg.sender's downvote for a token
      * @dev Reverts if msg.send has already voted on token
-     * @param tokenID The ID of the token to downvote
+     * @param _ballotID The ID of the token to downvote
      */
-    function _castDownVote(uint256 tokenID) internal virtual {
-        Ballot storage bal = _ballots[tokenID];
+    function _castDownVote(uint256 _ballotID)
+        internal
+        virtual
+        ballotExists(_ballotID)
+    {
+        Ballot storage bal = _ballots[_ballotID];
         require(
             !bal.upVoters[msg.sender],
             "UpDownVote: ACCOUNT_ALREADY_UPVOTED"
@@ -76,6 +123,6 @@ contract UpDownVote {
             "UpDownVotes: ACCOUNT_ALREADY_DOWNVOTED"
         );
         bal.downVoters[msg.sender] = true;
-        bal.downVoteCount = bal.downVoteCount + 1;
+        bal.downVoteCount += 1;
     }
 }
