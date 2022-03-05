@@ -5,18 +5,26 @@ contract Whitelistable {
     mapping(address => bool) private _whitelist;
 
     /**
-     * @notice Prevent account from minting tokens and voting
-     * @param _address The address to add to the whitelist
+     * @notice Returns true if address is whitelisted, false if not.
+     * @param _address The address to check.
      */
-    function addToWhitelist(address _address) public {
+    function isWhitelisted(address _address) public view returns (bool) {
+        return _whitelist[_address];
+    }
+
+    /**
+     * @notice Adds address to the whitelist.
+     * @param _address The address to add.
+     */
+    function _addToWhitelist(address _address) internal virtual {
         _whitelist[_address] = true;
     }
 
     /**
-     * @notice Allow account to mint tokens and vote again
-     * @param _address The address to remove from the whitelist
+     * @notice Removes address from the whitelist.
+     * @param _address The address to remove.
      */
-    function removeFromWhitelist(address _address) public {
+    function _removeFromWhitelist(address _address) internal virtual {
         _whitelist[_address] = false;
     }
 }
