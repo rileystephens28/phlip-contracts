@@ -112,7 +112,7 @@ contract Claimable {
      * @param _beneficiary Beneficiary address for new claim.
      * @param _assetIds Array of asset ids to claim.
      */
-    function _createClaim(address _beneficiary, uint256[] calldata _assetIds)
+    function _createClaim(address _beneficiary, uint256[] memory _assetIds)
         internal
         virtual
     {
