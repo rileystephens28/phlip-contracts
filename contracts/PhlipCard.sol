@@ -7,7 +7,9 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./utils/Blacklistable.sol";
+import "./utils/Claimable.sol";
 import "./utils/UpDownVote.sol";
+import "./IPhlipCard.sol";
 
 /**
  * @title An ERC721 contract for a base Phlip game card.
@@ -19,7 +21,9 @@ contract PhlipCard is
     ERC721URIStorage,
     Pausable,
     AccessControl,
+    IPhlipCard,
     Blacklistable,
+    Claimable,
     UpDownVote
 {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -30,20 +34,31 @@ contract PhlipCard is
 
     Counters.Counter private _tokenIdCounter;
 
-    string public baseURI;
-    // cost of minting a token
-    uint256 public mintingFee = .001 ether;
+    string public BASE_URI;
+    uint256 public MAX_ALLOWED_DOWNVOTES;
 
     /**
      * @notice Ensure token has been minted by contract
      * @dev Reverts if token does not exist
      */
-    modifier tokenExists(uint256 tokenID) {
-        require(tokenID > 0, "PhlipCard: INVALID_TOKEN_ID");
+    modifier tokenExists(uint256 _tokenID) {
+        require(_tokenID > 0, "PhlipCard: Token ID is not valid.");
         require(
-            tokenID <= _tokenIdCounter.current(),
-            "PhlipCard: TOKEN_ID_DOES_NOT_EXIST"
+            _tokenID <= _tokenIdCounter.current(),
+            "PhlipCard: Token ID does not exist."
         );
+        _;
+    }
+
+    /**
+     * @notice Ensure msg.sender holds PhlipDAO tokens
+     * @dev Reverts if sender does not
+     */
+    modifier onlyDaoHolders() {
+        // require(
+        //     ownerOf(_tokenID) == msg.sender,
+        //     "PhlipCard: Address does not own this token."
+        // );
         _;
     }
 
@@ -74,7 +89,7 @@ contract PhlipCard is
      * @notice Allow address with BLOCKER role to add an address to the blacklist
      * @param _address The address to add to the blacklist
      */
-    function addToBlacklist(address _address) public onlyRole(BLOCKER_ROLE) {
+    function blacklistAddress(address _address) public onlyRole(BLOCKER_ROLE) {
         _addToBlacklist(_address);
     }
 
@@ -82,7 +97,7 @@ contract PhlipCard is
      * @notice Allow address with BLOCKER role to remove an address from the blacklist
      * @param _address The address to remove from the blacklist
      */
-    function removeFromBlacklist(address _address)
+    function unblacklistAddress(address _address)
         public
         onlyRole(BLOCKER_ROLE)
     {
@@ -90,18 +105,66 @@ contract PhlipCard is
     }
 
     /**
-     * @notice Allow address with MINTER role to mint tokens to a given address
-     * @param to The address to mint tokens to
-     * @param uri The IPFS CID referencing the new tokens metadata
+     * @notice Create new claim of card(s) for given address.
+     * @param _address The beneficiary of the claim
+     * @param _amount The number of tokens that can be claimed
      */
-    function safeMint(address to, string memory uri)
+    function createClaim(address _address, uint256 _amount)
+        public
+        onlyRole(MINTER_ROLE)
+    {}
+
+    /**
+     * @notice Increase the number of claimable cards for an existing claim.
+     * @param _address The beneficiary of the existing claim
+     * @param _amount The number of claimable tokens to add to the claim
+     */
+    function increaseClaim(address _address, uint256 _amount)
+        public
+        onlyRole(MINTER_ROLE)
+    {}
+
+    /**
+     * @notice Allow address with MINTER role to mint tokens to a given address
+     * @param _to The address to mint tokens to
+     * @param _uri The IPFS CID referencing the new tokens metadata
+     */
+    function mintcard(address _to, string memory _uri)
         public
         onlyRole(MINTER_ROLE)
     {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
-        _safeMint(to, tokenId);
-        _setTokenURI(tokenId, uri);
+        _safeMint(_to, tokenId);
+        _setTokenURI(tokenId, _uri);
+    }
+
+    /**
+     * @notice Mint card to beneficiary and decrease the number of claimable cards by 1.
+     * @param _address The beneficiary redeeming the card
+     */
+    function redeemCard(address _address)
+        public
+        whenNotPaused
+        noBlacklisters
+        onlyBeneficiary
+    {}
+
+    /**
+     * @notice Updates the URI of an existing token. If the current owner of the token is
+     * not the minter, this function should revert.
+     * @param _tokenID The ID of the token to update
+     * @param _uri The new URI
+     */
+    function updateCardURI(uint256 _tokenID, string memory _uri)
+        public
+        noBlacklisters
+    {
+        require(
+            ownerOf(_tokenID) == msg.sender,
+            "PhlipCard: Address does not own this token."
+        );
+        _setTokenURI(_tokenID, _uri);
     }
 
     /**
@@ -112,8 +175,38 @@ contract PhlipCard is
         public
         onlyRole(MINTER_ROLE)
     {
-        baseURI = _newBaseURI;
+        BASE_URI = _newBaseURI;
     }
+
+    /**
+     * @notice Record token upvote.
+     * @param _tokenID The ID of the token upvoted
+     */
+    function upVote(uint256 _tokenID) public noBlacklisters onlyDaoHolders {}
+
+    /**
+     * @notice Record token downvote. If the token has been downvoted more than
+     * the allowed number of times, it should be marked unplayable.
+     * @param _tokenID The ID of the token upvoted
+     */
+    function downVote(uint256 _tokenID) public noBlacklisters onlyDaoHolders {}
+
+    /**
+     * @notice Set the max number of downvotes a card can have before it is marked unplayable.
+     * @param _newMax The new max number of downvotes allowed
+     */
+    function setDownVoteMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
+        MAX_ALLOWED_DOWNVOTES = _newMax;
+    }
+
+    /**
+     * @notice Indicate card has been downvoted beyond the allowed number of time. The
+     * token will NOT be burned and the mintable supply increases by 1.
+     */
+    function markCardUnplayable(uint256 _tokenID)
+        public
+        onlyRole(MINTER_ROLE)
+    {}
 
     /**
      * @notice Getter method for getting token's URI from ID
@@ -158,7 +251,7 @@ contract PhlipCard is
      * @dev Override of ERC721._baseURI to use ipfs base url
      */
     function _baseURI() internal view virtual override returns (string memory) {
-        return baseURI;
+        return BASE_URI;
     }
 
     function supportsInterface(bytes4 interfaceId)
