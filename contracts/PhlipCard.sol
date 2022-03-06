@@ -18,7 +18,6 @@ import "./IPhlipCard.sol";
  */
 contract PhlipCard is
     ERC721,
-    ERC721URIStorage,
     Pausable,
     AccessControl,
     IPhlipCard,
@@ -260,37 +259,36 @@ contract PhlipCard is
         onlyRole(MINTER_ROLE)
     {}
 
-    // function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-    //     require(_exists(tokenId), "ERC721URIStorage: URI query for nonexistent token");
-
-    //     string memory _tokenURI = _tokenURIs[tokenId];
-    //     string memory base = _baseURI();
-
-    //     // If there is no base URI, return the token URI.
-    //     if (bytes(base).length == 0) {
-    //         return _tokenURI;
-    //     }
-    //     // If both are set, concatenate the baseURI and tokenURI (via abi.encodePacked).
-    //     if (bytes(_tokenURI).length > 0) {
-    //         return string(abi.encodePacked(base, _tokenURI));
-    //     }
-
-    //     return super.tokenURI(tokenId);
-    // }
-
     /**
      * @notice Getter method for getting token's URI from ID
-     * @dev Calls ERC721URIStorage.tokenURI function
-     * @param tokenId ID of token
+     * @dev Modified implementation of ERC721URIStorage.tokenURI
+     * @param _tokenId ID of token
      */
-    function tokenURI(uint256 tokenId)
+    function tokenURI(uint256 _tokenId)
         public
         view
         virtual
-        override(ERC721, ERC721URIStorage)
+        override
         returns (string memory)
     {
-        return super.tokenURI(tokenId);
+        require(
+            _exists(_tokenId),
+            "ERC721URIStorage: URI query for nonexistent token"
+        );
+
+        string memory _tokenURI = _cards[_tokenId].uri;
+        string memory base = _baseURI();
+
+        // If there is no base URI, return the token URI.
+        if (bytes(base).length == 0) {
+            return _tokenURI;
+        }
+        // If both are set, concatenate the baseURI and tokenURI (via abi.encodePacked).
+        if (bytes(_tokenURI).length > 0) {
+            return string(abi.encodePacked(base, _tokenURI));
+        }
+
+        return super.tokenURI(_tokenId);
     }
 
     /**
@@ -308,17 +306,8 @@ contract PhlipCard is
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
-    // The following functions are overrides required by Solidity.
-
-    function _burn(uint256 tokenId)
-        internal
-        override(ERC721, ERC721URIStorage)
-    {
-        super._burn(tokenId);
-    }
-
     /**
-     * @dev Override of ERC721._baseURI to use ipfs base url
+     * @dev Override of ERC721._baseURI
      */
     function _baseURI() internal view virtual override returns (string memory) {
         return BASE_URI;
