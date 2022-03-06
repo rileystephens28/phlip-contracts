@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
@@ -16,14 +16,14 @@ import "./IPhlipCard.sol";
  * @author Riley Stephens
  * @notice This contract is intended to reference it's metadata on IPFS.
  */
-contract PhlipCard is
+abstract contract PhlipCard is
     ERC721,
     Pausable,
     AccessControl,
-    IPhlipCard,
     Blacklistable,
     Claimable,
-    UpDownVote
+    UpDownVote,
+    IPhlipCard
 {
     using Counters for Counters.Counter;
 
@@ -34,11 +34,15 @@ contract PhlipCard is
     string public BASE_URI;
     uint256 public MAX_DOWNVOTES;
     uint256 public MAX_URI_CHANGES;
+    uint256 public MIN_DAO_TOKENS_TO_VOTE;
+
+    IERC20 public DAO_TOKEN;
 
     struct Card {
         string uri;
         address minter;
         uint256 uriChangeCount;
+        bool playable;
     }
 
     Counters.Counter private _tokenIdCounter;
@@ -53,38 +57,28 @@ contract PhlipCard is
         _;
     }
 
-    /**
-     * @notice Ensure msg.sender holds PhlipDAO tokens
-     * @dev Reverts if sender does not
-     */
-    modifier onlyDaoHolders() {
-        // require(
-        //     ownerOf(_tokenID) == msg.sender,
-        //     "PhlipCard: Address does not own this token."
-        // );
-        _;
-    }
-
     constructor(
         string memory _name,
         string memory _symbol,
-        string memory _baseUri
+        string memory _baseUri,
+        address _daoTokenAddress
     ) ERC721(_name, _symbol) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         setBaseURI(_baseUri);
+        DAO_TOKEN = IERC20(_daoTokenAddress);
     }
 
     /**
      * @notice Allow address with PAUSER role to pause token transfers
      */
-    function pause() public onlyRole(PAUSER_ROLE) {
+    function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
     /**
      * @notice Allow address with PAUSER role to unpause token transfers
      */
-    function unpause() public onlyRole(PAUSER_ROLE) {
+    function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
@@ -92,7 +86,10 @@ contract PhlipCard is
      * @notice Allow address with BLOCKER role to add an address to the blacklist
      * @param _address The address to add to the blacklist
      */
-    function blacklistAddress(address _address) public onlyRole(BLOCKER_ROLE) {
+    function blacklistAddress(address _address)
+        external
+        onlyRole(BLOCKER_ROLE)
+    {
         _addToBlacklist(_address);
     }
 
@@ -101,25 +98,17 @@ contract PhlipCard is
      * @param _address The address to remove from the blacklist
      */
     function unblacklistAddress(address _address)
-        public
+        external
         onlyRole(BLOCKER_ROLE)
     {
         _removeFromBlacklist(_address);
     }
 
     /**
-     * @notice Set the base URI of all tokens created by this contract
-     * @param _newURI New base URI
-     */
-    function setBaseURI(string memory _newURI) public onlyRole(MINTER_ROLE) {
-        BASE_URI = _newURI;
-    }
-
-    /**
      * @notice Set the max number of downvotes a card can have before it is marked unplayable.
      * @param _newMax The new max number of downvotes allowed
      */
-    function setDownVoteMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
+    function setDownVoteMax(uint256 _newMax) external onlyRole(MINTER_ROLE) {
         MAX_DOWNVOTES = _newMax;
     }
 
@@ -129,7 +118,7 @@ contract PhlipCard is
      * @param _amount The number of tokens that can be claimed
      */
     function createClaim(address _address, uint256 _amount)
-        public
+        external
         onlyRole(MINTER_ROLE)
     {
         uint256[] memory claimableTokenIds = new uint256[](_amount);
@@ -147,7 +136,7 @@ contract PhlipCard is
      * @param _amount The number of claimable tokens to add to the claim
      */
     function increaseClaim(address _address, uint256 _amount)
-        public
+        external
         onlyRole(MINTER_ROLE)
     {
         for (uint256 i = 0; i < _amount; i++) {
@@ -162,8 +151,8 @@ contract PhlipCard is
      * @param _to The address to mint tokens to
      * @param _uri The IPFS CID referencing the new tokens metadata
      */
-    function mintcard(address _to, string memory _uri)
-        public
+    function mintCard(address _to, string memory _uri)
+        external
         onlyRole(MINTER_ROLE)
     {
         // Get the next token ID then increment the counter
@@ -171,7 +160,7 @@ contract PhlipCard is
         _tokenIdCounter.increment();
 
         // Store the new card data then mint the token
-        _cards[tokenId] = Card(_uri, _to, 0);
+        _cards[tokenId] = Card(_uri, _to, 0, true);
         _safeMint(_to, tokenId);
 
         // Create a ballot for the new card
@@ -183,7 +172,7 @@ contract PhlipCard is
      * @param _uri The IPFS CID referencing the new tokens metadata
      */
     function redeemCard(string memory _uri)
-        public
+        external
         whenNotPaused
         noBlacklisters
         onlyBeneficiary
@@ -194,7 +183,7 @@ contract PhlipCard is
         _removeFromClaim(msg.sender, 0);
 
         // Store the newly claimed card data then mint the token
-        _cards[claimableTokenId] = Card(_uri, msg.sender, 0);
+        _cards[claimableTokenId] = Card(_uri, msg.sender, 0, true);
         _safeMint(msg.sender, claimableTokenId);
 
         // Create a ballot for the newly claimed card
@@ -207,7 +196,7 @@ contract PhlipCard is
      * @param _uri The new URI
      */
     function updateCardURI(uint256 _tokenID, string memory _uri)
-        public
+        external
         noBlacklisters
     {
         require(
@@ -232,11 +221,17 @@ contract PhlipCard is
      * @param _tokenID The ID of the token upvoted
      */
     function upVote(uint256 _tokenID)
-        public
+        external
         noBlacklisters
-        onlyDaoHolders
         tokenExists(_tokenID)
-    {}
+    {
+        require(
+            isDaoTokenHolder(msg.sender),
+            "PhlipCard: Must own PhlipDAO tokens to vote."
+        );
+        // NOTE - Should we allow upvotes on unplayable cards?
+        _castUpVote(_tokenID);
+    }
 
     /**
      * @notice Record token downvote. If the token has been downvoted more than
@@ -244,20 +239,31 @@ contract PhlipCard is
      * @param _tokenID The ID of the token upvoted
      */
     function downVote(uint256 _tokenID)
-        public
+        external
         noBlacklisters
-        onlyDaoHolders
         tokenExists(_tokenID)
-    {}
+    {
+        require(
+            isDaoTokenHolder(msg.sender),
+            "PhlipCard: Must own PhlipDAO tokens to vote."
+        );
+        // NOTE - Should we allow downvotes on unplayable cards?
+        _castDownVote(_tokenID);
+
+        // NOTE - Need to take into account the number of upvotes
+        if (downVotesFor(_tokenID) >= MAX_DOWNVOTES) {
+            Card storage card = _cards[_tokenID];
+            card.playable = false;
+        }
+    }
 
     /**
-     * @notice Indicate card has been downvoted beyond the allowed number of time. The
-     * token will NOT be burned and the mintable supply increases by 1.
+     * @notice Set the base URI of all tokens created by this contract
+     * @param _newURI New base URI
      */
-    function markCardUnplayable(uint256 _tokenID)
-        public
-        onlyRole(MINTER_ROLE)
-    {}
+    function setBaseURI(string memory _newURI) public onlyRole(MINTER_ROLE) {
+        BASE_URI = _newURI;
+    }
 
     /**
      * @notice Getter method for getting token's URI from ID
@@ -273,7 +279,7 @@ contract PhlipCard is
     {
         require(
             _exists(_tokenId),
-            "ERC721URIStorage: URI query for nonexistent token"
+            "PhlipCard.tokenURI: URI query for nonexistent token"
         );
 
         string memory _tokenURI = _cards[_tokenId].uri;
@@ -292,18 +298,37 @@ contract PhlipCard is
     }
 
     /**
+     * @notice Set the address of the PhlipDAO contract
+     * @param _daoTokenAddress New contract address
+     */
+    function setDaoTokenAddress(address _daoTokenAddress)
+        public
+        onlyRole(MINTER_ROLE)
+    {
+        DAO_TOKEN = IERC20(_daoTokenAddress);
+    }
+
+    /**
+     * @notice Check if the given address is a PhlipDAO token holder
+     * @param _account Address to check.
+     */
+    function isDaoTokenHolder(address _account) public view returns (bool) {
+        return DAO_TOKEN.balanceOf(_account) > 0;
+    }
+
+    /**
      * @notice Function called before tokens are transferred
      * @dev Override to make sure that token tranfers have not been paused
-     * @param from The address tokens will be transferred from
-     * @param to The address tokens will be transferred  to
-     * @param tokenId The ID of the token to transfer
+     * @param _from The address tokens will be transferred from
+     * @param _to The address tokens will be transferred  to
+     * @param _tokenId The ID of the token to transfer
      */
     function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
+        address _from,
+        address _to,
+        uint256 _tokenId
     ) internal override whenNotPaused {
-        super._beforeTokenTransfer(from, to, tokenId);
+        super._beforeTokenTransfer(_from, _to, _tokenId);
     }
 
     /**
@@ -311,6 +336,13 @@ contract PhlipCard is
      */
     function _baseURI() internal view virtual override returns (string memory) {
         return BASE_URI;
+    }
+
+    /**
+     * @dev Override of ERC721._baseURI
+     */
+    function _burn(uint256 tokenId) internal override {
+        super._burn(tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
