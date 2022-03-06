@@ -6,9 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./utils/Blacklistable.sol";
-import "./utils/Claimable.sol";
-import "./utils/UpDownVote.sol";
+import "../extensions/Blacklistable.sol";
+import "../extensions/Claimable.sol";
+import "../extensions/UpDownVote.sol";
 import "./IPhlipCard.sol";
 
 /**
