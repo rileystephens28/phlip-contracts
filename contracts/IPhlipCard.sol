@@ -49,11 +49,6 @@ interface IPhlipCard {
     function updateCardURI(uint256 _tokenID, string memory _uri) external;
 
     /**
-     * @dev Update the base URI of all tokens. Implementation should use role-based access control.
-     */
-    function setBaseURI(string memory _baseUri) external;
-
-    /**
      * @dev Record the upvote of a specified address on a specified token.
      */
     function upVote(uint256 _tokenID) external;
@@ -67,10 +62,4 @@ interface IPhlipCard {
      * @dev Set the max number of downvotes a card can have before it is marked unplayable.
      */
     function setDownVoteMax(uint256 _newMax) external;
-
-    /**
-     * @dev Adds token to the unplayable list. The token will NOT be burned, but should
-     * increase the mintable supply by 1.
-     */
-    function markCardUnplayable(uint256 _tokenID) external;
 }
