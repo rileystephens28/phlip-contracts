@@ -26,27 +26,31 @@ contract PhlipCard is
     Claimable,
     UpDownVote
 {
+    using Counters for Counters.Counter;
+
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BLOCKER_ROLE = keccak256("BLOCKER_ROLE");
 
-    using Counters for Counters.Counter;
+    string public BASE_URI;
+    uint256 public MAX_DOWNVOTES;
+    uint256 public MAX_URI_CHANGES;
+
+    struct Card {
+        string uri;
+        address minter;
+        uint256 uriChangeCount;
+    }
 
     Counters.Counter private _tokenIdCounter;
-
-    string public BASE_URI;
-    uint256 public MAX_ALLOWED_DOWNVOTES;
+    mapping(uint256 => Card) private _cards;
 
     /**
      * @notice Ensure token has been minted by contract
      * @dev Reverts if token does not exist
      */
     modifier tokenExists(uint256 _tokenID) {
-        require(_tokenID > 0, "PhlipCard: Token ID is not valid.");
-        require(
-            _tokenID <= _tokenIdCounter.current(),
-            "PhlipCard: Token ID does not exist."
-        );
+        require(_exists(_tokenID), "PhlipCard: Token does not exist.");
         _;
     }
 
@@ -105,6 +109,22 @@ contract PhlipCard is
     }
 
     /**
+     * @notice Set the base URI of all tokens created by this contract
+     * @param _newURI New base URI
+     */
+    function setBaseURI(string memory _newURI) public onlyRole(MINTER_ROLE) {
+        BASE_URI = _newURI;
+    }
+
+    /**
+     * @notice Set the max number of downvotes a card can have before it is marked unplayable.
+     * @param _newMax The new max number of downvotes allowed
+     */
+    function setDownVoteMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
+        MAX_DOWNVOTES = _newMax;
+    }
+
+    /**
      * @notice Create new claim of card(s) for given address.
      * @param _address The beneficiary of the claim
      * @param _amount The number of tokens that can be claimed
@@ -112,7 +132,15 @@ contract PhlipCard is
     function createClaim(address _address, uint256 _amount)
         public
         onlyRole(MINTER_ROLE)
-    {}
+    {
+        uint256[] memory claimableTokenIds = new uint256[](_amount);
+        for (uint256 i = 0; i < _amount; i++) {
+            uint256 tokenId = _tokenIdCounter.current();
+            _tokenIdCounter.increment();
+            claimableTokenIds[i] = tokenId;
+        }
+        _createClaim(_address, claimableTokenIds);
+    }
 
     /**
      * @notice Increase the number of claimable cards for an existing claim.
@@ -122,7 +150,13 @@ contract PhlipCard is
     function increaseClaim(address _address, uint256 _amount)
         public
         onlyRole(MINTER_ROLE)
-    {}
+    {
+        for (uint256 i = 0; i < _amount; i++) {
+            uint256 tokenId = _tokenIdCounter.current();
+            _tokenIdCounter.increment();
+            _addToClaim(_address, tokenId);
+        }
+    }
 
     /**
      * @notice Allow address with MINTER role to mint tokens to a given address
@@ -133,26 +167,43 @@ contract PhlipCard is
         public
         onlyRole(MINTER_ROLE)
     {
+        // Get the next token ID then increment the counter
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
+
+        // Store the new card data then mint the token
+        _cards[tokenId] = Card(_uri, _to, 0);
         _safeMint(_to, tokenId);
-        _setTokenURI(tokenId, _uri);
+
+        // Create a ballot for the new card
+        _createBallot(tokenId);
     }
 
     /**
-     * @notice Mint card to beneficiary and decrease the number of claimable cards by 1.
-     * @param _address The beneficiary redeeming the card
+     * @notice Mint card to beneficiary and remove from claimable cards.
+     * @param _uri The IPFS CID referencing the new tokens metadata
      */
-    function redeemCard(address _address)
+    function redeemCard(string memory _uri)
         public
         whenNotPaused
         noBlacklisters
         onlyBeneficiary
-    {}
+    {
+        // Get the first claimable token ID, then remove
+        // it from the claimable tokens to prevent reentrance
+        uint256 claimableTokenId = nextClaimableID(msg.sender);
+        _removeFromClaim(msg.sender, 0);
+
+        // Store the newly claimed card data then mint the token
+        _cards[claimableTokenId] = Card(_uri, msg.sender, 0);
+        _safeMint(msg.sender, claimableTokenId);
+
+        // Create a ballot for the newly claimed card
+        _createBallot(claimableTokenId);
+    }
 
     /**
-     * @notice Updates the URI of an existing token. If the current owner of the token is
-     * not the minter, this function should revert.
+     * @notice Updates the URI of an existing token.
      * @param _tokenID The ID of the token to update
      * @param _uri The new URI
      */
@@ -164,40 +215,41 @@ contract PhlipCard is
             ownerOf(_tokenID) == msg.sender,
             "PhlipCard: Address does not own this token."
         );
-        _setTokenURI(_tokenID, _uri);
-    }
-
-    /**
-     * @notice Set the base URI of all tokens created by this contract
-     * @param _newBaseURI New base URI
-     */
-    function setBaseURI(string memory _newBaseURI)
-        public
-        onlyRole(MINTER_ROLE)
-    {
-        BASE_URI = _newBaseURI;
+        Card storage card = _cards[_tokenID];
+        require(
+            card.uriChangeCount < MAX_URI_CHANGES,
+            "PhlipCard: Maximum number of URI changes reached."
+        );
+        require(
+            card.minter == msg.sender,
+            "PhlipCard: Only the minter can update the URI."
+        );
+        card.uri = _uri;
+        card.uriChangeCount += 1;
     }
 
     /**
      * @notice Record token upvote.
      * @param _tokenID The ID of the token upvoted
      */
-    function upVote(uint256 _tokenID) public noBlacklisters onlyDaoHolders {}
+    function upVote(uint256 _tokenID)
+        public
+        noBlacklisters
+        onlyDaoHolders
+        tokenExists(_tokenID)
+    {}
 
     /**
      * @notice Record token downvote. If the token has been downvoted more than
      * the allowed number of times, it should be marked unplayable.
      * @param _tokenID The ID of the token upvoted
      */
-    function downVote(uint256 _tokenID) public noBlacklisters onlyDaoHolders {}
-
-    /**
-     * @notice Set the max number of downvotes a card can have before it is marked unplayable.
-     * @param _newMax The new max number of downvotes allowed
-     */
-    function setDownVoteMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
-        MAX_ALLOWED_DOWNVOTES = _newMax;
-    }
+    function downVote(uint256 _tokenID)
+        public
+        noBlacklisters
+        onlyDaoHolders
+        tokenExists(_tokenID)
+    {}
 
     /**
      * @notice Indicate card has been downvoted beyond the allowed number of time. The
@@ -207,6 +259,24 @@ contract PhlipCard is
         public
         onlyRole(MINTER_ROLE)
     {}
+
+    // function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+    //     require(_exists(tokenId), "ERC721URIStorage: URI query for nonexistent token");
+
+    //     string memory _tokenURI = _tokenURIs[tokenId];
+    //     string memory base = _baseURI();
+
+    //     // If there is no base URI, return the token URI.
+    //     if (bytes(base).length == 0) {
+    //         return _tokenURI;
+    //     }
+    //     // If both are set, concatenate the baseURI and tokenURI (via abi.encodePacked).
+    //     if (bytes(_tokenURI).length > 0) {
+    //         return string(abi.encodePacked(base, _tokenURI));
+    //     }
+
+    //     return super.tokenURI(tokenId);
+    // }
 
     /**
      * @notice Getter method for getting token's URI from ID
