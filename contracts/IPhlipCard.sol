@@ -57,9 +57,4 @@ interface IPhlipCard {
      * @dev Record the downvote of a specified address on a specified token.
      */
     function downVote(uint256 _tokenID) external;
-
-    /**
-     * @dev Set the max number of downvotes a card can have before it is marked unplayable.
-     */
-    function setDownVoteMax(uint256 _newMax) external;
 }
