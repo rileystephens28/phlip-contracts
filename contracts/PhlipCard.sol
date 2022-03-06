@@ -105,14 +105,6 @@ abstract contract PhlipCard is
     }
 
     /**
-     * @notice Set the max number of downvotes a card can have before it is marked unplayable.
-     * @param _newMax The new max number of downvotes allowed
-     */
-    function setDownVoteMax(uint256 _newMax) external onlyRole(MINTER_ROLE) {
-        MAX_DOWNVOTES = _newMax;
-    }
-
-    /**
      * @notice Create new claim of card(s) for given address.
      * @param _address The beneficiary of the claim
      * @param _amount The number of tokens that can be claimed
@@ -266,6 +258,33 @@ abstract contract PhlipCard is
     }
 
     /**
+     * @notice Set the max number of downvotes a card can have before it is marked unplayable.
+     * @param _newMax The new max number of downvotes allowed
+     */
+    function setDownVoteMax(uint256 _newMax) external onlyRole(MINTER_ROLE) {
+        MAX_DOWNVOTES = _newMax;
+    }
+
+    /**
+     * @notice Set max number of times minter can change the URI of a card.
+     * @param _newMax New max changes allowed
+     */
+    function setUriChangeMax(uint256 _newMax) external onlyRole(MINTER_ROLE) {
+        MAX_URI_CHANGES = _newMax;
+    }
+
+    /**
+     * @notice Set the address of the PhlipDAO contract
+     * @param _daoTokenAddress New contract address
+     */
+    function setDaoTokenAddress(address _daoTokenAddress)
+        public
+        onlyRole(MINTER_ROLE)
+    {
+        DAO_TOKEN = IERC20(_daoTokenAddress);
+    }
+
+    /**
      * @notice Getter method for getting token's URI from ID
      * @dev Modified implementation of ERC721URIStorage.tokenURI
      * @param _tokenId ID of token
@@ -295,17 +314,6 @@ abstract contract PhlipCard is
         }
 
         return super.tokenURI(_tokenId);
-    }
-
-    /**
-     * @notice Set the address of the PhlipDAO contract
-     * @param _daoTokenAddress New contract address
-     */
-    function setDaoTokenAddress(address _daoTokenAddress)
-        public
-        onlyRole(MINTER_ROLE)
-    {
-        DAO_TOKEN = IERC20(_daoTokenAddress);
     }
 
     /**
