@@ -34,7 +34,7 @@ abstract contract PhlipCard is
     string public BASE_URI;
     uint256 public MAX_DOWNVOTES;
     uint256 public MAX_URI_CHANGES;
-    uint256 public MIN_DAO_TOKENS_TO_VOTE;
+    uint256 public MIN_DAO_TOKENS_REQUIRED;
 
     IERC20 public DAO_TOKEN;
 
@@ -61,11 +61,17 @@ abstract contract PhlipCard is
         string memory _name,
         string memory _symbol,
         string memory _baseUri,
+        uint256 _maxDownvotes,
+        uint256 _maxUriChanges,
+        uint256 _minDaoTokensRequired,
         address _daoTokenAddress
     ) ERC721(_name, _symbol) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         setBaseURI(_baseUri);
-        DAO_TOKEN = IERC20(_daoTokenAddress);
+        setDownVoteMax(_maxDownvotes);
+        setUriChangeMax(_maxUriChanges);
+        setMinDaoTokensRequired(_minDaoTokensRequired);
+        setDaoTokenAddress(_daoTokenAddress);
     }
 
     /**
@@ -250,6 +256,14 @@ abstract contract PhlipCard is
     }
 
     /**
+     * @notice Check if the given address is a PhlipDAO token holder
+     * @param _account Address to check.
+     */
+    function isDaoTokenHolder(address _account) public view returns (bool) {
+        return DAO_TOKEN.balanceOf(_account) > 0;
+    }
+
+    /**
      * @notice Set the base URI of all tokens created by this contract
      * @param _newURI New base URI
      */
@@ -261,7 +275,7 @@ abstract contract PhlipCard is
      * @notice Set the max number of downvotes a card can have before it is marked unplayable.
      * @param _newMax The new max number of downvotes allowed
      */
-    function setDownVoteMax(uint256 _newMax) external onlyRole(MINTER_ROLE) {
+    function setDownVoteMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
         MAX_DOWNVOTES = _newMax;
     }
 
@@ -269,8 +283,19 @@ abstract contract PhlipCard is
      * @notice Set max number of times minter can change the URI of a card.
      * @param _newMax New max changes allowed
      */
-    function setUriChangeMax(uint256 _newMax) external onlyRole(MINTER_ROLE) {
+    function setUriChangeMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
         MAX_URI_CHANGES = _newMax;
+    }
+
+    /**
+     * @notice Set min number of PhlipDAO tokens required to vote and mint.
+     * @param _newMin New min DAO tokens required
+     */
+    function setMinDaoTokensRequired(uint256 _newMin)
+        public
+        onlyRole(MINTER_ROLE)
+    {
+        MIN_DAO_TOKENS_REQUIRED = _newMin;
     }
 
     /**
@@ -314,14 +339,6 @@ abstract contract PhlipCard is
         }
 
         return super.tokenURI(_tokenId);
-    }
-
-    /**
-     * @notice Check if the given address is a PhlipDAO token holder
-     * @param _account Address to check.
-     */
-    function isDaoTokenHolder(address _account) public view returns (bool) {
-        return DAO_TOKEN.balanceOf(_account) > 0;
     }
 
     /**
