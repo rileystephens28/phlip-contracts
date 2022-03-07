@@ -110,8 +110,38 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
+     * @notice Add a friend to a profile.
+     * @param _profileID The ID of the profile adding a friend.
+     * @param _friendID The ID of the profile being adding as a friend.
+     */
+    function addFriend(uint256 _profileID, uint256 _friendID)
+        external
+        profileExists(_friendID)
+    {
+        // Sender must be the owner of the profile
+        require(ownerOf(_profileID) == msg.sender);
+        Profile storage profile = _profiles[_profileID];
+        profile.friends.push(_friendID);
+    }
+
+    /**
+     * @notice Remove a friend from a profile.
+     * @param _profileID The ID of the profile removing a friend.
+     * @param _friendIndex The index of the friend in the friends array.
+     */
+    function removeFriend(uint256 _profileID, uint256 _friendIndex) external {
+        // Sender must be the owner of the profile
+        require(ownerOf(_profileID) == msg.sender);
+
+        Profile storage profile = _profiles[_profileID];
+        require(_friendIndex < profile.friends.length);
+        delete profile.friends[_friendIndex];
+    }
+
+    /**
      * @notice Record token game win.
      * @param _profileID The ID of the token to record.
+     * @param _winnings The amount the owner of the token won from the game.
      */
     function recordWin(uint256 _profileID, uint256 _winnings)
         external
