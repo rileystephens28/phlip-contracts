@@ -169,7 +169,6 @@ contract PhlipCard is
     function redeemCard(string memory _uri)
         external
         whenNotPaused
-        noBlacklisters
         onlyBeneficiary
     {
         // Get the first claimable token ID, then remove
@@ -184,10 +183,7 @@ contract PhlipCard is
      * @param _tokenID The ID of the token to update
      * @param _uri The new URI
      */
-    function updateCardURI(uint256 _tokenID, string memory _uri)
-        external
-        noBlacklisters
-    {
+    function updateCardURI(uint256 _tokenID, string memory _uri) external {
         require(
             ownerOf(_tokenID) == msg.sender,
             "PhlipCard: Address does not own this token."
