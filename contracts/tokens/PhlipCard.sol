@@ -9,21 +9,19 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "../extensions/Blacklistable.sol";
 import "../extensions/Claimable.sol";
 import "../extensions/UpDownVote.sol";
-import "./IPhlipCard.sol";
 
 /**
  * @title An ERC721 contract for a base Phlip game card.
  * @author Riley Stephens
  * @notice This contract is intended to reference it's metadata on IPFS.
  */
-abstract contract PhlipCard is
+contract PhlipCard is
     ERC721,
     Pausable,
     AccessControl,
     Blacklistable,
     Claimable,
-    UpDownVote,
-    IPhlipCard
+    UpDownVote
 {
     using Counters for Counters.Counter;
 
@@ -66,7 +64,12 @@ abstract contract PhlipCard is
         uint256 _minDaoTokensRequired,
         address _daoTokenAddress
     ) ERC721(_name, _symbol) {
+        // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+
+        // Set constants
         setBaseURI(_baseUri);
         setDownVoteMax(_maxDownvotes);
         setUriChangeMax(_maxUriChanges);
@@ -156,13 +159,7 @@ abstract contract PhlipCard is
         // Get the next token ID then increment the counter
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
-
-        // Store the new card data then mint the token
-        _cards[tokenId] = Card(_uri, _to, 0, true);
-        _safeMint(_to, tokenId);
-
-        // Create a ballot for the new card
-        _createBallot(tokenId);
+        _mintCard(tokenId, _to, _uri);
     }
 
     /**
@@ -179,13 +176,7 @@ abstract contract PhlipCard is
         // it from the claimable tokens to prevent reentrance
         uint256 claimableTokenId = nextClaimableID(msg.sender);
         _removeFromClaim(msg.sender, 0);
-
-        // Store the newly claimed card data then mint the token
-        _cards[claimableTokenId] = Card(_uri, msg.sender, 0, true);
-        _safeMint(msg.sender, claimableTokenId);
-
-        // Create a ballot for the newly claimed card
-        _createBallot(claimableTokenId);
+        _mintCard(claimableTokenId, msg.sender, _uri);
     }
 
     /**
@@ -342,6 +333,32 @@ abstract contract PhlipCard is
     }
 
     /**
+     * @notice Handles the creation of a new card.
+     * @param _tokenID The ID of token being minted
+     * @param _to The address to mint tokens to
+     * @param _uri The IPFS CID referencing the new tokens metadata
+     */
+    function _mintCard(
+        uint256 _tokenID,
+        address _to,
+        string memory _uri
+    ) internal {
+        // Store the new card data then mint the token
+        _cards[_tokenID] = Card(_uri, _to, 0, true);
+        _safeMint(_to, _tokenID);
+
+        // Create a ballot for the new card
+        _createBallot(_tokenID);
+    }
+
+    /**
+     * @dev Override of ERC721._baseURI
+     */
+    function _burn(uint256 tokenId) internal override {
+        super._burn(tokenId);
+    }
+
+    /**
      * @notice Function called before tokens are transferred
      * @dev Override to make sure that token tranfers have not been paused
      * @param _from The address tokens will be transferred from
@@ -361,13 +378,6 @@ abstract contract PhlipCard is
      */
     function _baseURI() internal view virtual override returns (string memory) {
         return BASE_URI;
-    }
-
-    /**
-     * @dev Override of ERC721._baseURI
-     */
-    function _burn(uint256 tokenId) internal override {
-        super._burn(tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
