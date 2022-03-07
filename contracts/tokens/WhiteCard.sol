@@ -2,9 +2,8 @@
 pragma solidity ^0.8.11;
 
 import "./PhlipCard.sol";
-import "./IPhlipCard.sol";
 
-contract WhiteCard is PhlipCard, IPhlipCard {
+contract WhiteCard is PhlipCard {
     bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
 
     struct GameRecord {

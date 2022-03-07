@@ -2,9 +2,8 @@
 pragma solidity ^0.8.11;
 
 import "./PhlipCard.sol";
-import "./IPhlipCard.sol";
 
-contract PinkCard is PhlipCard, IPhlipCard {
+contract PinkCard is PhlipCard {
     constructor(
         string memory _baseUri,
         uint256 _maxDownvotes,
