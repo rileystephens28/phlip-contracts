@@ -68,6 +68,7 @@ contract PhlipCard is
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(BLOCKER_ROLE, msg.sender);
 
         // Set constants
         setBaseURI(_baseUri);
