@@ -69,7 +69,6 @@ contract Claimable {
         public
         view
         virtual
-        claimExists(_address)
         returns (uint256)
     {
         return _claims[_address].remainingAmount;
