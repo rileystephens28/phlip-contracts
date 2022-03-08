@@ -20,7 +20,9 @@ contract PhlipP2E is ERC20, ERC20Burnable, Pausable, AccessControl {
      * @notice Create contract with initial supply of 10,000,000,000 tokens
      * @dev Only DEFAULT_ADMIN_ROLE is assigned because other roles can be assigned later by admin
      */
-    constructor() ERC20("PhlipP2E", "PHRN") {
+    constructor(string memory _name, string memory _symbol)
+        ERC20(_name, _symbol)
+    {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _mint(msg.sender, 10000000000 * 10**decimals());
     }
