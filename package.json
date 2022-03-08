@@ -8,7 +8,8 @@
     },
     "devDependencies": {
         "@truffle/hdwallet-provider": "^2.0.3",
-        "chai": "^4.3.4",
+        "chai": "^4.3.6",
+        "chai-bignumber": "^3.0.0",
         "dotenv": "^16.0.0",
         "truffle-plugin-verify": "^0.5.20"
     },
