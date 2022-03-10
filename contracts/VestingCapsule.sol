@@ -25,13 +25,15 @@ contract VestingCapsule is Context, AccessControl {
      * @param token The token to be vested.
      * @param amount The total amount of tokens to be vested.
      * @param cliff The cliff period in seconds.
+     * @param duration The number of seconds to until fully vested.
      * @param rate The rate of vesting in tokens per second.
      */
     struct VestingSchedule {
-        IERC20 token; // Token to be used for vesting
-        uint256 amount; // Total amount of tokens
-        uint256 cliff; // Num seconds that must pass before tokens begin vesting
-        uint256 rate; // Num tokens vesting per second - allows for graded vesting
+        IERC20 token;
+        uint256 amount;
+        uint256 cliff;
+        uint256 duration;
+        uint256 rate;
     }
 
     /**
@@ -48,11 +50,11 @@ contract VestingCapsule is Context, AccessControl {
      * @param claimedAmount The total amount of tokens that have been claimed (by current and previous owners)
      */
     struct ActiveCapsule {
-        uint256 scheduleId; // Index of the schedule that this capsule is using
-        uint256 startTime; // Time at which cliff period begins
-        uint256 endTime; // Time at which vesting period ends
-        uint256 claimedAmount; // Amount of tokens claimed by beneficiary (when transfered, this will be updated to the total vested amount )
-        uint256 lastClaimedTimestamp; // Time at which last claim was made
+        uint256 scheduleId;
+        uint256 startTime;
+        uint256 endTime;
+        uint256 claimedAmount;
+        uint256 lastClaimedTimestamp;
     }
 
     /**
@@ -64,11 +66,12 @@ contract VestingCapsule is Context, AccessControl {
      * @param claimedAmount Amount of tokens claimed from dormant capsule
      */
     struct DormantCapsule {
-        IERC20 token; // Token to be claimed
-        uint256 totalAmount; // Total amount of tokens
-        uint256 claimedAmount; // Amount of tokens claimed from dormant capsule
+        IERC20 token;
+        uint256 totalAmount;
+        uint256 claimedAmount;
     }
 
+    mapping(uint256 => VestingSchedule) private _vestingSchedules;
     // Maps addresses to their active and dormant capsules
     mapping(address => mapping(uint256 => ActiveCapsule))
         private _activeCapsules;
@@ -78,15 +81,81 @@ contract VestingCapsule is Context, AccessControl {
     // scheduleId -> value locked in schedule (will be denominated in token)
     mapping(uint256 => uint256) private _valueLockedInSchedule;
 
+    // Total amount of tokens locked in all schedules
+    mapping(address => uint256) private _tokenValueLocked;
+
+    /**
+     * @notice Creates a new VestingSchedule that can be used by future ActiveCapsules.
+     * @param _token The token to be vested.
+     * @param _amount The amount of tokens to be vested.
+     * @param _cliffSeconds The number of seconds after schedule starts and vesting begins.
+     * @param _tokenRatePerSecond The number of tokens to be vested per second.
+     */
+    function createVestingSchedule(
+        address _token,
+        uint256 _amount,
+        uint256 _cliffSeconds,
+        uint256 _durationSeconds,
+        uint256 _tokenRatePerSecond
+    ) public onlyRole(TREASURER_ROLE) {
+        IERC20 token = IERC20(_token);
+        require(
+            token.balanceOf(address(this)) - _tokenValueLocked[_token] >=
+                _amount,
+            "VestingCapsule: Contract does not have enough tokens to create a new capsule."
+        );
+        require(
+            _cliffSeconds >= _durationSeconds,
+            "VestingCapsule: Cliff must be less than duration."
+        );
+
+        uint256 currentScheduleId = _scheduleIdCounter.current();
+        _scheduleIdCounter.increment();
+        _vestingSchedules[currentScheduleId] = VestingSchedule(
+            IERC20(_token),
+            _amount,
+            _cliffSeconds,
+            _durationSeconds,
+            _tokenRatePerSecond
+        );
+    }
+
     /**
      * @notice Add address to the list of token beneficiaries.
-     * @param _address Address to the list of token beneficiaries.
+     * @param _address Beneficiary of vesting tokens.
+     * @param _scheduleId Schedule ID of the associated vesting schedule.
+     * @param _startTime Time at which cliff period begins.
      */
-    function enrollBeneficiary(address _address)
-        public
-        onlyRole(ENROLLER_ROLE)
-    {
+    function enrollBeneficiary(
+        address _address,
+        uint256 _scheduleId,
+        uint256 _startTime
+    ) public onlyRole(ENROLLER_ROLE) {
+        // Check address is valid
         require(_address != address(0));
+        // Check scheduleId is valid
+        require(_scheduleId < _scheduleIdCounter.current());
+        VestingSchedule memory schedule = _vestingSchedules[_scheduleId];
+        // Check that the contract holds enough tokens to create a new capsule
+        require(
+            schedule.token.balanceOf(address(this)) -
+                _tokenValueLocked[address(schedule.token)] >=
+                schedule.amount,
+            "VestingCapsule: Contract does not have enough tokens to create a new capsule."
+        );
+
+        // Get current ID and increment
+        uint256 currentActiveCapsuleId = _activeCapsuleIdCounter.current();
+        _activeCapsuleIdCounter.increment();
+
+        // Save new ActiveCapsule for the address
+        _activeCapsules[_address][currentActiveCapsuleId] = ActiveCapsule(
+            _scheduleId,
+            _startTime,
+            _startTime + schedule.duration,
+            0,
+            0
+        );
     }
 
     /**
