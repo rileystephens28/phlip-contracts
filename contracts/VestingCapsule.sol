@@ -11,8 +11,6 @@ contract VestingCapsule is Context, AccessControl {
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
 
-    bytes32 public constant ENROLLER_ROLE = keccak256("ENROLLER_ROLE");
-    bytes32 public constant SWITCHER_ROLE = keccak256("SWITCHER_ROLE");
     bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
 
     Counters.Counter private _scheduleIdCounter;
@@ -121,18 +119,18 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Add address to the list of token beneficiaries.
-     * @param _address Beneficiary of vesting tokens.
+     * @notice Create a new ActiveCapsule with specified schedule ID for a given address.
+     * @param _beneficiary Beneficiary of vesting tokens.
      * @param _scheduleId Schedule ID of the associated vesting schedule.
      * @param _startTime Time at which cliff period begins.
      */
-    function enrollBeneficiary(
-        address _address,
+    function createCapsule(
+        address _beneficiary,
         uint256 _scheduleId,
         uint256 _startTime
-    ) public onlyRole(ENROLLER_ROLE) {
+    ) public onlyRole(TREASURER_ROLE) {
         // Check address is valid
-        require(_address != address(0));
+        require(_beneficiary != address(0));
         // Check scheduleId is valid
         require(_scheduleId < _scheduleIdCounter.current());
         VestingSchedule memory schedule = _vestingSchedules[_scheduleId];
@@ -149,7 +147,7 @@ contract VestingCapsule is Context, AccessControl {
         _activeCapsuleIdCounter.increment();
 
         // Save new ActiveCapsule for the address
-        _activeCapsules[_address][currentActiveCapsuleId] = ActiveCapsule(
+        _activeCapsules[_beneficiary][currentActiveCapsuleId] = ActiveCapsule(
             _scheduleId,
             _startTime,
             _startTime + schedule.duration,
@@ -162,10 +160,7 @@ contract VestingCapsule is Context, AccessControl {
      * @notice Add address to the list of token beneficiaries.
      * @param _address Address to the list of token beneficiaries.
      */
-    function transferBeneficiary(address _address)
-        public
-        onlyRole(SWITCHER_ROLE)
-    {
+    function transferBeneficiary(address _address) public {
         require(_address != address(0));
     }
 }
