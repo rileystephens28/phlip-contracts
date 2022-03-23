@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
+/**
+ * @title Whitelistable
+ * @author Riley Stephens
+ * @notice Provides contract with the ability to manage a whitelist of addresses
+ * @dev It is recommended to use the 'Claimable' extension if your whitelist requires more granular controls.
+ */
 contract Whitelistable {
     mapping(address => bool) private _whitelist;
 

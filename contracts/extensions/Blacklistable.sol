@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
+/**
+ * @title Blacklistable
+ * @author Riley Stephens
+ * @notice Provides contract with the ability to manage a blacklist of addresses
+ */
 contract Blacklistable {
     mapping(address => bool) private _blacklist;
 

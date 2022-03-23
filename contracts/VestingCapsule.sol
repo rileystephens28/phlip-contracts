@@ -7,6 +7,14 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/**
+ * @title VestingCapsule
+ * @author Riley Stephens
+ * @notice A VestingCapsule provides a protocol for creating custom vesting schedules and transferable vesting capsules.
+ * @dev This contract will hold ERC20 tokens on behalf of vesting beneficiaries and control the rate at which
+ * beneficiaries can withdraw them. When a capsule is tranferred, the tokens owed to the prior owner
+ * is stored in a temporary capsule that is destoyed once the prior owner withdraws them.
+ */
 contract VestingCapsule is Context, AccessControl {
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;

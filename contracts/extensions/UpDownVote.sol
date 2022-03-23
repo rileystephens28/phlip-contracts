@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
+/**
+ * @title UpDownVote
+ * @author Riley Stephens
+ * @notice Provides contract with the ability to create and manage a voting system
+ */
 contract UpDownVote {
     /**
      * A Ballot tracks the number of up and down votes and how each

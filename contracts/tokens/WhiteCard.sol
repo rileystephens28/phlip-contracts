@@ -3,6 +3,11 @@ pragma solidity 0.8.11;
 
 import "./PhlipCard.sol";
 
+/**
+ * @title WhiteCard
+ * @author Riley Stephens
+ * @notice Implementation of a PhlipCard with with basic game recording functionality.
+ */
 contract WhiteCard is PhlipCard {
     bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
 
