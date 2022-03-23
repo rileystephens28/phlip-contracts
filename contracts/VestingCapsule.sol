@@ -239,11 +239,10 @@ contract VestingCapsule is Context, AccessControl {
                     msg.sender
                 );
             }
-
-            // Transfer capsule to new owner
-            delete _activeCapsules[msg.sender][_capsuleID];
-            _activeCapsules[_to][_capsuleID] = capsule;
         }
+        // Transfer capsule to new owner
+        delete _activeCapsules[msg.sender][_capsuleID];
+        _activeCapsules[_to][_capsuleID] = capsule;
     }
 
     /**
@@ -255,13 +254,13 @@ contract VestingCapsule is Context, AccessControl {
             msg.sender == _activeCapsuleOwners[_capsuleID],
             "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
         );
-        ActiveCapsule storage capsule = _activeCapsules[msg.sender][_capsuleID];
         uint256 claimAmount = activeCapsuleBalance(msg.sender, _capsuleID);
         require(
             claimAmount > 0,
             "VestingCapsule: Cannot claim capsule because it has already been emptied."
         );
 
+        ActiveCapsule storage capsule = _activeCapsules[msg.sender][_capsuleID];
         VestingSchedule memory schedule = _vestingSchedules[capsule.scheduleId];
 
         // Decrease amount locked in active capsules & schedule
