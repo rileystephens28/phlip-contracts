@@ -96,6 +96,13 @@ contract VestingCapsule is Context, AccessControl {
     mapping(uint256 => uint256) private _valueLockedInSchedules;
 
     /**
+     * @dev Create a new VestingCapsule instance and grant msg.sender TREASURER role.
+     */
+    constructor() {
+        _grantRole(TREASURER_ROLE, msg.sender);
+    }
+
+    /**
      * @dev Sums the _activeCapsuleValueLocked and _dormantCapsuleValueLocked
      * @param _token The address of the token to be queried
      * @return The total amount qty locked in all capsules for a given token
