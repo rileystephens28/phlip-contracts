@@ -148,13 +148,11 @@ contract VestingCapsule is Context, AccessControl {
     /**
      * @dev Creates a new VestingSchedule that can be used by future ActiveCapsules.
      * @param _token The token to be vested.
-     * @param _amount The amount of tokens to be vested.
      * @param _cliffSeconds The number of seconds after schedule starts and vesting begins.
      * @param _tokenRatePerSecond The number of tokens to be vested per second.
      */
     function createVestingSchedule(
         address _token,
-        uint256 _amount,
         uint256 _cliffSeconds,
         uint256 _durationSeconds,
         uint256 _tokenRatePerSecond
@@ -168,7 +166,7 @@ contract VestingCapsule is Context, AccessControl {
         _scheduleIdCounter.increment();
         _vestingSchedules[currentScheduleId] = VestingSchedule(
             _token,
-            _amount,
+            _durationSeconds * _tokenRatePerSecond,
             _cliffSeconds,
             _durationSeconds,
             _tokenRatePerSecond
