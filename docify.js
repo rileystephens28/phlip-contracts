@@ -1,10 +1,10 @@
 const NODE_DIR = "./node_modules";
 const INPUT_DIR = "./contracts";
-const CONFIG_DIR = "./docgen";
-const OUTPUT_DIR = "./docgen/docs";
-const README_FILE = "./docgen/README.md";
-const SUMMARY_FILE = "./docgen/SUMMARY.md";
-const EXCLUDE_FILE = "./docgen/exclude.txt";
+const CONFIG_DIR = "./docs";
+const OUTPUT_DIR = "./docs/reference";
+const README_FILE = "./docs/README.md";
+const SUMMARY_FILE = "./docs/SUMMARY.md";
+const EXCLUDE_FILE = "./docs/exclude.txt";
 
 const fs = require("fs");
 const path = require("path");
@@ -83,7 +83,6 @@ const args = [
 const result = spawnSync("node", args, {
     stdio: ["inherit", "inherit", "pipe"],
 });
-console.log("EYY", result.stderr.toString());
-// if (result.stderr.length > 0) throw new Error(result.stderr);
+if (result.stderr.length > 0) throw new Error(result.stderr);
 
 fix(OUTPUT_DIR);
