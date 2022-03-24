@@ -18,8 +18,8 @@ import "../extensions/UpDownVote.sol";
  *
  * ## Features ##
  *
- * Updatable Metadata - Card minters (must also be owner) are allowed to change their card’s URI once
- * if their card has been downvoted too many times. Once a card’s URI has been updated, the card’s stats
+ * Updatable Metadata - Card minters (must also be owner) are allowed to change their cards URI once
+ * if their card has been downvoted too many times. Once a cards URI has been updated, the cards stats
  * should be reset to reflect that the card is basically new.
  *
  * Automated Ballots - Addresses that hold a predetermined number of PhlipDAO tokens can cast up or down votes
@@ -35,6 +35,7 @@ import "../extensions/UpDownVote.sol";
  * tokens on a vesting schedule. When a Card is transferred to another address, the new owner becomes the recipient
  * of the vesting tokens. Once the tokens in a vesting capsule for a Card have run out, all future owners of that
  * Card will stop receiving vested payouts.
+ *
  */
 contract PhlipCard is
     ERC721,
