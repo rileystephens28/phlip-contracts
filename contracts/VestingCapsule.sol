@@ -158,6 +158,18 @@ contract VestingCapsule is Context, AccessControl {
         uint256 _tokenRatePerSecond
     ) external onlyRole(TREASURER_ROLE) {
         require(
+            _token != address(0),
+            "VestingCapsule: Token address cannot be 0x0"
+        );
+        require(
+            _durationSeconds > 0,
+            "VestingCapsule: Duration must be greater than 0"
+        );
+        require(
+            _tokenRatePerSecond > 0,
+            "VestingCapsule: Token release rate must be greater than 0"
+        );
+        require(
             _cliffSeconds >= _durationSeconds,
             "VestingCapsule: Cliff must be less than duration."
         );
