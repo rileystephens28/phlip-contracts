@@ -6,7 +6,7 @@ import "./PhlipCard.sol";
 /**
  * @title PinkCard
  * @author Riley Stephens
- * @notice Implementation of a PhlipCard with no additional functionality.
+ * @dev Implementation of a PhlipCard with no additional functionality.
  */
 contract PinkCard is PhlipCard {
     constructor(

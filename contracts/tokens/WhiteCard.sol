@@ -6,7 +6,7 @@ import "./PhlipCard.sol";
 /**
  * @title WhiteCard
  * @author Riley Stephens
- * @notice Implementation of a PhlipCard with with basic game recording functionality.
+ * @dev Implementation of a PhlipCard with with basic game recording functionality.
  */
 contract WhiteCard is PhlipCard {
     bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
@@ -39,7 +39,7 @@ contract WhiteCard is PhlipCard {
     }
 
     /**
-     * @notice Record token game win.
+     * @dev Increment the number of wins by 1 for a given card.
      * @param _tokenID The ID of the token to record.
      */
     function recordWin(uint256 _tokenID)
@@ -53,7 +53,7 @@ contract WhiteCard is PhlipCard {
     }
 
     /**
-     * @notice Record token game loss.
+     * @dev Increment the number of losses by 1 for a given card.
      * @param _tokenID The ID of the token to record.
      */
     function recordLoss(uint256 _tokenID)

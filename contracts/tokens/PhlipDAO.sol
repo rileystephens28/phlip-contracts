@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 /**
  * @title PhlipDAO
  * @author Riley Stephens
- * @notice This is an ERC20 token will role-base access control that implements features for external governance.
+ * @dev This is an ERC20 token will role-base access control that implements features for external governance.
  */
 contract PhlipDAO is
     ERC20,
@@ -26,8 +26,8 @@ contract PhlipDAO is
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
 
     /**
-     * @notice Create contract with initial supply of 5,479,500,000 tokens
-     * @dev Only DEFAULT_ADMIN_ROLE is assigned because other roles can be assigned later by admin
+     * @dev Create contract with initial supply of 5,479,500,000 tokens. Only DEFAULT_ADMIN_ROLE
+     * is assigned because other roles can be assigned later by admin
      */
     constructor(string memory _name, string memory _symbol)
         ERC20(_name, _symbol)
@@ -38,21 +38,21 @@ contract PhlipDAO is
     }
 
     /**
-     * @notice Allow address with PAUSER role to pause token transfers
+     * @dev Allow address with PAUSER role to pause token transfers
      */
     function pause() public onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
     /**
-     * @notice Allow address with PAUSER role to unpause token transfers
+     * @dev Allow address with PAUSER role to unpause token transfers
      */
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
     /**
-     * @notice Allow address with MINTER role to mint tokens to a given address
+     * @dev Allow address with MINTER role to mint tokens to a given address
      * @param to The address to mint tokens to
      * @param amount The amount of tokens to mint
      */
@@ -61,7 +61,7 @@ contract PhlipDAO is
     }
 
     /**
-     * @notice Allow address with MINTER role to mint tokens to a given address
+     * @dev Allow address with MINTER role to mint tokens to a given address
      * @param account The address holding tokens to burn
      * @param amount The amount of tokens to burn
      */
@@ -73,8 +73,8 @@ contract PhlipDAO is
     }
 
     /**
-     * @notice Function called before tokens are transferred
-     * @dev Override to make sure that token tranfers have not been paused
+     * @dev Function called before tokens are transferred. Override to make
+     * sure that token tranfers have not been paused
      * @param from The address tokens will be transferred from
      * @param to The address tokens will be transferred  to
      * @param amount The amount of tokens to transfer
@@ -88,8 +88,8 @@ contract PhlipDAO is
     }
 
     /**
-     * @notice Function called after tokens have been transferred
-     * @dev Override of ERC20._afterTokenTransfer and ERC20Votes._afterTokenTransfer
+     * @dev Function called after tokens have been transferred. Override of
+     * ERC20._afterTokenTransfer and ERC20Votes._afterTokenTransfer
      * @param from The address tokens were transferred from
      * @param to The address tokens were transferred  to
      * @param amount The amount of tokens transferred
@@ -103,7 +103,6 @@ contract PhlipDAO is
     }
 
     /**
-     * @notice Internal mint function
      * @dev Override of ERC20._mint and ERC20Votes._mint
      * @param to The address to mint tokens to
      * @param amount The amount of tokens to mint
@@ -116,7 +115,6 @@ contract PhlipDAO is
     }
 
     /**
-     * @notice Internal token burn function
      * @dev Override of ERC20._burn and ERC20Votes._burn
      * @param account The address to burn tokens from
      * @param amount The amount of tokens to burn

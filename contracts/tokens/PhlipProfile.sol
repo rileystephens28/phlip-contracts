@@ -8,7 +8,15 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 /**
  * @title UserProfile
  * @author Riley Stephens
- * @notice ERC721 contract representing a Phlip user and their interactions with the game.
+ * @dev ERC721 contract representing a Phlip user and their interactions with the game.
+ *
+ * ## Features ##
+ *
+ * Connect With Friends - Adding other Players as friends allows you to play with them in private matches.
+ *
+ * Create & Join Teams - Any player can create a new team. Once a team is created, any other players can
+ * join too. Joining a team does not provide any direct game benefits to Players. However, teams that
+ * frequently win can rise through the leaderboards and gain a lot of publicity (play-to-advertise model).
  */
 contract PhlipProfile is ERC721, AccessControl {
     using Counters for Counters.Counter;
@@ -39,8 +47,8 @@ contract PhlipProfile is ERC721, AccessControl {
     mapping(uint256 => Team) private _teams;
 
     /**
-     * @notice Ensure token has been minted by contract
-     * @dev Reverts if token does not exist
+     * @dev Requires profile has been minted by contract and reverts if not.
+     * @param _profileID The profile ID to check.
      */
     modifier profileExists(uint256 _profileID) {
         require(_exists(_profileID), "PhlipProfile: Profile does not exist.");
@@ -56,16 +64,17 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
-     * @notice Check if an address has a profile.
+     * @dev Check if an address has a profile.
      * @param _address Address to check.
+     * @return Whether or not an address has a profile
      */
     function hasProfile(address _address) public view returns (bool) {
         return balanceOf(_address) > 0;
     }
 
     /**
-     * @notice Mint a new profile to address
-     * @param _uri URI of the profile.
+     * @dev Mint a new profile to address
+     * @param _uri The IPFS CID referencing the new profile's metadata
      */
     function createProfile(string memory _uri) external {
         require(!hasProfile(msg.sender));
@@ -82,7 +91,8 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
-     * @notice Mint a new profile to address
+     * @dev Creates a new team and adds msg.sender as the founder.
+     * note: Should the founder be added to the team by default?
      * @param _name Name of the team.
      */
     function createTeam(string memory _name) external {
@@ -98,7 +108,7 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
-     * @notice Allow a user to join a team.
+     * @dev Sets the currentTeam of an existing profile.
      * @param _profileID ID of the profile joining the team.
      * @param _teamID ID of the team to join
      */
@@ -110,7 +120,7 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
-     * @notice Add a friend to a profile.
+     * @dev Appends an address to the friends array of an existing profile.
      * @param _profileID The ID of the profile adding a friend.
      * @param _friendID The ID of the profile being adding as a friend.
      */
@@ -125,7 +135,7 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
-     * @notice Remove a friend from a profile.
+     * @dev Remove an address from the friends array of an existing profile.
      * @param _profileID The ID of the profile removing a friend.
      * @param _friendIndex The index of the friend in the friends array.
      */
@@ -139,7 +149,8 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
-     * @notice Record token game win.
+     * @dev Incrememnts the gamesWon counter by 1 and adds the value (in ETH or DAO tokens?)
+     * to an existing profile's totalGameWinnings.
      * @param _profileID The ID of the token to record.
      * @param _winnings The amount the owner of the token won from the game.
      */
@@ -154,7 +165,7 @@ contract PhlipProfile is ERC721, AccessControl {
     }
 
     /**
-     * @notice Record token game loss.
+     * @dev Incrememnts the gamesLost counter by 1 for an existing profile.
      * @param _profileID The ID of the token to record.
      */
     function recordLoss(uint256 _profileID)

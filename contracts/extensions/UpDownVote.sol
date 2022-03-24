@@ -4,12 +4,20 @@ pragma solidity 0.8.11;
 /**
  * @title UpDownVote
  * @author Riley Stephens
- * @notice Provides contract with the ability to create and manage a voting system
+ * @dev Provides contract with the ability to create and manage a voting simple
+ * voting system. The system allows for a single up or down vote to be cast per
+ * address. In order to prevent spam voting, it is expected that this will be
+ * converted to a weighted system that reduces the impact of an address's votes
+ * if they up they cast a lot of votes in ether direction.
  */
 contract UpDownVote {
     /**
-     * A Ballot tracks the number of up and down votes and how each
+     * @dev A Ballot tracks the number of up and down votes and how each
      * address voted. Tracking addresses prevents double voting.
+     * @param upvoteCount The number of up votes cast.
+     * @param downvoteCount The number of up votes cast.
+     * @param upVoters Mapping of addresses that up voted.
+     * @param downVoters Mapping of addresses that down voted.
      */
     struct Ballot {
         uint256 upVoteCount;
@@ -22,46 +30,7 @@ contract UpDownVote {
     mapping(uint256 => Ballot) internal _ballots;
 
     /**
-     * @notice Returns true if _ballotID is registered, false if not.
-     * @param _ballotID The ID of a ballot
-     */
-    function ballotIsRegistered(uint256 _ballotID)
-        public
-        view
-        virtual
-        returns (bool)
-    {
-        return _registeredBallots[_ballotID];
-    }
-
-    /**
-     * @notice Returns the number of up votes for a given ballot.
-     * @param _ballotID The ID of a ballot
-     */
-    function upVotesFor(uint256 _ballotID)
-        public
-        view
-        virtual
-        returns (uint256)
-    {
-        return _ballots[_ballotID].upVoteCount;
-    }
-
-    /**
-     * @notice Returns the number of down votes for a given ballot.
-     * @param _ballotID The ID of a ballot
-     */
-    function downVotesFor(uint256 _ballotID)
-        public
-        view
-        virtual
-        returns (uint256)
-    {
-        return _ballots[_ballotID].downVoteCount;
-    }
-
-    /**
-     * @notice Requires _ballotID to be registered.
+     * @dev Requires that _ballotId is true in _registeredBallots mapping.
      * @param _ballotID The ID of a ballot
      */
     modifier ballotExists(uint256 _ballotID) {
@@ -73,9 +42,51 @@ contract UpDownVote {
     }
 
     /**
-     * @notice Count msg.sender's upvote for a token
-     * @dev Reverts if msg.send has already voted on token
-     * @param _newBallotID The ID of the token to upvote
+     * @dev Accessor function for checking if a ballot has been registered.
+     * @param _ballotID The ID of a ballot to check.
+     * @return True if the ballot has been registered, false if not.
+     */
+    function ballotIsRegistered(uint256 _ballotID)
+        public
+        view
+        virtual
+        returns (bool)
+    {
+        return _registeredBallots[_ballotID];
+    }
+
+    /**
+     * @dev Accessor function for getting a ballot's upVoteCount.
+     * @param _ballotID The ID of a ballot
+     * @return The number of up votes cast on a given ballot.
+     */
+    function upVotesFor(uint256 _ballotID)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
+        return _ballots[_ballotID].upVoteCount;
+    }
+
+    /**
+     * @dev Accessor function for getting a ballot's downVoteCount.
+     * @param _ballotID The ID of a ballot
+     * @return The number of down votes cast on a given ballot.
+     */
+    function downVotesFor(uint256 _ballotID)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
+        return _ballots[_ballotID].downVoteCount;
+    }
+
+    /**
+     * @dev Sets the new ballot ID to true in the _registeredBallots
+     * mapping. The new ballot ID must be unique.
+     * @param _newBallotID The ID of the ballot to create
      */
     function _createBallot(uint256 _newBallotID) internal virtual {
         require(
@@ -86,9 +97,9 @@ contract UpDownVote {
     }
 
     /**
-     * @notice Count msg.sender's upvote for a token
-     * @dev Reverts if msg.send has already voted on token
-     * @param _ballotID The ID of the token to upvote
+     * @dev Increments the upVoteCount for a given ballot. Requires
+     * that msg.sender has not already casted a vote on the ballot.
+     * @param _ballotID The ID of the ballot to up vote.
      */
     function _castUpVote(uint256 _ballotID)
         internal
@@ -109,9 +120,9 @@ contract UpDownVote {
     }
 
     /**
-     * @notice Count msg.sender's downvote for a token
-     * @dev Reverts if msg.send has already voted on token
-     * @param _ballotID The ID of the token to downvote
+     * @dev Increments the downVoteCount for a given ballot. Requires
+     * that msg.sender has not already casted a vote on the ballot.
+     * @param _ballotID The ID of the ballot to down vote.
      */
     function _castDownVote(uint256 _ballotID)
         internal

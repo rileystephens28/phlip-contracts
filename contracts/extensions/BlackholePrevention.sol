@@ -7,9 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 /**
- * @notice Prevents ETH or Tokens from getting stuck in a contract by allowing
- *  the Owner/DAO to pull them out on behalf of a user
- * This is only meant to contracts that are not expected to hold tokens, but do handle transferring them.
+ * @dev Prevents ETH or Tokens from getting stuck in a contract by allowing
+ * the Owner/DAO to pull them out on behalf of a user. This is only meant to used by
+ * contracts that are not expected to hold tokens, but do handle transferring them.
  */
 contract BlackholePrevention {
     using Address for address payable;

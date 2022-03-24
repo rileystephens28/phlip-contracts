@@ -10,8 +10,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 /**
  * @title VestingCapsule
  * @author Riley Stephens
- * @notice VestingCapsule is a protocol for creating custom vesting schedules and transferable vesting capsules.
- * @dev This contract will hold ERC20 tokens on behalf of vesting beneficiaries and control the rate at which
+ * @dev VestingCapsule is a protocol for creating custom vesting schedules and transferable vesting
+ * capsules. This contract will hold ERC20 tokens on behalf of vesting beneficiaries and control the rate at which
  * beneficiaries can withdraw them. When a capsule is tranferred, the tokens owed to the prior owner
  * are stored in a temporary capsule that is destoyed once the prior owner withdraws them.
  */
@@ -26,8 +26,8 @@ contract VestingCapsule is Context, AccessControl {
     Counters.Counter private _dormantCapsuleIdCounter;
 
     /**
-     * @notice A VestingSchedule represents a uinque graded vesting schedule for a given token.
-     * @dev ActiveCapsules refer to VestingSchedules to determine the amount of tokens owned to beneficiaries.
+     * @dev A VestingSchedule represents a uinque graded vesting schedule for a given token.
+     * ActiveCapsules refer to VestingSchedules to determine the amount of tokens owned to beneficiaries.
      * @param token The address of the token to be vested.
      * @param amount The total amount of tokens to be vested.
      * @param cliff The cliff period in seconds.
@@ -43,12 +43,12 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice An ActiveCapsule represents a capsule that has not fully vested.
-     * @dev When ownership of an ActiveCapsule is transferred to a new owner, the claimedAmount
-     * no longer represents the amount of tokens that have actually been claimed, but
-     * rather the total amount of tokens that have vested up until the transfer. The difference between
-     * the actual claimed amount and the total vested amount is stuck into a DormantCapusle so the
-     * previous owner can still withdraw the tokens that vested under their onwership of the capsule.
+     * @dev An ActiveCapsule represents a capsule that has not fully vested. When ownership of an
+     * ActiveCapsule is transferred to a new owner, the claimedAmount no longer represents the amount
+     * of tokens that have actually been claimed, but rather the total amount of tokens that have vested
+     * up until the transfer. The difference between the actual claimed amount and the total vested amount
+     * is stuck into a DormantCapusle so the previous owner can still withdraw the tokens that vested
+     * under their onwership of the capsule.
      * @param scheduleId The ID of the VestingSchedule associated with this capsule
      * @param startTime Time at which cliff period begins
      * @param endTime Time at which capsule is fully vested
@@ -64,8 +64,8 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice  A DormantCapsule represents a stake in a capsule that is no longer owned by an address.
-     * @dev When an ActiveCapsule is transferred, the tokens that have vested but NOT been claimed are stored in a DormantCapsule.
+     * @dev A DormantCapsule represents a stake in a capsule that is no longer owned by an address. When an
+     * ActiveCapsule is transferred, the tokens that have vested but NOT been claimed are stored in a DormantCapsule.
      * A single address can have several DormantCapsules (one per token) but once one is empty it is deleted.
      * @param token Token to be claimed
      * @param totalAmount Total amount of tokens to be claimed
@@ -96,8 +96,9 @@ contract VestingCapsule is Context, AccessControl {
     mapping(uint256 => uint256) private _valueLockedInSchedules;
 
     /**
-     * @notice Returns the total amount locked in all capsules for a given token
+     * @dev Sums the _activeCapsuleValueLocked and _dormantCapsuleValueLocked
      * @param _token The address of the token to be queried
+     * @return The total amount qty locked in all capsules for a given token
      */
     function valueLockedInCapsules(address _token)
         public
@@ -110,9 +111,10 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Returns the amount of claimable tokens in an active capsule
+     * @dev Calculates the total amount of tokens that have vested up until a the current time
      * @param _owner The address capsule's owner
      * @param _capsuleID The ID of the active capsule to be queried
+     * @return The amount of claimable tokens in an active capsule
      */
     function activeCapsuleBalance(address _owner, uint256 _capsuleID)
         public
@@ -137,7 +139,7 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Creates a new VestingSchedule that can be used by future ActiveCapsules.
+     * @dev Creates a new VestingSchedule that can be used by future ActiveCapsules.
      * @param _token The token to be vested.
      * @param _amount The amount of tokens to be vested.
      * @param _cliffSeconds The number of seconds after schedule starts and vesting begins.
@@ -167,7 +169,7 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Create a new ActiveCapsule with specified schedule ID for a given address.
+     * @dev Create a new ActiveCapsule with specified schedule ID for a given address.
      * @param _beneficiary Beneficiary of vesting tokens.
      * @param _scheduleId Schedule ID of the associated vesting schedule.
      * @param _startTime Time at which cliff period begins.
@@ -189,7 +191,9 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Allow ActiveCapsule owner to transfer ownership to another address.
+     * @dev Allow ActiveCapsule owner to transfer ownership to another address. If the current
+     * owner has not claimed all of the vested tokens, a DormantCapsule is created to store
+     * remaining tokens owned to the current owner.
      * @param _capsuleID ID of the ActiveCapsule to be transferred.
      * @param _to Address to the list of token beneficiaries.
      */
@@ -254,7 +258,7 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Release vested tokens in an ActiveCapsule to the owner.
+     * @dev Tranfers the amount of tokens in an ActiveCapsule that have vested to the owner of the capsule.
      * @param _capsuleID ID of the ActiveCapsule to be claimed.
      */
     function claimActiveCapsule(uint256 _capsuleID) external {
@@ -290,7 +294,7 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Release all tokens in a DormantCapsule to the owner.
+     * @dev Tranfers the amount of tokens in a DormantCapsule to the owner of the capsule.
      * @param _capsuleID ID of the DormantCapsule to be claimed.
      */
     function claimDormantCapsule(uint256 _capsuleID) external {
@@ -320,7 +324,8 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Creates a new ActiveCapsule for the given address.
+     * @dev Creates a new ActiveCapsule for the given address if the contract holds
+     * enough tokens to cover the amount of tokens required for the vesting schedule.
      * @param _scheduleId The ID of the schedule to be used for the capsule.
      * @param _startTime The amount of claimable tokens in the capsule.
      * @param _beneficiary Address able to claim the tokens in the capsule.
@@ -359,7 +364,7 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @notice Creates a new DormantCapsule for the given address.
+     * @dev Creates a new DormantCapsule for the given address.
      * @param _token The ERC20 token claimable from the capsule.
      * @param _amount The amount of claimable tokens in the capsule.
      * @param _beneficiary Address able to claim the tokens in the capsule.

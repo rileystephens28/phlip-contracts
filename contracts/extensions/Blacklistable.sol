@@ -4,14 +4,13 @@ pragma solidity 0.8.11;
 /**
  * @title Blacklistable
  * @author Riley Stephens
- * @notice Provides contract with the ability to manage a blacklist of addresses
+ * @dev Provides contract with the ability to manage a blacklist of addresses.
  */
 contract Blacklistable {
     mapping(address => bool) private _blacklist;
 
     /**
-     * @notice Require msg.sender to not be blacklisted
-     * @dev Reverts if msg.sender is blacklisted
+     * @dev Require msg.sender to not be blacklisted and reverts if not.
      */
     modifier noBlacklisters() {
         require(
@@ -22,15 +21,15 @@ contract Blacklistable {
     }
 
     /**
-     * @notice Returns true if address is blacklisted, false if not.
      * @param _address The address to check.
+     * @return Whether or not the address is blacklisted.
      */
     function isBlacklisted(address _address) public view returns (bool) {
         return _blacklist[_address];
     }
 
     /**
-     * @notice Prevent account from minting tokens and voting
+     * @dev Set address to true in the blacklist mapping
      * @param _address The address to add to the blacklist
      */
     function _addToBlacklist(address _address) internal virtual {
@@ -38,7 +37,7 @@ contract Blacklistable {
     }
 
     /**
-     * @notice Allow account to mint tokens and vote again
+     * @dev Set address to false the blacklist mapping
      * @param _address The address to remove from the blacklist
      */
     function _removeFromBlacklist(address _address) internal virtual {

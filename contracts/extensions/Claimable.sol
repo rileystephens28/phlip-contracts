@@ -4,7 +4,7 @@ pragma solidity 0.8.11;
 /**
  * @title Claimable
  * @author Riley Stephens
- * @notice A Claim represents an asset(s) IOU that can be redeemed
+ * @dev A Claim represents an asset(s) IOU that can be redeemed
  * by an address. Claims allow contracts to track the ownership of
  * NF assets that are intended to be minted at a later date.
  */
@@ -19,8 +19,7 @@ contract Claimable {
     mapping(uint256 => address) private _assetBeneficiaries;
 
     /**
-     * @notice Require msg.sender to be a beneficiary
-     * @dev Reverts if msg.sender is not
+     * @dev Require msg.sender to be a beneficiary and reverts if not
      */
     modifier onlyBeneficiary() {
         require(
@@ -31,8 +30,7 @@ contract Claimable {
     }
 
     /**
-     * @notice Require address to be a beneficiary of an asset
-     * @dev Reverts if address is not
+     * @dev Require address to have claim of an asset and reverts if not
      * @param _assetID The ID of an asset
      */
     modifier onlyClaimer(uint256 _assetID) {
@@ -44,8 +42,7 @@ contract Claimable {
     }
 
     /**
-     * @notice Require address to be a beneficiary (means claim exists)
-     * @dev Reverts if address is not
+     * @dev Require address to have at least 1 claim and reverts if not.
      * @param _address The address to check.
      */
     modifier claimExists(address _address) {
@@ -54,16 +51,18 @@ contract Claimable {
     }
 
     /**
-     * @notice Returns true if address has a claim, false if not.
+     * @dev Helper function to check if an address has a claim
      * @param _address The address to check.
+     * @return Whether or not the address has a claim.
      */
     function hasClaim(address _address) public view returns (bool) {
         return _beneficiaries[_address];
     }
 
     /**
-     * @notice Returns the number of remaining claims for an account.
+     * @dev Helper to get number of claims for an address.
      * @param _address Beneficiary address of the claim.
+     * @return Number of claims for an address.
      */
     function remainingClaims(address _address)
         public
@@ -75,8 +74,9 @@ contract Claimable {
     }
 
     /**
-     * @notice Returns the first asset ID in the claim.
-     * @param _address Beneficiary address of the claim.
+     * @dev Accessor method to get the first available ID in the list of address's claims.
+     * @param _address Address that has >= 1 claim(s).
+     * @return The first asset ID in the array of claims.
      */
     function nextClaimableID(address _address)
         public
@@ -89,8 +89,9 @@ contract Claimable {
     }
 
     /**
-     * @notice Returns the asset ID at specified position in the claim.
-     * @param _address Beneficiary address of the claim.
+     * @dev Accessor method to get the asset ID at a specific index in the list of address's claims.
+     * @param _address Address that has >= 1 claim(s).
+     * @return The asset ID at specified position in the array of claims.
      */
     function getClaimableID(address _address, uint256 _index)
         public
@@ -107,9 +108,10 @@ contract Claimable {
     }
 
     /**
-     * @notice Creates a new claim for an address.
-     * @param _beneficiary Beneficiary address for new claim.
-     * @param _assetIds Array of asset ids to claim.
+     * @dev Creates a claim for an address that does not already have one.
+     * The asset IDs being registered in the claim cannot appear in any other claims.
+     * @param _beneficiary Address to create claim for.
+     * @param _assetIds Array of IDs representing outside assets that can be claimed.
      */
     function _createClaim(address _beneficiary, uint256[] memory _assetIds)
         internal
@@ -136,9 +138,10 @@ contract Claimable {
     }
 
     /**
-     * @notice Adds an asset ID to an existing claim.
-     * @param _address Beneficiary address of the claim.
-     * @param _assetId Asset ID to add to the claim.
+     * @dev Appends an ID to an existing claim's assetIds.
+     * The ID cannot appear in any other claims.
+     * @param _address Address with an existing claim.
+     * @param _assetId ID to add to assetIds.
      */
     function _addToClaim(address _address, uint256 _assetId)
         internal
@@ -155,10 +158,10 @@ contract Claimable {
     }
 
     /**
-     * @notice Removes an asset at a specified index from
+     * @dev Removes an asset at a specified index from
      * an existing claim. If the claim is fully redeemed after
      * the asset is removed, the claim is deleted.
-     * @param _address Beneficiary address of the claim.
+     * @param _address Address with an existing claim.
      * @param _index Index of the asset ID to remove from the claim.
      */
     function _removeFromClaim(address _address, uint256 _index)
