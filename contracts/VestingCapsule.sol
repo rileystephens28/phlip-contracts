@@ -191,6 +191,10 @@ contract VestingCapsule is Context, AccessControl {
             "VestingCapsule: Beneficiary cannot be 0x0"
         );
         require(
+            _startTime >= block.timestamp,
+            "VestingCapsule: Capsule startTime cannot be in the past."
+        );
+        require(
             _scheduleId < _scheduleIdCounter.current(),
             "VestingCapsule: Invalid scheduleId"
         );
