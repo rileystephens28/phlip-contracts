@@ -1,7 +1,6 @@
 const VestingCapsule = artifacts.require("VestingCapsule");
-
+const timeMachine = require("ganache-time-traveler");
 require("chai").should();
-const utils = require("./utils.js");
 
 contract("VestingCapsule", (accounts) => {
     const TREASURER_ACCOUNT = accounts[0];
@@ -9,43 +8,85 @@ contract("VestingCapsule", (accounts) => {
     const account = accounts[2];
 
     beforeEach(async () => {
-        this.token = await VestingCapsule.new({ from: TREASURER_ACCOUNT });
+        this.capsule = await VestingCapsule.new({ from: TREASURER_ACCOUNT });
     });
 
-    describe("Creating Vesting Schedules", () => {
+    describe("Access-Control", async () => {
         it("should allow TREASURER to create a schedule", async () => {});
-        it("should prevent TREASURER from creating a schedule when token address is 0x0 ", async () => {});
-        it("should prevent TREASURER from creating a schedule when durationSeconds is 0 ", async () => {});
-        it("should prevent TREASURER from creating a schedule when tokenRatePerSecond is 0 ", async () => {});
-        it("should prevent TREASURER from creating a schedule when cliffSeconds >= durationSeconds ", async () => {});
-        it("should prevent NO_ROLE_ACCOUNT from creating a schedule", async () => {});
-    });
-    describe("Creating Capsules", () => {
         it("should allow TREASURER to create a capsule", async () => {});
-        it("should prevent TREASURER from creating a capsule when beneficiary is 0x0 ", async () => {});
-        it("should prevent TREASURER from creating a capsule when schedule ID is invalid", async () => {});
-        it("should prevent TREASURER from creating a capsule when startTime < block.timestamp", async () => {});
-        it("should prevent TREASURER from creating a capsule when contract's token balance < schedule amount", async () => {});
+        it("should prevent NO_ROLE_ACCOUNT from creating a schedule", async () => {});
         it("should prevent NO_ROLE_ACCOUNT from creating a capsule", async () => {});
     });
 
-    describe("Transfering Capsules", () => {
-        it("should allow CAPSULE_OWNER to transfer capsule that has not reached its cliff", async () => {});
-        it("should allow CAPSULE_OWNER to transfer partially vested capsule that has never been claimed", async () => {});
-        it("should allow CAPSULE_OWNER to transfer partially vested capsule that has been fully claimed", async () => {});
-        it("should prevent CAPSULE_OWNER from tranfering when recipient is CAPSULE_OWNER", async () => {});
-        it("should prevent CAPSULE_OWNER from tranfering when recipient is 0x0", async () => {});
-        it("should prevent CAPSULE_OWNER from tranfering when capsule is fully vested", async () => {});
-        it("should prevent non_CAPSULE_OWNER from tranfering a capsule they do not own", async () => {});
+    describe("Using Invalid Params", async () => {
+        describe("When Creating Schedules", async () => {
+            it("should fail when token address is 0x0 ", async () => {});
+            it("should fail when durationSeconds is 0 ", async () => {});
+            it("should fail when tokenRatePerSecond is 0 ", async () => {});
+            it("should fail when cliffSeconds >= durationSeconds ", async () => {});
+        });
+        describe("When Creating Capsules", async () => {
+            it("should fail when beneficiary is 0x0 ", async () => {});
+            it("should fail when schedule ID is invalid", async () => {});
+            it("should fail when startTime < block.timestamp", async () => {});
+            it("should fail when contract's token balance < schedule amount", async () => {});
+        });
+        describe("When Transfering Capsules", async () => {
+            it("should fail when recipient is 0x0 ", async () => {});
+            it("should fail when recipient is self", async () => {});
+            it("should fail when capsule ID is out of bounds", async () => {});
+            it("should fail when capsule ID is owned by another address", async () => {});
+        });
     });
 
-    describe("Claiming Capsules", () => {
-        it("should allow CAPSULE_OWNER to claim partially vested ActiveCapsule", async () => {});
-        it("should allow CAPSULE_OWNER to claim fully vested ActiveCapsule", async () => {});
-        it("should allow CAPSULE_OWNER to claim DormantCapsule", async () => {});
-        it("should prevent CAPSULE_OWNER from claiming ActiveCapsule when vested amount has already been fully claimed", async () => {});
-        it("should prevent CAPSULE_OWNER from claiming DormantCapsule when capsule has already been fuuly claimed", async () => {});
-        it("should prevent non_CAPSULE_OWNER from claiming ActiveCapsule", async () => {});
-        it("should prevent non_CAPSULE_OWNER from claiming DormantCapsule", async () => {});
+    describe("Capsule Life Cycle", () => {
+        // Balance checks are done throughout the life cycle
+        let snapshotId;
+        beforeEach(async () => {
+            let snapshot = await timeMachine.takeSnapshot();
+            snapshotId = snapshot["result"];
+        });
+
+        afterEach(async () => {
+            await timeMachine.revertToSnapshot(snapshotId);
+        });
+
+        describe("Has Not Reached Cliff", async () => {
+            // Balance Check
+            it("should have 0 claimable balance", async () => {});
+
+            // Transfering
+            it("should allow CAPSULE_OWNER to transfer", async () => {});
+
+            // Claiming
+            it("should prevent CAPSULE_OWNER from claiming", async () => {});
+        });
+
+        describe("Has Partially Vested", async () => {
+            // Transfering
+            it("should allow CAPSULE_OWNER to transfer capsule that is 0% claimed", async () => {});
+            it("should allow CAPSULE_OWNER to transfer capsule that is 50% claimed", async () => {});
+            it("should allow CAPSULE_OWNER to transfer capsule that is 100% claimed", async () => {});
+
+            // Claiming Active Capsules
+            it("should allow CAPSULE_OWNER to claim capsule that is 0% claimed", async () => {});
+            it("should allow CAPSULE_OWNER to claim capsule that is 50% claimed", async () => {});
+            it("should prevent CAPSULE_OWNER to claim capsule that is 100% claimed", async () => {});
+
+            // Claiming Dormant Capsules
+            it("should allow previous CAPSULE_OWNER to claim DormantCapsule when amount > 0", async () => {});
+            it("should prevent previous CAPSULE_OWNER from claiming DormantCapsule when amount = 0", async () => {});
+            it("should prevent previous CAPSULE_OWNER from claiming DormantCapsule when it has already been claimed", async () => {});
+        });
+
+        describe("Has Fully Vested", async () => {
+            // Transfering
+            it("should prevent CAPSULE_OWNER from transfering capsule", async () => {});
+
+            // Claiming
+            it("should allow CAPSULE_OWNER to claim capsule that is 0% claimed", async () => {});
+            it("should allow CAPSULE_OWNER to claim capsule that is 50% claimed", async () => {});
+            it("should prevent CAPSULE_OWNER to claim capsule that is 100% claimed", async () => {});
+        });
     });
 });
