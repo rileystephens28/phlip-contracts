@@ -103,9 +103,35 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
+     * @dev Accessor function for specific tokens _activeCapsuleValueLocked value.
+     * @param _token The address of the token to be queried
+     * @return The total qty locked in active capsules for a given token
+     */
+    function valueInActiveCapsules(address _token)
+        public
+        view
+        returns (uint256)
+    {
+        return _activeCapsuleValueLocked[_token];
+    }
+
+    /**
+     * @dev Accessor function for specific tokens _dormantCapsuleValueLocked value.
+     * @param _token The address of the token to be queried
+     * @return The total qty locked in dormant capsules for a given token
+     */
+    function valueInDormantCapsules(address _token)
+        public
+        view
+        returns (uint256)
+    {
+        return _dormantCapsuleValueLocked[_token];
+    }
+
+    /**
      * @dev Sums the _activeCapsuleValueLocked and _dormantCapsuleValueLocked
      * @param _token The address of the token to be queried
-     * @return The total amount qty locked in all capsules for a given token
+     * @return The total qty locked in all capsules for a given token
      */
     function valueLockedInCapsules(address _token)
         public
