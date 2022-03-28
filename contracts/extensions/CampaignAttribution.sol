@@ -108,7 +108,7 @@ contract CampaignAttribution {
                 "CampaignAttribution: Campaign start time must be before end time"
             );
         }
-        // Get the current campaign id and increment
+        // Get the current campaign ID and increment
         uint256 campaignId = _campaignIdCounter.current();
         _campaignIdCounter.increment();
 
@@ -178,7 +178,7 @@ contract CampaignAttribution {
     /**
      * @dev Add existing affiliate to existing campaign
      * @param _affiliate The affiliate address to add to campaign
-     * @param _campaignId The id of the campaign to add affiliate to
+     * @param _campaignId The ID of the campaign to add affiliate to
      */
     function _addAffiliateToCampaign(address _affiliate, uint256 _campaignId)
         internal
@@ -209,7 +209,7 @@ contract CampaignAttribution {
     /**
      * @dev Remove existing affiliate to existing campaign
      * @param _affiliate The affiliate address to remove from campaign
-     * @param _campaignId The id of the campaign to remove affiliate from
+     * @param _campaignId The ID of the campaign to remove affiliate from
      */
     function _removeAffiliateFromCampaign(
         address _affiliate,
