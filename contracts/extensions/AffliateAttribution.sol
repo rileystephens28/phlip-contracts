@@ -174,4 +174,56 @@ contract CampaignAttribution {
         );
         affiliate.active = true;
     }
+
+    /**
+     * @dev Add existing affiliate to existing campaign
+     * @param _affiliate The affiliate address to add to campaign
+     * @param _campaignId The id of the campaign to add affiliate to
+     */
+    function _addAffiliateToCampaign(address _affiliate, uint256 _campaignId)
+        internal
+        virtual
+    {
+        require(
+            _registeredAffiliates[_affiliate],
+            "CampaignAttribution: Affiliate is not registered"
+        );
+        require(
+            !_campaignAffiliates[_campaignId][_affiliate],
+            "CampaignAttribution: Affiliate has already been added to campaign"
+        );
+        Affiliate storage affiliate = _affiliates[_affiliate];
+        require(
+            affiliate.active,
+            "CampaignAttribution: Affiliate is not active"
+        );
+
+        // Add affiliate to campaign and increment numAffiliates
+        _campaignAffiliates[_campaignId][_affiliate] = true;
+        _campaigns[_campaignId].numAffiliates += 1;
+
+        // Increment affiliates numCampaigns
+        affiliate.numCampaigns += 1;
+    }
+
+    /**
+     * @dev Remove existing affiliate to existing campaign
+     * @param _affiliate The affiliate address to remove from campaign
+     * @param _campaignId The id of the campaign to remove affiliate from
+     */
+    function _removeAffiliateFromCampaign(
+        address _affiliate,
+        uint256 _campaignId
+    ) internal virtual {
+        require(
+            !_campaignAffiliates[_campaignId][_affiliate],
+            "CampaignAttribution: Affiliate has not been added to campaign"
+        );
+        // Remove affiliate from campaign and decrement numAffiliates
+        _campaignAffiliates[_campaignId][_affiliate] = false;
+        _campaigns[_campaignId].numAffiliates -= 1;
+
+        // Decrement affiliates numCampaigns
+        _affiliates[_affiliate].numCampaigns -= 1;
+    }
 }
