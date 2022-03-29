@@ -2,7 +2,7 @@ const PhlipDAO = artifacts.require("PhlipDAO");
 const PinkCard = artifacts.require("PinkCard");
 
 require("chai").should();
-const utils = require("./utils.js");
+const utils = require("./utils/token");
 
 contract("PinkCard", (accounts) => {
     const _name = "Phlip Pink Card";
