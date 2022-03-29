@@ -129,6 +129,32 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
+     * @dev Accessor function for specified ActiveCapsule owner.
+     * @param _capsuleID The ID of the ActiveCapsule to be queried.
+     * @return The address of the active capsule owner
+     */
+    function getActiveCapsuleOwner(uint256 _capsuleID)
+        public
+        view
+        returns (address)
+    {
+        return _activeCapsuleOwners[_capsuleID];
+    }
+
+    /**
+     * @dev Accessor function for specified DormantCapsule owner.
+     * @param _capsuleID The ID of the DormantCapsule to be queried.
+     * @return The address of the dormant capsule owner
+     */
+    function getDormantCapsuleOwner(uint256 _capsuleID)
+        public
+        view
+        returns (address)
+    {
+        return _dormantCapsuleOwners[_capsuleID];
+    }
+
+    /**
      * @dev Accessor function for specific tokens _activeCapsuleValueLocked value.
      * @param _token The address of the token to be queried
      * @return The total qty locked in active capsules for a given token
