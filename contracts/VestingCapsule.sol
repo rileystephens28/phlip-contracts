@@ -103,8 +103,8 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @dev Accessor function for specified VestingCapsule details.
-     * @param _scheduleID The address of the token to be queried
+     * @dev Accessor function for specified VestingSchedule details.
+     * @param _scheduleID The ID of the VestingSchedule to be queried.
      * @return The struct values of the vesting schedule
      */
     function getScheduleDetails(uint256 _scheduleID)
@@ -113,6 +113,19 @@ contract VestingCapsule is Context, AccessControl {
         returns (VestingSchedule memory)
     {
         return _vestingSchedules[_scheduleID];
+    }
+
+    /**
+     * @dev Accessor function for specified ActiveCapsule details.
+     * @param _capsuleID The ID of the ActiveCapsule to be queried.
+     * @return The struct values of the actve capsule
+     */
+    function getCapsuleDetails(uint256 _capsuleID)
+        public
+        view
+        returns (ActiveCapsule memory)
+    {
+        return _activeCapsules[_activeCapsuleOwners[_capsuleID]][_capsuleID];
     }
 
     /**
