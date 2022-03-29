@@ -224,7 +224,7 @@ contract VestingCapsule is Context, AccessControl {
             "VestingCapsule: Token release rate must be greater than 0"
         );
         require(
-            _cliffSeconds >= _durationSeconds,
+            _cliffSeconds < _durationSeconds,
             "VestingCapsule: Cliff must be less than duration."
         );
 
