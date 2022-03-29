@@ -1,92 +1,195 @@
 const VestingCapsule = artifacts.require("VestingCapsule");
-const timeMachine = require("ganache-time-traveler");
+const ERC20Mock = artifacts.require("ERC20Mock");
+const {
+    BN, // Big Number support
+    constants, // Common constants, like the zero address and largest integers
+    expectEvent, // Assertions for emitted events
+    expectRevert, // Assertions for transactions that should fail
+    snapshot,
+} = require("@openzeppelin/test-helpers");
 require("chai").should();
 
 contract("VestingCapsule", (accounts) => {
-    const TREASURER_ACCOUNT = accounts[0];
-    const NO_ROLL_ACCOUNT = accounts[1];
-    const account = accounts[2];
+    const [treasurer, no_role_account, account] = accounts;
+
+    before(async () => {
+        this.capsule = await VestingCapsule.new({ from: treasurer });
+        this.token = await ERC20Mock.new({ from: treasurer });
+
+        // fund the treasurer account with some tokens
+        await this.token.mint(treasurer, 1000, { from: treasurer });
+
+        this.treasurer_role = await this.capsule.TREASURER_ROLE();
+    });
 
     beforeEach(async () => {
-        this.capsule = await VestingCapsule.new({ from: TREASURER_ACCOUNT });
+        this.snapshot = await snapshot();
     });
 
-    describe("Access-Control", async () => {
-        it("should allow TREASURER to create a schedule", async () => {});
-        it("should allow TREASURER to create a capsule", async () => {});
-        it("should prevent NO_ROLE_ACCOUNT from creating a schedule", async () => {});
-        it("should prevent NO_ROLE_ACCOUNT from creating a capsule", async () => {});
+    afterEach(async () => {
+        await this.snapshot.restore();
     });
 
-    describe("Using Invalid Params", async () => {
-        describe("When Creating Schedules", async () => {
-            it("should fail when token address is 0x0 ", async () => {});
-            it("should fail when durationSeconds is 0 ", async () => {});
-            it("should fail when tokenRatePerSecond is 0 ", async () => {});
-            it("should fail when cliffSeconds >= durationSeconds ", async () => {});
-        });
-        describe("When Creating Capsules", async () => {
-            it("should fail when beneficiary is 0x0 ", async () => {});
-            it("should fail when schedule ID is invalid", async () => {});
-            it("should fail when startTime < block.timestamp", async () => {});
-            it("should fail when contract's token balance < schedule amount", async () => {});
-        });
-        describe("When Transfering Capsules", async () => {
-            it("should fail when recipient is 0x0 ", async () => {});
-            it("should fail when recipient is self", async () => {});
-            it("should fail when capsule ID is out of bounds", async () => {});
-            it("should fail when capsule ID is owned by another address", async () => {});
-        });
-    });
+    describe("Creating Vesting Schedules", async () => {
+        let schedule;
 
-    describe("Capsule Life Cycle", () => {
-        // Balance checks are done throughout the life cycle
-        let snapshotId;
         beforeEach(async () => {
-            let snapshot = await timeMachine.takeSnapshot();
-            snapshotId = snapshot["result"];
+            // 1000 tokens vested in 1000 seconds
+            schedule = {
+                token: this.token.address,
+                cliff: new BN(100),
+                duration: new BN(1000),
+                rate: new BN(1),
+            };
         });
 
-        afterEach(async () => {
-            await timeMachine.revertToSnapshot(snapshotId);
+        // Failure cases
+        it("should fail when msg.sender = no_role_account", async () => {
+            const revertReason =
+                "AccessControl: account " +
+                no_role_account.toLowerCase() +
+                " is missing role " +
+                this.treasurer_role +
+                ".";
+            await expectRevert(
+                this.capsule.createVestingSchedule(
+                    schedule.token,
+                    schedule.cliff,
+                    schedule.duration,
+                    schedule.rate,
+                    { from: no_role_account }
+                ),
+                revertReason
+            );
+        });
+        it("should fail when token address is 0x0 ", async () => {
+            schedule.token = constants.ZERO_ADDRESS;
+            await expectRevert(
+                this.capsule.createVestingSchedule(
+                    schedule.token,
+                    schedule.cliff,
+                    schedule.duration,
+                    schedule.rate,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Token address cannot be 0x0"
+            );
+        });
+        it("should fail when durationSeconds is 0 ", async () => {
+            schedule.duration = new BN(0);
+            await expectRevert(
+                this.capsule.createVestingSchedule(
+                    schedule.token,
+                    schedule.cliff,
+                    schedule.duration,
+                    schedule.rate,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Duration must be greater than 0"
+            );
+        });
+        it("should fail when tokenRatePerSecond is 0 ", async () => {
+            schedule.rate = new BN(0);
+            await expectRevert(
+                this.capsule.createVestingSchedule(
+                    schedule.token,
+                    schedule.cliff,
+                    schedule.duration,
+                    schedule.rate,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Token release rate must be greater than 0"
+            );
+        });
+        it("should fail when cliffSeconds >= durationSeconds ", async () => {
+            schedule.cliff = new BN(schedule.duration + 1);
+            await expectRevert(
+                this.capsule.createVestingSchedule(
+                    schedule.token,
+                    schedule.cliff,
+                    schedule.duration,
+                    schedule.rate,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Cliff must be less than duration"
+            );
         });
 
-        describe("Has Not Reached Cliff", async () => {
-            // Balance Check
-            it("should have 0 claimable balance", async () => {});
+        // Passing cases
+        it("should pass when msg.sender = treasurer and parmas are valid", async () => {
+            // create schedule
+            await this.capsule.createVestingSchedule(
+                schedule.token,
+                schedule.cliff,
+                schedule.duration,
+                schedule.rate,
+                { from: treasurer }
+            );
 
-            // Transfering
-            it("should allow CAPSULE_OWNER to transfer", async () => {});
+            const newSchedule = await this.capsule.getScheduleDetails(0);
 
-            // Claiming
-            it("should prevent CAPSULE_OWNER from claiming", async () => {});
+            // check that the new schedule has correct values
+            newSchedule["token"].should.be.equal(schedule.token);
+            newSchedule["rate"].should.be.bignumber.equal(schedule.rate);
+            newSchedule["cliff"].should.be.bignumber.equal(schedule.cliff);
+            newSchedule["duration"].should.be.bignumber.equal(
+                schedule.duration
+            );
+            newSchedule["amount"].should.be.bignumber.equal(
+                schedule.rate.mul(schedule.duration)
+            );
         });
+    });
 
-        describe("Has Partially Vested", async () => {
-            // Transfering
-            it("should allow CAPSULE_OWNER to transfer capsule that is 0% claimed", async () => {});
-            it("should allow CAPSULE_OWNER to transfer capsule that is 50% claimed", async () => {});
-            it("should allow CAPSULE_OWNER to transfer capsule that is 100% claimed", async () => {});
+    describe.skip("Creating Active Capsules", async () => {
+        // Failure cases
+        it("should fail when msg.sender = no_role_account", async () => {});
+        it("should fail when beneficiary is 0x0 ", async () => {});
+        it("should fail when schedule ID is invalid", async () => {});
+        it("should fail when startTime < block.timestamp", async () => {});
+        it("should fail when contract's token balance < schedule amount", async () => {});
 
-            // Claiming Active Capsules
-            it("should allow CAPSULE_OWNER to claim capsule that is 0% claimed", async () => {});
-            it("should allow CAPSULE_OWNER to claim capsule that is 50% claimed", async () => {});
-            it("should prevent CAPSULE_OWNER to claim capsule that is 100% claimed", async () => {});
+        // Passing cases
+        it("should pass when msg.sender = treasurer and parmas are valid", async () => {});
+    });
 
-            // Claiming Dormant Capsules
-            it("should allow previous CAPSULE_OWNER to claim DormantCapsule when amount > 0", async () => {});
-            it("should prevent previous CAPSULE_OWNER from claiming DormantCapsule when amount = 0", async () => {});
-            it("should prevent previous CAPSULE_OWNER from claiming DormantCapsule when it has already been claimed", async () => {});
-        });
+    describe.skip("Transfering Active Capsules", async () => {
+        // Failure cases
+        it("should fail when recipient is 0x0 ", async () => {});
+        it("should fail when recipient is self", async () => {});
+        it("should fail when capsule ID is out of bounds", async () => {});
+        it("should fail when msg.sender is not capsule owner", async () => {});
+        it("should fail when capsule is fully vested", async () => {});
 
-        describe("Has Fully Vested", async () => {
-            // Transfering
-            it("should prevent CAPSULE_OWNER from transfering capsule", async () => {});
+        // Passing cases
+        it("should pass when cliff has not been reached", async () => {});
+        it("should pass when 0% of partially vested capsule tokens have been claimed", async () => {});
+        it("should pass when 50% of partially vested capsule tokens have been claimed", async () => {});
+        it("should pass when 100% of partially vested capsule tokens have been claimed", async () => {});
+    });
 
-            // Claiming
-            it("should allow CAPSULE_OWNER to claim capsule that is 0% claimed", async () => {});
-            it("should allow CAPSULE_OWNER to claim capsule that is 50% claimed", async () => {});
-            it("should prevent CAPSULE_OWNER to claim capsule that is 100% claimed", async () => {});
-        });
+    describe.skip("Claiming Active Capsules", async () => {
+        // Failure cases
+        it("should fail when capsule ID is out of bounds", async () => {});
+        it("should fail when msg.sender is not capsule owner", async () => {});
+        it("should fail when cliff has not been reached", async () => {});
+        it("should fail when 100% of partially vested capsule tokens have been claimed", async () => {});
+        it("should fail when 100% of fully vested capsule tokens have been claimed", async () => {});
+
+        // Passing cases
+        it("should pass when 0% of partially vested capsule tokens have been claimed", async () => {});
+        it("should pass when 50% of partially vested capsule tokens have been claimed", async () => {});
+        it("should pass when 0% of fully vested capsule tokens have been claimed", async () => {});
+        it("should pass when 50% of fully vested capsule tokens have been claimed", async () => {});
+    });
+
+    describe.skip("Claiming Dormant Capsules", async () => {
+        // Failure cases
+        it("should fail when capsule ID is out of bounds", async () => {});
+        it("should fail when msg.sender is not capsule owner", async () => {});
+        it("should fail when capsule tokens have already been claimed", async () => {});
+
+        // Passing cases
+        it("should pass when claimable amount > 0 and tokens have not been claimed", async () => {});
     });
 });
