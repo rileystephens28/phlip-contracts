@@ -339,15 +339,12 @@ contract VestingCapsule is Context, AccessControl {
 
         VestingSchedule memory schedule = _vestingSchedules[capsule.scheduleId];
 
-        uint256 cliffTime = capsule.startTime + schedule.cliff;
-
         // Check if the capsule's cliff period has ended
-        if (block.timestamp > cliffTime) {
-            // Calculate amount of tokens that have vested but not been claimed
-            uint256 totalVestedAmount = (block.timestamp - cliffTime) *
-                schedule.rate;
-            uint256 unclaimedVestedAmount = totalVestedAmount -
-                capsule.claimedAmount;
+        if (block.timestamp > capsule.startTime + schedule.cliff) {
+            uint256 unclaimedVestedAmount = activeCapsuleBalance(
+                msg.sender,
+                _capsuleID
+            );
 
             if (unclaimedVestedAmount > 0) {
                 // Decrease amount locked in schedule & active capsules
@@ -360,7 +357,7 @@ contract VestingCapsule is Context, AccessControl {
                 ] -= unclaimedVestedAmount;
 
                 // Update capsule values to reflect that they have been "claimed"
-                capsule.claimedAmount = totalVestedAmount;
+                capsule.claimedAmount += unclaimedVestedAmount;
                 capsule.lastClaimedTimestamp = block.timestamp;
 
                 _createDormantCapsule(
@@ -470,6 +467,7 @@ contract VestingCapsule is Context, AccessControl {
 
         // Increase amount of tokens locked in active capsules
         _activeCapsuleValueLocked[schedule.token] += schedule.amount;
+        _valueLockedInSchedules[_scheduleId] += schedule.amount;
 
         // Save new ActiveCapsule for the address
         _activeCapsules[_beneficiary][currentId] = ActiveCapsule(
