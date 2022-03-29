@@ -304,7 +304,7 @@ contract VestingCapsule is Context, AccessControl {
         );
         ActiveCapsule memory capsule = _activeCapsules[msg.sender][_capsuleID];
         require(
-            capsule.endTime < block.timestamp,
+            capsule.endTime > block.timestamp,
             "VestingCapsule: Cannot transfer capsule because it has already been fully vested."
         );
 
