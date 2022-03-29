@@ -11,7 +11,7 @@ const {
 require("chai").should();
 
 contract("VestingCapsule", (accounts) => {
-    const [treasurer, no_role_account, account] = accounts;
+    const [treasurer, no_role_account, sender, recipient, account] = accounts;
 
     before(async () => {
         this.capsule = await VestingCapsule.new({ from: treasurer });
@@ -38,11 +38,11 @@ contract("VestingCapsule", (accounts) => {
         await this.snapshot.restore();
     });
 
-    describe.skip("Creating Vesting Schedules", async () => {
+    describe("Creating Vesting Schedules", async () => {
         let schedule;
 
         beforeEach(async () => {
-            // 1000 tokens vested in 1000 seconds
+            // reset the schedule
             schedule = { ...this.baseSchedule };
         });
 
@@ -156,15 +156,6 @@ contract("VestingCapsule", (accounts) => {
                 { from: treasurer }
             );
 
-            // Index 1 - create a schedule that vests 2000 tokens in 1000 seconds
-            await this.capsule.createVestingSchedule(
-                this.baseSchedule.token,
-                this.baseSchedule.cliff,
-                this.baseSchedule.duration,
-                this.baseSchedule.rate.mul(new BN(2)),
-                { from: treasurer }
-            );
-
             // tranfer 1000 tokens to capsule contract
             await this.token.transfer(this.capsule.address, 1000, {
                 from: treasurer,
@@ -233,6 +224,15 @@ contract("VestingCapsule", (accounts) => {
             );
         });
         it("should fail when contract's token balance < schedule amount", async () => {
+            // Index 1 - create a schedule that vests 2000 tokens in 1000 seconds
+            await this.capsule.createVestingSchedule(
+                this.baseSchedule.token,
+                this.baseSchedule.cliff,
+                this.baseSchedule.duration,
+                this.baseSchedule.rate.mul(new BN(2)),
+                { from: treasurer }
+            );
+
             capsule.scheduleId = new BN(1);
             await expectRevert(
                 this.capsule.createCapsule(
@@ -271,19 +271,151 @@ contract("VestingCapsule", (accounts) => {
         });
     });
 
-    describe.skip("Transfering Active Capsules", async () => {
+    describe("Transfering Active Capsules", async () => {
+        let transfer;
+        const startTimeOffset = new BN(100);
+        before(async () => {
+            // Index 0 - create a schedule that vests 1000 tokens in 1000 seconds
+            await this.capsule.createVestingSchedule(
+                this.baseSchedule.token,
+                this.baseSchedule.cliff,
+                this.baseSchedule.duration,
+                this.baseSchedule.rate,
+                { from: treasurer }
+            );
+
+            // tranfer 1000 tokens to capsule contract
+            await this.token.transfer(this.capsule.address, 1000, {
+                from: treasurer,
+            });
+        });
+
+        beforeEach(async () => {
+            // Index 0 - create a capsule that vests 1000 tokens in 1000 seconds starting in 100 seconds
+            const currentTime = await time.latest();
+            await this.capsule.createCapsule(
+                sender,
+                new BN(0),
+                currentTime.add(startTimeOffset),
+                { from: treasurer }
+            );
+
+            transfer = {
+                capsuleId: new BN(0),
+                to: recipient,
+            };
+        });
+
         // Failure cases
-        it("should fail when recipient is 0x0 ", async () => {});
-        it("should fail when recipient is self", async () => {});
-        it("should fail when capsule ID is out of bounds", async () => {});
-        it("should fail when msg.sender is not capsule owner", async () => {});
-        it("should fail when capsule is fully vested", async () => {});
+        it("should fail when recipient is 0x0 ", async () => {
+            transfer.to = constants.ZERO_ADDRESS;
+            await expectRevert(
+                this.capsule.transferCapsule(transfer.capsuleId, transfer.to, {
+                    from: sender,
+                }),
+                "VestingCapsule: Cannot transfer capsule to 0x0."
+            );
+        });
+        it("should fail when recipient is self", async () => {
+            transfer.to = sender;
+            await expectRevert(
+                this.capsule.transferCapsule(transfer.capsuleId, transfer.to, {
+                    from: sender,
+                }),
+                "VestingCapsule: Cannot transfer capsule to self."
+            );
+        });
+        it("should fail when capsule ID is out of bounds", async () => {
+            transfer.capsuleId = new BN(1);
+            await expectRevert(
+                this.capsule.transferCapsule(transfer.capsuleId, transfer.to, {
+                    from: sender,
+                }),
+                "VestingCapsule: Invalid capsule ID"
+            );
+        });
+        it("should fail when msg.sender is not capsule owner", async () => {
+            await expectRevert(
+                this.capsule.transferCapsule(transfer.capsuleId, transfer.to, {
+                    from: account,
+                }),
+                "VestingCapsule: Cannot transfer capsule because msg.sender is not the owner."
+            );
+        });
+        it("should fail when capsule is fully vested", async () => {
+            // Increase time to the end of the vesting period
+            const secondsUntilFullyVested = startTimeOffset.add(
+                this.baseSchedule.duration
+            );
+            await time.increase(secondsUntilFullyVested);
+
+            // Ensure capsule is fully vested
+            const capsuleDetails = await this.capsule.getCapsuleDetails(0);
+            const futureTime = await time.latest();
+            capsuleDetails["endTime"].should.be.bignumber.lessThan(futureTime);
+
+            await expectRevert(
+                this.capsule.transferCapsule(transfer.capsuleId, transfer.to, {
+                    from: sender,
+                }),
+                "VestingCapsule: Cannot transfer capsule because it has already been fully vested."
+            );
+        });
 
         // Passing cases
-        it("should pass when cliff has not been reached", async () => {});
-        it("should pass when 0% of partially vested capsule tokens have been claimed", async () => {});
-        it("should pass when 50% of partially vested capsule tokens have been claimed", async () => {});
-        it("should pass when 100% of partially vested capsule tokens have been claimed", async () => {});
+        it("should pass when cliff has not been reached", async () => {
+            // Ensure capsule cliff has not been reached
+            const capsuleDetails = await this.capsule.getCapsuleDetails(0);
+            const currentTime = await time.latest();
+
+            // Cliff seconds + start time
+            const cliffTime = this.baseSchedule.cliff.add(
+                new BN(capsuleDetails["startTime"])
+            );
+            currentTime.should.be.bignumber.lessThan(cliffTime);
+
+            await this.capsule.transferCapsule(
+                transfer.capsuleId,
+                transfer.to,
+                { from: sender }
+            );
+            const newOwnerAddress = await this.capsule.getActiveCapsuleOwner(0);
+            newOwnerAddress.should.be.equal(transfer.to);
+        });
+        it("should pass when capsule has partially vested", async () => {
+            // Increase time so capsule is 20% vested
+            const secondsUntil20PercVested = startTimeOffset.add(
+                this.baseSchedule.duration.div(new BN(5))
+            );
+            await time.increase(secondsUntil20PercVested);
+
+            const activeCapsuleBalance =
+                await this.capsule.activeCapsuleBalance(sender, 0);
+
+            // Transfer capsule to recipient
+            await this.capsule.transferCapsule(
+                transfer.capsuleId,
+                transfer.to,
+                { from: sender }
+            );
+
+            // Check that active capsule owner is now recipient
+            const activeCapOwner = await this.capsule.getActiveCapsuleOwner(0);
+            activeCapOwner.should.be.equal(transfer.to);
+
+            // Check that dormant capsule owner is now sender
+            const dormantCapOwner = await this.capsule.getDormantCapsuleOwner(
+                0
+            );
+            dormantCapOwner.should.be.equal(sender);
+
+            // Check that dormant capsule has been created with ~20% of total capsules tokens
+            const dormantCapsuleBalance =
+                await this.capsule.dormantCapsuleBalance(dormantCapOwner, 0);
+            dormantCapsuleBalance.should.be.bignumber.equal(
+                activeCapsuleBalance
+            );
+        });
     });
 
     describe.skip("Claiming Active Capsules", async () => {
