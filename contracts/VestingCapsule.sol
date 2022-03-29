@@ -295,6 +295,10 @@ contract VestingCapsule is Context, AccessControl {
             "VestingCapsule: Cannot transfer capsule to 0x0."
         );
         require(
+            _capsuleID < _activeCapsuleIdCounter.current(),
+            "VestingCapsule: Invalid capsule ID"
+        );
+        require(
             msg.sender == _activeCapsuleOwners[_capsuleID],
             "VestingCapsule: Cannot transfer capsule because msg.sender is not the owner."
         );
