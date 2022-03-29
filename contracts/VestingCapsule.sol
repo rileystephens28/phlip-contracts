@@ -103,6 +103,19 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
+     * @dev Accessor function for specified VestingCapsule details.
+     * @param _scheduleID The address of the token to be queried
+     * @return The struct values of the vesting schedule
+     */
+    function getScheduleDetails(uint256 _scheduleID)
+        public
+        view
+        returns (VestingSchedule memory)
+    {
+        return _vestingSchedules[_scheduleID];
+    }
+
+    /**
      * @dev Accessor function for specific tokens _activeCapsuleValueLocked value.
      * @param _token The address of the token to be queried
      * @return The total qty locked in active capsules for a given token
@@ -145,7 +158,7 @@ contract VestingCapsule is Context, AccessControl {
 
     /**
      * @dev Calculates the total amount of tokens that have vested up until a the current time
-     * @param _owner The address capsule's owner
+     * @param _owner The capsules owner address
      * @param _capsuleID The ID of the active capsule to be queried
      * @return The amount of claimable tokens in an active capsule
      */
@@ -169,6 +182,21 @@ contract VestingCapsule is Context, AccessControl {
         }
         // Cliff period has not ended so nothing to claim
         return 0;
+    }
+
+    /**
+     * @dev Calculates the total amount of tokens remaining in a dormant capsule
+     * @param _owner The capsules owner address
+     * @param _capsuleID The ID of the dormant capsule to be queried
+     * @return The amount of claimable tokens in a dormant capsule
+     */
+    function dormantCapsuleBalance(address _owner, uint256 _capsuleID)
+        public
+        view
+        returns (uint256)
+    {
+        DormantCapsule memory capsule = _dormantCapsules[_owner][_capsuleID];
+        return capsule.totalAmount - capsule.claimedAmount;
     }
 
     /**
