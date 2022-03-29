@@ -6,6 +6,7 @@ const {
     expectEvent, // Assertions for emitted events
     expectRevert, // Assertions for transactions that should fail
     snapshot,
+    time,
 } = require("@openzeppelin/test-helpers");
 require("chai").should();
 
@@ -16,8 +17,15 @@ contract("VestingCapsule", (accounts) => {
         this.capsule = await VestingCapsule.new({ from: treasurer });
         this.token = await ERC20Mock.new({ from: treasurer });
 
+        this.baseSchedule = {
+            token: this.token.address,
+            cliff: new BN(100),
+            duration: new BN(1000),
+            rate: new BN(1),
+        };
+
         // fund the treasurer account with some tokens
-        await this.token.mint(treasurer, 1000, { from: treasurer });
+        await this.token.mint(treasurer, 10000, { from: treasurer });
 
         this.treasurer_role = await this.capsule.TREASURER_ROLE();
     });
@@ -30,17 +38,12 @@ contract("VestingCapsule", (accounts) => {
         await this.snapshot.restore();
     });
 
-    describe("Creating Vesting Schedules", async () => {
+    describe.skip("Creating Vesting Schedules", async () => {
         let schedule;
 
         beforeEach(async () => {
             // 1000 tokens vested in 1000 seconds
-            schedule = {
-                token: this.token.address,
-                cliff: new BN(100),
-                duration: new BN(1000),
-                rate: new BN(1),
-            };
+            schedule = { ...this.baseSchedule };
         });
 
         // Failure cases
@@ -117,7 +120,6 @@ contract("VestingCapsule", (accounts) => {
 
         // Passing cases
         it("should pass when msg.sender = treasurer and parmas are valid", async () => {
-            // create schedule
             await this.capsule.createVestingSchedule(
                 schedule.token,
                 schedule.cliff,
@@ -141,16 +143,132 @@ contract("VestingCapsule", (accounts) => {
         });
     });
 
-    describe.skip("Creating Active Capsules", async () => {
+    describe("Creating Active Capsules", async () => {
+        let capsule;
+
+        beforeEach(async () => {
+            // Index 0 - create a schedule that vests 1000 tokens in 1000 seconds
+            await this.capsule.createVestingSchedule(
+                this.baseSchedule.token,
+                this.baseSchedule.cliff,
+                this.baseSchedule.duration,
+                this.baseSchedule.rate,
+                { from: treasurer }
+            );
+
+            // Index 1 - create a schedule that vests 2000 tokens in 1000 seconds
+            await this.capsule.createVestingSchedule(
+                this.baseSchedule.token,
+                this.baseSchedule.cliff,
+                this.baseSchedule.duration,
+                this.baseSchedule.rate.mul(new BN(2)),
+                { from: treasurer }
+            );
+
+            // tranfer 1000 tokens to capsule contract
+            await this.token.transfer(this.capsule.address, 1000, {
+                from: treasurer,
+            });
+
+            const currentTime = await time.latest();
+
+            capsule = {
+                beneficiary: account,
+                scheduleId: new BN(0),
+                startTime: currentTime.add(new BN(100)),
+            };
+        });
         // Failure cases
-        it("should fail when msg.sender = no_role_account", async () => {});
-        it("should fail when beneficiary is 0x0 ", async () => {});
-        it("should fail when schedule ID is invalid", async () => {});
-        it("should fail when startTime < block.timestamp", async () => {});
-        it("should fail when contract's token balance < schedule amount", async () => {});
+        it("should fail when msg.sender = no_role_account", async () => {
+            const revertReason =
+                "AccessControl: account " +
+                no_role_account.toLowerCase() +
+                " is missing role " +
+                this.treasurer_role +
+                ".";
+            await expectRevert(
+                this.capsule.createCapsule(
+                    capsule.beneficiary,
+                    capsule.scheduleId,
+                    capsule.startTime,
+                    { from: no_role_account }
+                ),
+                revertReason
+            );
+        });
+        it("should fail when beneficiary is 0x0 ", async () => {
+            capsule.beneficiary = constants.ZERO_ADDRESS;
+            await expectRevert(
+                this.capsule.createCapsule(
+                    capsule.beneficiary,
+                    capsule.scheduleId,
+                    capsule.startTime,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Beneficiary cannot be 0x0"
+            );
+        });
+        it("should fail when schedule ID is invalid", async () => {
+            capsule.scheduleId = new BN(2);
+            await expectRevert(
+                this.capsule.createCapsule(
+                    capsule.beneficiary,
+                    capsule.scheduleId,
+                    capsule.startTime,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Invalid scheduleId"
+            );
+        });
+        it("should fail when startTime < block.timestamp", async () => {
+            capsule.startTime = capsule.startTime.sub(new BN(1000));
+            await expectRevert(
+                this.capsule.createCapsule(
+                    capsule.beneficiary,
+                    capsule.scheduleId,
+                    capsule.startTime,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Capsule startTime cannot be in the past."
+            );
+        });
+        it("should fail when contract's token balance < schedule amount", async () => {
+            capsule.scheduleId = new BN(1);
+            await expectRevert(
+                this.capsule.createCapsule(
+                    capsule.beneficiary,
+                    capsule.scheduleId,
+                    capsule.startTime,
+                    { from: treasurer }
+                ),
+                "VestingCapsule: Contract does not hold enough tokens to create a new capsule."
+            );
+        });
 
         // Passing cases
-        it("should pass when msg.sender = treasurer and parmas are valid", async () => {});
+        it("should pass when msg.sender = treasurer and parmas are valid", async () => {
+            await this.capsule.createCapsule(
+                capsule.beneficiary,
+                capsule.scheduleId,
+                capsule.startTime,
+                { from: treasurer }
+            );
+
+            const newCapsule = await this.capsule.getCapsuleDetails(new BN(0), {
+                from: treasurer,
+            });
+            // check that the new schedule has correct values
+            newCapsule["scheduleId"].should.be.bignumber.equal(
+                capsule.scheduleId
+            );
+            newCapsule["startTime"].should.be.bignumber.equal(
+                capsule.startTime
+            );
+            newCapsule["endTime"].should.be.bignumber.equal(
+                capsule.startTime.add(this.baseSchedule.duration)
+            );
+            newCapsule["claimedAmount"].should.be.bignumber.equal(new BN(0));
+        });
     });
 
     describe.skip("Transfering Active Capsules", async () => {
