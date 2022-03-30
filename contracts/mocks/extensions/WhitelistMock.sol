@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.11;
+
+import "../../extensions/Whitelistable.sol";
+
+contract WhitelistMock is Whitelistable {
+    bool didwhitelistAction;
+
+    constructor() {
+        didwhitelistAction = false;
+    }
+
+    function whitelistedAction() public onlyWhitelisters {
+        didwhitelistAction = true;
+    }
+
+    function addToWhitelist(address _address) public {
+        _addToWhitelist(_address);
+    }
+
+    function removeFromWhitelist(address _address) public {
+        _removeFromWhitelist(_address);
+    }
+}
