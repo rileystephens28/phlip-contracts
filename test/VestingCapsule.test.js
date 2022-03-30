@@ -43,7 +43,7 @@ contract("VestingCapsule", (accounts) => {
         await this.snapshot.restore();
     });
 
-    describe.skip("Creating Vesting Schedules", async () => {
+    describe("Creating Vesting Schedules", async () => {
         let schedule;
 
         beforeEach(async () => {
@@ -148,7 +148,7 @@ contract("VestingCapsule", (accounts) => {
         });
     });
 
-    describe.skip("Creating Active Capsules", async () => {
+    describe("Creating Active Capsules", async () => {
         let capsule;
 
         beforeEach(async () => {
@@ -276,7 +276,7 @@ contract("VestingCapsule", (accounts) => {
         });
     });
 
-    describe.skip("Transfering Active Capsules", async () => {
+    describe("Transfering Active Capsules", async () => {
         let transfer;
         const startTimeOffset = new BN(100);
 
@@ -562,7 +562,7 @@ contract("VestingCapsule", (accounts) => {
             totalClaimAmount.should.be.bignumber.equal(ownerTokenBalance);
         });
         it("should pass when 0% of fully vested capsule tokens have been claimed", async () => {
-            const scheduleDetails = await this.capsule.getScheduleDetails(0);
+            const schedule = await this.capsule.getScheduleDetails(0);
 
             // Increase time so capsule is fully vested
             const secondsUntilFullyVested = startTimeOffset.add(
@@ -575,12 +575,10 @@ contract("VestingCapsule", (accounts) => {
 
             // Check that capsule owner has been credited with the correct amount of tokens
             const ownerTokenBalance = await this.token.balanceOf(sender);
-            scheduleDetails["amount"].should.be.bignumber.equal(
-                ownerTokenBalance
-            );
+            schedule["amount"].should.be.bignumber.equal(ownerTokenBalance);
         });
         it("should pass when 50% of fully vested capsule tokens have been claimed", async () => {
-            const scheduleDetails = await this.capsule.getScheduleDetails(0);
+            const schedule = await this.capsule.getScheduleDetails(0);
 
             // Increase time so capsule is 50% vested
             const secondsUntil50PercVested = startTimeOffset.add(
@@ -612,16 +610,94 @@ contract("VestingCapsule", (accounts) => {
             ownerTokenBalance = await this.token.balanceOf(sender);
             const totalClaimAmount = capsuleBalance1.add(capsuleBalance);
             totalClaimAmount.should.be.bignumber.equal(ownerTokenBalance);
+            totalClaimAmount.should.be.bignumber.equal(schedule["amount"]);
         });
     });
 
-    describe.skip("Claiming Dormant Capsules", async () => {
+    describe("Claiming Dormant Capsules", async () => {
+        let capsule;
+        const startTimeOffset = new BN(100);
+        beforeEach(async () => {
+            // Index 0 - create a schedule that vests 1000 tokens in 1000 seconds
+            await this.capsule.createVestingSchedule(
+                this.baseSchedule.token,
+                this.baseSchedule.cliff,
+                this.baseSchedule.duration,
+                this.baseSchedule.rate,
+                { from: treasurer }
+            );
+
+            // tranfer 1000 tokens to capsule contract
+            await this.token.transfer(this.capsule.address, 1000, {
+                from: treasurer,
+            });
+
+            const currentTime = await time.latest();
+            await this.capsule.createCapsule(
+                this.baseCapsule.beneficiary,
+                this.baseCapsule.scheduleId,
+                currentTime.add(startTimeOffset),
+                { from: treasurer }
+            );
+
+            // Increase time so capsule is 20% vested
+            const secondsUntil20PercVested = startTimeOffset.add(
+                this.baseSchedule.duration.div(new BN(5))
+            );
+            await time.increase(secondsUntil20PercVested);
+
+            // Transfer capsule to recipient
+            await this.capsule.transferCapsule(new BN(0), recipient, {
+                from: this.baseCapsule.beneficiary,
+            });
+        });
         // Failure cases
-        it("should fail when capsule ID is out of bounds", async () => {});
-        it("should fail when msg.sender is not capsule owner", async () => {});
-        it("should fail when capsule tokens have already been claimed", async () => {});
+        it("should fail when capsule ID is out of bounds", async () => {
+            await expectRevert(
+                this.capsule.claimDormantCapsule(new BN(1), {
+                    from: sender,
+                }),
+                "VestingCapsule: Invalid capsule ID"
+            );
+        });
+        it("should fail when msg.sender is not capsule owner", async () => {
+            it("should fail when msg.sender is not capsule owner", async () => {
+                await expectRevert(
+                    this.capsule.claimDormantCapsule(new BN(0), {
+                        from: recipient,
+                    }),
+                    "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
+                );
+            });
+        });
+        it("should fail when capsule tokens have already been claimed", async () => {
+            const balance = await this.capsule.dormantCapsuleBalance(sender, 0);
+            await this.capsule.claimDormantCapsule(new BN(0), {
+                from: sender,
+            });
+
+            // Capsule should have been emptied and then deleted, so the sender is no longer the owner
+            await expectRevert(
+                this.capsule.claimDormantCapsule(new BN(0), {
+                    from: sender,
+                }),
+                "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
+            );
+            // Check that capsule owner has been credited with the correct amount of tokens
+            const ownerTokenBalance = await this.token.balanceOf(sender);
+            balance.should.be.bignumber.equal(ownerTokenBalance);
+        });
 
         // Passing cases
-        it("should pass when claimable amount > 0 and tokens have not been claimed", async () => {});
+        it("should pass when claimable amount > 0 and tokens have not been claimed", async () => {
+            const balance = await this.capsule.dormantCapsuleBalance(sender, 0);
+            await this.capsule.claimDormantCapsule(new BN(0), {
+                from: sender,
+            });
+
+            // Check that capsule owner has been credited with the correct amount of tokens
+            const ownerTokenBalance = await this.token.balanceOf(sender);
+            balance.should.be.bignumber.equal(ownerTokenBalance);
+        });
     });
 });
