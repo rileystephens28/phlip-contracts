@@ -388,7 +388,7 @@ contract VestingCapsule is Context, AccessControl {
         uint256 claimAmount = activeCapsuleBalance(msg.sender, _capsuleID);
         require(
             claimAmount > 0,
-            "VestingCapsule: Cannot claim capsule because it has already been emptied."
+            "VestingCapsule: Capsule has no tokens to claim."
         );
 
         ActiveCapsule storage capsule = _activeCapsules[msg.sender][_capsuleID];
