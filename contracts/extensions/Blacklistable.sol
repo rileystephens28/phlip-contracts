@@ -47,7 +47,7 @@ contract Blacklistable {
     function _removeFromBlacklist(address _address) internal virtual {
         require(
             _blacklist[_address],
-            "Blacklistable: Address is not on the blacklisted"
+            "Blacklistable: Address is not on the blacklist"
         );
         _blacklist[_address] = false;
     }

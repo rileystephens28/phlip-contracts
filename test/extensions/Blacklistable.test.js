@@ -58,7 +58,7 @@ contract("Blacklistable", (accounts) => {
         it("should fail when address has not been blacklisted", async () => {
             await expectRevert(
                 removeFromBlacklist(),
-                "Blacklistable: Address is not on the blacklisted"
+                "Blacklistable: Address is not on the blacklist"
             );
         });
 
