@@ -418,6 +418,10 @@ contract VestingCapsule is Context, AccessControl {
      */
     function claimDormantCapsule(uint256 _capsuleID) external {
         require(
+            _capsuleID < _dormantCapsuleIdCounter.current(),
+            "VestingCapsule: Invalid capsule ID"
+        );
+        require(
             msg.sender == _dormantCapsuleOwners[_capsuleID],
             "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
         );
