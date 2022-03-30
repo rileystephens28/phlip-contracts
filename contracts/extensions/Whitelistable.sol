@@ -35,6 +35,10 @@ contract Whitelistable {
      * @param _address The address to add to the whitelist
      */
     function _addToWhitelist(address _address) internal virtual {
+        require(
+            !_whitelist[_address],
+            "Whitelistable: Address is already whitelisted"
+        );
         _whitelist[_address] = true;
     }
 
@@ -43,6 +47,10 @@ contract Whitelistable {
      * @param _address The address to remove from the whitelist
      */
     function _removeFromWhitelist(address _address) internal virtual {
+        require(
+            _whitelist[_address],
+            "Whitelistable: Address is not on the whitelist"
+        );
         _whitelist[_address] = false;
     }
 }
