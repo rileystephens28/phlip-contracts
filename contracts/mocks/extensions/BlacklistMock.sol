@@ -4,14 +4,14 @@ pragma solidity 0.8.11;
 import "../../extensions/Blacklistable.sol";
 
 contract BlacklistMock is Blacklistable {
-    bool didNonBlacklistAction;
+    bool public didProtectedAction;
 
     constructor() {
-        didNonBlacklistAction = false;
+        didProtectedAction = false;
     }
 
-    function nonBlacklisted() public noBlacklisters {
-        didNonBlacklistAction = true;
+    function protectedAction() public noBlacklisters {
+        didProtectedAction = true;
     }
 
     function addToBlacklist(address _address) public {
