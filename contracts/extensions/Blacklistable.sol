@@ -15,7 +15,7 @@ contract Blacklistable {
     modifier noBlacklisters() {
         require(
             !_blacklist[msg.sender],
-            "Blacklistable: BLACKLISTED_ADDRESSES_ARE_FORBIDDEN"
+            "Blacklistable: Blacklisted addresses are forbidden"
         );
         _;
     }
