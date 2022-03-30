@@ -24,6 +24,11 @@ contract("VestingCapsule", (accounts) => {
             rate: new BN(1),
         };
 
+        this.baseCapsule = {
+            beneficiary: sender,
+            scheduleId: new BN(0),
+        };
+
         // fund the treasurer account with some tokens
         await this.token.mint(treasurer, 10000, { from: treasurer });
 
@@ -164,8 +169,8 @@ contract("VestingCapsule", (accounts) => {
             const currentTime = await time.latest();
 
             capsule = {
-                beneficiary: account,
-                scheduleId: new BN(0),
+                beneficiary: this.baseCapsule.beneficiary,
+                scheduleId: this.baseCapsule.scheduleId,
                 startTime: currentTime.add(new BN(100)),
             };
         });
@@ -274,7 +279,8 @@ contract("VestingCapsule", (accounts) => {
     describe("Transfering Active Capsules", async () => {
         let transfer;
         const startTimeOffset = new BN(100);
-        before(async () => {
+
+        beforeEach(async () => {
             // Index 0 - create a schedule that vests 1000 tokens in 1000 seconds
             await this.capsule.createVestingSchedule(
                 this.baseSchedule.token,
@@ -288,14 +294,12 @@ contract("VestingCapsule", (accounts) => {
             await this.token.transfer(this.capsule.address, 1000, {
                 from: treasurer,
             });
-        });
 
-        beforeEach(async () => {
             // Index 0 - create a capsule that vests 1000 tokens in 1000 seconds starting in 100 seconds
             const currentTime = await time.latest();
             await this.capsule.createCapsule(
-                sender,
-                new BN(0),
+                this.baseCapsule.beneficiary,
+                this.baseCapsule.scheduleId,
                 currentTime.add(startTimeOffset),
                 { from: treasurer }
             );
@@ -419,9 +423,49 @@ contract("VestingCapsule", (accounts) => {
     });
 
     describe.skip("Claiming Active Capsules", async () => {
+        let capsule;
+        const startTimeOffset = new BN(100);
+        beforeEach(async () => {
+            // Index 0 - create a schedule that vests 1000 tokens in 1000 seconds
+            await this.capsule.createVestingSchedule(
+                this.baseSchedule.token,
+                this.baseSchedule.cliff,
+                this.baseSchedule.duration,
+                this.baseSchedule.rate,
+                { from: treasurer }
+            );
+
+            // tranfer 1000 tokens to capsule contract
+            await this.token.transfer(this.capsule.address, 1000, {
+                from: treasurer,
+            });
+
+            const currentTime = await time.latest();
+            await this.capsule.createCapsule(
+                this.baseCapsule.beneficiary,
+                this.baseCapsule.scheduleId,
+                currentTime.add(startTimeOffset),
+                { from: treasurer }
+            );
+        });
+
         // Failure cases
-        it("should fail when capsule ID is out of bounds", async () => {});
-        it("should fail when msg.sender is not capsule owner", async () => {});
+        it("should fail when capsule ID is out of bounds", async () => {
+            await expectRevert(
+                this.capsule.claimActiveCapsule(new BN(1), {
+                    from: sender,
+                }),
+                "VestingCapsule: Invalid capsule ID"
+            );
+        });
+        it("should fail when msg.sender is not capsule owner", async () => {
+            await expectRevert(
+                this.capsule.claimActiveCapsule(new BN(1), {
+                    from: recipient,
+                }),
+                "VestingCapsule: Invalid capsule ID"
+            );
+        });
         it("should fail when cliff has not been reached", async () => {});
         it("should fail when 100% of partially vested capsule tokens have been claimed", async () => {});
         it("should fail when 100% of fully vested capsule tokens have been claimed", async () => {});
