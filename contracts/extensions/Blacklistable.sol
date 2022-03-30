@@ -33,6 +33,10 @@ contract Blacklistable {
      * @param _address The address to add to the blacklist
      */
     function _addToBlacklist(address _address) internal virtual {
+        require(
+            !_blacklist[_address],
+            "Blacklistable: Address is already blacklisted"
+        );
         _blacklist[_address] = true;
     }
 
@@ -41,6 +45,10 @@ contract Blacklistable {
      * @param _address The address to remove from the blacklist
      */
     function _removeFromBlacklist(address _address) internal virtual {
+        require(
+            _blacklist[_address],
+            "Blacklistable: Address is not on the blacklisted"
+        );
         _blacklist[_address] = false;
     }
 }
