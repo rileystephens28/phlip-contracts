@@ -12,6 +12,17 @@ contract Whitelistable {
     mapping(address => bool) private _whitelist;
 
     /**
+     * @dev Require msg.sender to not be blacklisted and reverts if not.
+     */
+    modifier onlyWhitelisters() {
+        require(
+            _whitelist[msg.sender],
+            "Whitelistable: Address is not whitelisted"
+        );
+        _;
+    }
+
+    /**
      * @param _address The address to check.
      * @return Whether or not the address is whitelisted.
      */
