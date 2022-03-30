@@ -4,14 +4,14 @@ pragma solidity 0.8.11;
 import "../../extensions/Whitelistable.sol";
 
 contract WhitelistMock is Whitelistable {
-    bool didwhitelistAction;
+    bool public didProtectedAction;
 
     constructor() {
-        didwhitelistAction = false;
+        didProtectedAction = false;
     }
 
-    function whitelistedAction() public onlyWhitelisters {
-        didwhitelistAction = true;
+    function protectedAction() public onlyWhitelisters {
+        didProtectedAction = true;
     }
 
     function addToWhitelist(address _address) public {
