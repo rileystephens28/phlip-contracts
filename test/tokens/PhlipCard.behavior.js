@@ -65,14 +65,26 @@ function shouldBehaveLikePhlipCard(
         });
     };
 
+    const upVote = async (account = tokenHolder, id = 0) => {
+        return await context.cardInstance.upVote(new BN(id), {
+            from: account,
+        });
+    };
+
+    const downVote = async (account = tokenHolder, id = 0) => {
+        return await context.cardInstance.downVote(new BN(id), {
+            from: account,
+        });
+    };
+
     const verifyBaseUri = async (val) => {
         const baseUri = await context.cardInstance.BASE_URI();
         baseUri.should.be.equal(val);
     };
 
     const verifyMaxDownvotes = async (val) => {
-        const maxDownvotes = await context.cardInstance.MAX_DOWNVOTES();
-        maxDownvotes.should.be.bignumber.equal(val);
+        const maxDownVotes = await context.cardInstance.MAX_DOWNVOTES();
+        maxDownVotes.should.be.bignumber.equal(val);
     };
 
     const verifyMaxUriChanges = async (val) => {
@@ -113,6 +125,18 @@ function shouldBehaveLikePhlipCard(
         hasClaim.should.be.equal(bool);
     };
 
+    const verifyUpVotes = async (cardId, numVotes = true) => {
+        const voteCount = await context.cardInstance.upVotesFor(new BN(cardId));
+        voteCount.should.be.bignumber.equal(new BN(numVotes));
+    };
+
+    const verifyDownVotes = async (cardId, numVotes = true) => {
+        const voteCount = await context.cardInstance.downVotesFor(
+            new BN(cardId)
+        );
+        voteCount.should.be.bignumber.equal(new BN(numVotes));
+    };
+
     const getRoleRevertReason = (account, role) => {
         return (
             "AccessControl: account " +
@@ -139,7 +163,7 @@ function shouldBehaveLikePhlipCard(
         });
 
         it("has the correct max allowed downvotes", async () => {
-            await verifyMaxDownvotes(initialAttr.maxDownvotes);
+            await verifyMaxDownvotes(initialAttr.maxDownVotes);
         });
 
         it("has the correct max allowed URI changes", async () => {
@@ -180,7 +204,7 @@ function shouldBehaveLikePhlipCard(
                 revertReason
             );
             // Max downvotes should still equal initial max downvotes
-            await verifyMaxDownvotes(initialAttr.maxDownvotes);
+            await verifyMaxDownvotes(initialAttr.maxDownVotes);
         });
         it("should fail to set max number of allowed URI changes per card when msg.sender != minter", async () => {
             // Set max uri changes
@@ -486,101 +510,72 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe.skip("Up/Down Voting", () => {
-        //  PhlipDAO Vote on Existing Cards
-        const mintedCardId = 0;
-
-        it("should allow phlipDAO holder to up vote existing card", async () => {
-            // Mint a card
-            await context.cardInstance.mintCard(otherAccount, "test123", {
-                from: minter,
-            });
-
-            // DAO holder casts up vote
-            await context.cardInstance.upVote(mintedCardId, {
-                from: tokenHolder,
-            });
-
-            // Card should have 1 up vote
-            const upVotes = await context.cardInstance.upVotesFor(mintedCardId);
-            upVotes.toString().should.equal("1");
-        });
-        it("should allow phlipDAO holder to down vote existing card", async () => {
-            // Mint a card
-            await context.cardInstance.mintCard(otherAccount, "test123", {
-                from: minter,
-            });
-
-            // DAO holder casts down vote
-            await context.cardInstance.downVote(mintedCardId, {
-                from: tokenHolder,
-            });
-
-            // Card should have 1 down vote
-            const upVotes = await context.cardInstance.downVotesFor(
-                mintedCardId
+    describe("Up/Down Voting", () => {
+        // Failing cases
+        it("should fail to up vote when msg.sender owns card", async () => {
+            await expectRevert(
+                upVote(cardHolder),
+                "PhlipCard: Cannot vote on your own card."
             );
-            upVotes.toString().should.equal("1");
         });
-
-        // Non-PhlipDAO Attemptig to Vote
-        it("should prevent non-phlipDAO holder from up voting", async () => {
-            // Mint a card
-            await context.cardInstance.mintCard(otherAccount, "test123", {
-                from: minter,
-            });
-            try {
-                // non-DAO holder attemptes to cast up vote
-                await context.cardInstance.upVote(mintedCardId, {
-                    from: otherAccount,
-                });
-            } catch (error) {}
-            // Card should have 0 up votes
-            const upVotes = await context.cardInstance.upVotesFor(mintedCardId);
-            upVotes.toString().should.equal("0");
-        });
-        it("should prevent non-phlipDAO holder from down voting", async () => {
-            // Mint a card
-            await context.cardInstance.mintCard(otherAccount, "test123", {
-                from: minter,
-            });
-            try {
-                // non-DAO holder attemptes to cast down vote
-                await context.cardInstance.downVote(mintedCardId, {
-                    from: otherAccount,
-                });
-            } catch (error) {}
-            // Card should have 0 down votes
-            const upVotes = await context.cardInstance.downVotesFor(
-                mintedCardId
+        it("should fail to down vote when msg.sender owns card", async () => {
+            await expectRevert(
+                downVote(cardHolder),
+                "PhlipCard: Cannot vote on your own card."
             );
-            upVotes.toString().should.equal("0");
+        });
+        it("should fail to up vote when msg.sender does not hold enough tokens", async () => {
+            await expectRevert(
+                upVote(otherAccount),
+                "PhlipCard: Must own PhlipDAO tokens to vote."
+            );
         });
 
-        //  PhlipDAO Vote on Non-Existing Cards
-        it("should prevent phlipDAO holder from up voting non-existant card", async () => {
-            let voteFailed = false;
-            try {
-                // DAO holder casts down vote
-                await context.cardInstance.upVote(mintedCardId, {
-                    from: tokenHolder,
-                });
-            } catch (error) {
-                voteFailed = true;
-            }
-            voteFailed.should.equal(true);
+        it("should fail to down vote when msg.sender does not hold enough tokens", async () => {
+            await expectRevert(
+                downVote(otherAccount),
+                "PhlipCard: Must own PhlipDAO tokens to vote."
+            );
         });
-        it("should prevent phlipDAO holder from down voting non-existant card", async () => {
-            let voteFailed = false;
-            try {
-                // DAO holder casts down vote
-                await context.cardInstance.downVote(mintedCardId, {
-                    from: tokenHolder,
-                });
-            } catch (error) {
-                voteFailed = true;
-            }
-            voteFailed.should.equal(true);
+
+        it("should fail to up vote when card does not exist", async () => {
+            await expectRevert(
+                upVote(tokenHolder, 1),
+                "PhlipCard: Token does not exist."
+            );
+        });
+
+        it("should fail to down vote when card does not exist", async () => {
+            await expectRevert(
+                downVote(tokenHolder, 1),
+                "PhlipCard: Token does not exist."
+            );
+        });
+
+        // Passing cases
+        it("should up vote when msg.sender does not own card and has enough tokens", async () => {
+            // Up vote cardHolder's card
+            await upVote();
+            // Verify up vote was successful
+            await verifyUpVotes(0, 1);
+        });
+
+        it("should down vote when msg.sender does not own card and has enough tokens", async () => {
+            // Down vote cardHolder's card
+            await downVote();
+            // Verify down vote was successful
+            await verifyDownVotes(0, 1);
+        });
+
+        it("should make card unplayable if card is down voted more than max allowed", async () => {
+            // Doen vote card twice (testing max)
+            await downVote(tokenHolder);
+            await downVote(minter);
+
+            // Verify down votes were successful
+            await verifyDownVotes(0, initialAttr.maxDownVotes);
+            const isPlayable = await context.cardInstance.isPlayable(new BN(0));
+            isPlayable.should.be.equal(false);
         });
     });
 }
