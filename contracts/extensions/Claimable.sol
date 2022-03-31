@@ -14,29 +14,17 @@ contract Claimable {
         uint256 remainingAmount;
     }
 
-    mapping(address => bool) private _beneficiaries;
+    mapping(address => bool) private _claimers;
     mapping(address => Claim) private _claims;
     mapping(uint256 => address) private _assetBeneficiaries;
 
     /**
-     * @dev Require msg.sender to be a beneficiary and reverts if not
+     * @dev Require msg.sender to be a claimer and reverts if not
      */
-    modifier onlyBeneficiary() {
+    modifier onlyClaimers() {
         require(
-            _beneficiaries[msg.sender],
-            "Claimable: Address is not a beneficiary"
-        );
-        _;
-    }
-
-    /**
-     * @dev Require address to have claim of an asset and reverts if not
-     * @param _assetID The ID of an asset
-     */
-    modifier onlyClaimer(uint256 _assetID) {
-        require(
-            _assetBeneficiaries[_assetID] == msg.sender,
-            "Claimable: Address is not the beneficiary of asset ID"
+            _claimers[msg.sender],
+            "Claimable: Address does not have a claim."
         );
         _;
     }
@@ -46,7 +34,7 @@ contract Claimable {
      * @param _address The address to check.
      */
     modifier claimExists(address _address) {
-        require(_beneficiaries[_address], "Claimable: Claim does not exist.");
+        require(_claimers[_address], "Claimable: Claim does not exist.");
         _;
     }
 
@@ -56,7 +44,7 @@ contract Claimable {
      * @return Whether or not the address has a claim.
      */
     function hasClaim(address _address) public view returns (bool) {
-        return _beneficiaries[_address];
+        return _claimers[_address];
     }
 
     /**
@@ -123,10 +111,10 @@ contract Claimable {
         );
         // Add address to beneficiaries
         require(
-            !_beneficiaries[_beneficiary],
+            !_claimers[_beneficiary],
             "Claimable._createClaim: Claim has already been created for this address. Call _updateClaim() for existing beneficiaries."
         );
-        _beneficiaries[_beneficiary] = true;
+        _claimers[_beneficiary] = true;
 
         // Register asset beneficiaries
         for (uint256 i = 0; i < _assetIds.length; i++) {
@@ -192,7 +180,7 @@ contract Claimable {
         // If there are no more assets in the claim, delete the claim
         if (claim.remainingAmount == 0) {
             delete _claims[_address];
-            delete _beneficiaries[_address];
+            delete _claimers[_address];
         }
     }
 }
