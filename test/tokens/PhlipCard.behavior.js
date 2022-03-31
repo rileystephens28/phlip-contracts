@@ -38,11 +38,25 @@ function shouldBehaveLikePhlipCard(
     const createClaim = async (
         from = minter,
         to = otherAccount,
-        amount = new BN(1)
+        amount = 1
     ) => {
-        return await context.cardInstance.createClaim(to, amount, {
+        return await context.cardInstance.createClaim(to, new BN(amount), {
             from: from,
         });
+    };
+
+    const increaseClaim = async (
+        from = minter,
+        account = claimHolder,
+        amount = 1
+    ) => {
+        return await context.cardInstance.increaseClaim(
+            account,
+            new BN(amount),
+            {
+                from: from,
+            }
+        );
     };
 
     const verifyBaseUri = async (val) => {
@@ -322,7 +336,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe("Minting Cards", () => {
+    describe.skip("Minting Cards", () => {
         // Failing cases
         it("should fail when msg.sender != minter", async () => {
             const revertReason = getRoleRevertReason(tokenHolder, MINTER);
@@ -353,7 +367,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe("Creating Card Claims", () => {
+    describe.skip("Creating Card Claims", () => {
         // Failing cases
         it("should fail when msg.sender != minter", async () => {
             const revertReason = getRoleRevertReason(tokenHolder, MINTER);
@@ -380,6 +394,7 @@ function shouldBehaveLikePhlipCard(
             );
         });
 
+        // Passing cases
         it("should pass when msg.sender = minter and address has no claims", async () => {
             await createClaim();
 
@@ -387,63 +402,40 @@ function shouldBehaveLikePhlipCard(
             await verifyAddressHasClaim(otherAccount);
             await verifyClaimBalance(otherAccount, 1);
         });
+    });
 
-        // Increasing Claims
-        xit("should allow minter to increase claimable amount of existing claim", async () => {
-            // Create a claim
-            await context.cardInstance.createClaim(otherAccount, 1, {
-                from: minter,
-            });
-
-            // Account should have 1 claimable card
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                1
-            );
-
-            await context.cardInstance.increaseClaim(otherAccount, 2, {
-                from: minter,
-            });
-
-            // Account should have 3 claimable cards
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                3
-            );
+    describe("Increasing Card Claims", () => {
+        // Failing cases
+        it("should fail when msg.sender != minter", async () => {
+            const revertReason = getRoleRevertReason(otherAccount, MINTER);
+            await expectRevert(increaseClaim(otherAccount), revertReason);
         });
-        xit("should prevent non-minter from increasing claimable amount of existing claim", async () => {
-            // Create a claim
-            await context.cardInstance.createClaim(otherAccount, 1, {
-                from: minter,
-            });
 
-            // Account should have 1 claimable card
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                1
-            );
-
-            try {
-                // Attempt to mint a card
-                await context.cardInstance.increaseClaim(otherAccount, 2, {
-                    from: otherAccount,
-                });
-            } catch (error) {
-                // Expect missing role exception to be thrown
-                error.message.should.includes("missing role");
-            }
-
-            // Account should still have 1 claimable card
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                1
+        it("should fail when address does not have an existing claim", async () => {
+            await expectRevert(
+                increaseClaim(minter, otherAccount),
+                "Claimable: Claim does not exist."
             );
         });
 
+        it("should fail when amount to increase = 0", async () => {
+            await expectRevert(
+                increaseClaim(minter, claimHolder, 0),
+                "PhlipCard: Can only increase claim by amount greater than 0."
+            );
+        });
+
+        // Passing cases
+        it("should pass when msg.sender = minter and address has a claim", async () => {
+            // Increase claim of claimHolder by 2
+            await increaseClaim(minter, claimHolder, 2);
+
+            // Ensure claim was increased correctly
+            await verifyClaimBalance(claimHolder, 4);
+        });
+    });
+
+    describe("Redeeming Card Claims", () => {
         // Redeeming Claims
         xit("should allow address with multiple claims to redeem card", async () => {
             // Create a claim
