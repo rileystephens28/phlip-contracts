@@ -202,6 +202,8 @@ contract PhlipCard is
         // Get the first claimable token ID, then remove
         // it from the claimable tokens to prevent reentrance
         uint256 claimableTokenId = nextClaimableID(msg.sender);
+
+        // NOTE claiming the last index (instead of 0) saves gas
         _removeFromClaim(msg.sender, 0);
         _mintCard(claimableTokenId, msg.sender, _uri);
     }

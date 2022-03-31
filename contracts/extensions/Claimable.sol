@@ -174,7 +174,10 @@ contract Claimable {
         claim.remainingAmount -= 1;
 
         // Remove asset ID from claim and asset beneficiaries
-        delete claim.assetIds[_index];
+        for (uint256 i = _index; i < claim.assetIds.length - 1; i++) {
+            claim.assetIds[i] = claim.assetIds[i + 1];
+        }
+        claim.assetIds.pop();
         delete _assetBeneficiaries[assetId];
 
         // If there are no more assets in the claim, delete the claim
