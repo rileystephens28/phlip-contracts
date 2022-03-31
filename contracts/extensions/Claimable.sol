@@ -117,6 +117,10 @@ contract Claimable {
         internal
         virtual
     {
+        require(
+            _beneficiary != address(0),
+            "Claimable._createClaim: Beneficiary cannot be 0x0 address"
+        );
         // Add address to beneficiaries
         require(
             !_beneficiaries[_beneficiary],
