@@ -371,9 +371,13 @@ contract PhlipCard is
         address _to,
         string memory _uri
     ) internal {
+        require(
+            bytes(_uri).length > 0,
+            "PhlipCard: Cannot mint with empty URI."
+        );
         // Store the new card data then mint the token
         _cards[_tokenID] = Card(_uri, _to, 0, true);
-        _safeMint(_to, _tokenID);
+        _safeMint(_to, _tokenID, "");
 
         // Create a ballot for the new card
         _createBallot(_tokenID);
