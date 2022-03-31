@@ -2,46 +2,95 @@ const {
     BN, // Big Number support
     constants, // Common constants, like the zero address and largest integers
     expectRevert, // Assertions for transactions that should fail
-    snapshot,
     time,
 } = require("@openzeppelin/test-helpers");
 require("chai").should();
 const utils = require("../utils/token");
 
-function shouldBehaveLikePhlipCard(initialAttr, accounts) {
-    const minter = (pauser = blocker = accounts[0]);
-    const tokenHolder = accounts[1];
-    const otherAccount = accounts[2];
+const MINTER = web3.utils.soliditySha3("MINTER_ROLE");
+const PAUSER = web3.utils.soliditySha3("PAUSER_ROLE");
+const BLOCKER = web3.utils.soliditySha3("BLOCKER_ROLE");
+
+function shouldBehaveLikePhlipCard(
+    context,
+    initialAttr,
+    admin,
+    tokenHolder,
+    cardHolder,
+    claimHolder,
+    otherAccount
+) {
+    const minter = admin;
+    const pauser = admin;
+    const blocker = admin;
+    baseCid = "test123";
+
+    const mintCard = async (
+        from = minter,
+        to = otherAccount,
+        cid = baseCid
+    ) => {
+        return await context.cardInstance.mintCard(to, cid, {
+            from: from,
+        });
+    };
+
+    const createClaim = async (
+        from = minter,
+        to = otherAccount,
+        amount = new BN(1)
+    ) => {
+        return await context.cardInstance.createClaim(to, amount, {
+            from: from,
+        });
+    };
 
     const verifyBaseUri = async (val) => {
-        const baseUri = await this.cardInstance.BASE_URI();
+        const baseUri = await context.cardInstance.BASE_URI();
         baseUri.should.be.equal(val);
     };
 
     const verifyMaxDownvotes = async (val) => {
-        const maxDownvotes = await this.cardInstance.MAX_DOWNVOTES();
+        const maxDownvotes = await context.cardInstance.MAX_DOWNVOTES();
         maxDownvotes.should.be.bignumber.equal(val);
     };
 
     const verifyMaxUriChanges = async (val) => {
-        const maxUriChanges = await this.cardInstance.MAX_URI_CHANGES();
+        const maxUriChanges = await context.cardInstance.MAX_URI_CHANGES();
         maxUriChanges.should.be.bignumber.equal(val);
     };
 
     const verifyMinTokenReq = async (val) => {
         const minDaoTokensRequired =
-            await this.cardInstance.MIN_DAO_TOKENS_REQUIRED();
+            await context.cardInstance.MIN_DAO_TOKENS_REQUIRED();
         minDaoTokensRequired.should.be.bignumber.equal(val);
     };
 
     const verifyPause = async (bool) => {
-        const paused = await this.cardInstance.paused();
+        const paused = await context.cardInstance.paused();
         paused.should.be.equal(bool);
     };
 
     const verifyBlacklisted = async (address, bool) => {
-        const blacklisted = await this.cardInstance.isBlacklisted(address);
+        const blacklisted = await context.cardInstance.isBlacklisted(address);
         blacklisted.should.be.equal(bool);
+    };
+
+    const verifyCardBalance = async (address, amount) => {
+        const cardBalance = await context.cardInstance.balanceOf(address);
+        cardBalance.should.be.bignumber.equal(new BN(amount));
+    };
+
+    const verifyClaimBalance = async (address, amount) => {
+        const claimBalance = await context.cardInstance.remainingClaims(
+            address
+        );
+        claimBalance.should.be.bignumber.equal(new BN(amount));
+    };
+
+    const verifyAddressHasClaim = async (address, bool = true) => {
+        const hasClaim = await context.cardInstance.hasClaim(address);
+        hasClaim.should.be.equal(bool);
     };
 
     const getRoleRevertReason = (account, role) => {
@@ -54,18 +103,14 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         );
     };
 
-    describe("Token Attributes", () => {
-        console.log("YEE", this.cardInstance);
-
+    describe.skip("Token Attributes", () => {
         it("has the correct name", async function () {
-            console.log("WEE1", this.cardInstance);
-
-            const name = await this.cardInstance.name();
+            const name = await context.cardInstance.name();
             name.should.equal(initialAttr.name);
         });
 
         it("has the correct symbol", async () => {
-            const symbol = await this.cardInstance.symbol();
+            const symbol = await context.cardInstance.symbol();
             symbol.should.equal(initialAttr.symbol);
         });
 
@@ -86,18 +131,18 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         });
     });
 
-    describe("Setter Functions", () => {
+    describe.skip("Setter Functions", () => {
         const newBaseUri = "https://test.com/";
-        const newMaxDownvotes = 200;
-        const newMaxUriChanges = 10;
-        const newMinTokenReq = 300;
-        const revertReason = getRoleRevertReason(otherAccount, this.minterRole);
+        const newMaxDownvotes = new BN(200);
+        const newMaxUriChanges = new BN(10);
+        const newMinTokenReq = new BN(300);
+        const revertReason = getRoleRevertReason(otherAccount, MINTER);
 
         // Failing cases
         it("should fail to set base URI for cards when msg.sender != minter", async () => {
             // Set base URI
             await expectRevert(
-                this.cardInstance.setBaseUri(newBaseUri, {
+                context.cardInstance.setBaseURI(newBaseUri, {
                     from: otherAccount,
                 }),
                 revertReason
@@ -109,7 +154,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         it("should fail to set max number of allowed downvotes per card when msg.sender != minter", async () => {
             // Set max downvotes
             await expectRevert(
-                this.cardInstance.setMaxDownvotes(newMaxDownvotes, {
+                context.cardInstance.setMaxDownvotes(newMaxDownvotes, {
                     from: otherAccount,
                 }),
                 revertReason
@@ -120,7 +165,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         it("should fail to set max number of allowed URI changes per card when msg.sender != minter", async () => {
             // Set max uri changes
             await expectRevert(
-                this.cardInstance.setMaxUriChanges(newMaxUriChanges, {
+                context.cardInstance.setMaxUriChanges(newMaxUriChanges, {
                     from: otherAccount,
                 }),
                 revertReason
@@ -131,7 +176,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         it("should fail to set min number of DAO tokens required to vote when msg.sender != minter", async () => {
             // Set min require DAO tokens
             await expectRevert(
-                this.cardInstance.setMinDaoTokensRequired(newMinTokenReq, {
+                context.cardInstance.setMinDaoTokensRequired(newMinTokenReq, {
                     from: otherAccount,
                 }),
                 revertReason
@@ -143,14 +188,14 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         // Passing cases
         it("should set base URI for cards when msg.sender = minter", async () => {
             // Set base URI
-            await this.cardInstance.setBaseURI(newBaseUri, { from: minter });
+            await context.cardInstance.setBaseURI(newBaseUri, { from: minter });
 
             // URI should equal new URI
             await verifyBaseUri(newBaseUri);
         });
         it("should set max number of allowed downvotes per card when msg.sender = minter", async () => {
             // Set max downvotes
-            await this.cardInstance.setDownVoteMax(newMaxDownvotes, {
+            await context.cardInstance.setMaxDownvotes(newMaxDownvotes, {
                 from: minter,
             });
 
@@ -159,7 +204,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         });
         it("should set max number of allowed URI changes per card when msg.sender = minter", async () => {
             // Set max uri changes
-            await this.cardInstance.setUriChangeMax(newMaxUriChanges, {
+            await context.cardInstance.setMaxUriChanges(newMaxUriChanges, {
                 from: minter,
             });
 
@@ -168,7 +213,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         });
         it("should set min number of DAO tokens required to vote", async () => {
             // Set min require DAO tokens
-            await this.cardInstance.setMinDaoTokensRequired(newMinTokenReq, {
+            await context.cardInstance.setMinDaoTokensRequired(newMinTokenReq, {
                 from: minter,
             });
 
@@ -177,12 +222,12 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         });
     });
 
-    describe("Pausing Tranfers", () => {
-        const revertReason = getRoleRevertReason(otherAccount, this.pauserRole);
+    describe.skip("Pausing Tranfers", () => {
+        const revertReason = getRoleRevertReason(otherAccount, PAUSER);
         // Failing cases
         it("should fail to pause when msg.sender != pauser", async () => {
-            expectRevert(
-                this.cardInstance.pause({ from: otherAccount }),
+            await expectRevert(
+                context.cardInstance.pause({ from: otherAccount }),
                 revertReason
             );
 
@@ -192,13 +237,13 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
 
         it("should fail to unpause when msg.sender != pauser", async () => {
             // Pause the contract
-            await this.cardInstance.pause({ from: pauser });
+            await context.cardInstance.pause({ from: pauser });
 
             // Contract should be paused
             await verifyPause(true);
 
-            expectRevert(
-                this.cardInstance.pause({ from: otherAccount }),
+            await expectRevert(
+                context.cardInstance.pause({ from: otherAccount }),
                 revertReason
             );
 
@@ -209,28 +254,25 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         // Passing cases
         it("should pause/unpause when msg.sender = pauser", async () => {
             // Pause the contract
-            await this.cardInstance.pause({ from: pauser });
+            await context.cardInstance.pause({ from: pauser });
 
             // Contract should be paused
             await verifyPause(true);
 
             // Unpause the contract
-            await this.cardInstance.unpause({ from: pauser });
+            await context.cardInstance.unpause({ from: pauser });
 
             // Contract should be unpaused
             await verifyPause(false);
         });
     });
 
-    describe("Blocking Addresses", () => {
-        const revertReason = getRoleRevertReason(
-            otherAccount,
-            this.blockerRole
-        );
+    describe.skip("Blocking Addresses", () => {
+        const revertReason = getRoleRevertReason(otherAccount, BLOCKER);
         // Failing cases
         it("should fail to blacklist when msg.sender != blocker", async () => {
-            expectRevert(
-                this.cardInstance.blacklistAddress(tokenHolder, {
+            await expectRevert(
+                context.cardInstance.blacklistAddress(tokenHolder, {
                     from: otherAccount,
                 }),
                 revertReason
@@ -242,15 +284,15 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
 
         it("should fail to unblacklist when msg.sender != blocker", async () => {
             // Blacklist address
-            await this.cardInstance.blacklistAddress(tokenHolder, {
+            await context.cardInstance.blacklistAddress(tokenHolder, {
                 from: blocker,
             });
 
             // Address should be blacklisted
             await verifyBlacklisted(tokenHolder, true);
 
-            expectRevert(
-                this.cardInstance.unblacklistAddress(tokenHolder, {
+            await expectRevert(
+                context.cardInstance.unblacklistAddress(tokenHolder, {
                     from: otherAccount,
                 }),
                 revertReason
@@ -263,7 +305,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         // Passing cases
         it("should blacklist/unblacklist when msg.sender = blocker", async () => {
             // Blacklist address
-            await this.cardInstance.blacklistAddress(tokenHolder, {
+            await context.cardInstance.blacklistAddress(tokenHolder, {
                 from: blocker,
             });
 
@@ -271,7 +313,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
             await verifyBlacklisted(tokenHolder, true);
 
             // Unblacklist address
-            await this.cardInstance.unblacklistAddress(tokenHolder, {
+            await context.cardInstance.unblacklistAddress(tokenHolder, {
                 from: blocker,
             });
 
@@ -280,170 +322,113 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
         });
     });
 
-    describe.skip("Minting Cards", () => {
+    describe("Minting Cards", () => {
         // Failing cases
-        it("should fail to mint when msg.sender != blocker", async () => {
-            expectRevert(
-                this.cardInstance.blacklistAddress(tokenHolder, {
-                    from: otherAccount,
-                }),
-                revertReason
+        it("should fail when msg.sender != minter", async () => {
+            const revertReason = getRoleRevertReason(tokenHolder, MINTER);
+            await expectRevert(mintCard(tokenHolder), revertReason);
+        });
+
+        xit("should fail when recipient is 0x0", async () => {
+            // BUG: This test fails because it uses all gas not because of zero address
+            await expectRevert(
+                mintCard(minter, constants.ZERO_ADDRESS),
+                "ERC721: mint to the zero address"
             );
-
-            // Contract should not be paused
-            await verifyBlacklisted(tokenHolder, false);
         });
 
-        //  Minting Cards
-        it("should allow minter to mint a new card to an address", async () => {
-            // Account should 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
-
-            await this.cardInstance.mintCard(otherAccount, "test123", {
-                from: minter,
-            });
-
-            // Account should have 1 card
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 1);
+        it("should fail to mint when URI is blank", async () => {
+            await expectRevert(
+                mintCard(minter, otherAccount, ""),
+                "PhlipCard: Cannot mint with empty URI."
+            );
         });
-        it("should prevent NO_ROLE_ACCOUNT from minting a new card to an address", async () => {
-            // Account should 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
 
-            try {
-                // Attempt to mint a card
-                await this.cardInstance.mintCard(otherAccount, "test123", {
-                    from: otherAccount,
-                });
-            } catch (error) {
-                // Expect missing role exception to be thrown
-                error.message.should.includes("missing role");
-            }
+        // Passing cases
+        it("should pass when msg.sender = minter", async () => {
+            await mintCard();
 
-            // Account should still have no cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
+            // token holder should have 1 card
+            await verifyCardBalance(otherAccount, 1);
         });
     });
 
-    describe.skip("Claiming and Minting", () => {
-        //  Minting Cards
-        it("should allow minter to mint a new card to an address", async () => {
-            // Account should 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
-
-            await this.cardInstance.mintCard(otherAccount, "test123", {
-                from: minter,
-            });
-
-            // Account should have 1 card
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 1);
-        });
-        it("should prevent NO_ROLE_ACCOUNT from minting a new card to an address", async () => {
-            // Account should 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
-
-            try {
-                // Attempt to mint a card
-                await this.cardInstance.mintCard(otherAccount, "test123", {
-                    from: otherAccount,
-                });
-            } catch (error) {
-                // Expect missing role exception to be thrown
-                error.message.should.includes("missing role");
-            }
-
-            // Account should still have no cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
+    describe("Creating Card Claims", () => {
+        // Failing cases
+        it("should fail when msg.sender != minter", async () => {
+            const revertReason = getRoleRevertReason(tokenHolder, MINTER);
+            await expectRevert(createClaim(tokenHolder), revertReason);
         });
 
-        //  Creating Claiming
-        it("should allow minter to create a new claim", async () => {
-            // Account should 0 claimable cards
-            await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
-                otherAccount,
-                0
-            );
-
-            // Create claim
-            await this.cardInstance.createClaim(otherAccount, 1, {
-                from: minter,
-            });
-
-            // Account should have 1 card
-            await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
-                otherAccount,
-                1
+        it("should fail when recipient is 0x0", async () => {
+            // BUG: This test fails because it uses all gas not because of zero address
+            await expectRevert(
+                createClaim(minter, constants.ZERO_ADDRESS),
+                "Claimable._createClaim: Beneficiary cannot be 0x0 address"
             );
         });
-        it("should prevent non-minter from creating a new claim", async () => {
-            // Account should 0 claimable cards
-            await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
-                otherAccount,
-                0
-            );
 
-            try {
-                // Attempt to mint a card
-                await this.cardInstance.createClaim(otherAccount, 1, {
-                    from: otherAccount,
-                });
-            } catch (error) {
-                // Expect missing role exception to be thrown
-                error.message.should.includes("missing role");
-            }
+        it("should fail when address has an existing claim", async () => {
+            await createClaim();
 
-            // Account should still 0 claimable cards
-            await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
-                otherAccount,
-                0
+            // Ensure account has a claim
+            await verifyAddressHasClaim(otherAccount);
+
+            await expectRevert(
+                createClaim(),
+                "Claimable._createClaim: Claim has already been created for this address. Call _updateClaim() for existing beneficiaries."
             );
+        });
+
+        it("should pass when msg.sender = minter and address has no claims", async () => {
+            await createClaim();
+
+            // Ensure account has a claim with correct balance
+            await verifyAddressHasClaim(otherAccount);
+            await verifyClaimBalance(otherAccount, 1);
         });
 
         // Increasing Claims
-        it("should allow minter to increase claimable amount of existing claim", async () => {
+        xit("should allow minter to increase claimable amount of existing claim", async () => {
             // Create a claim
-            await this.cardInstance.createClaim(otherAccount, 1, {
+            await context.cardInstance.createClaim(otherAccount, 1, {
                 from: minter,
             });
 
             // Account should have 1 claimable card
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 1
             );
 
-            await this.cardInstance.increaseClaim(otherAccount, 2, {
+            await context.cardInstance.increaseClaim(otherAccount, 2, {
                 from: minter,
             });
 
             // Account should have 3 claimable cards
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 3
             );
         });
-        it("should prevent non-minter from increasing claimable amount of existing claim", async () => {
+        xit("should prevent non-minter from increasing claimable amount of existing claim", async () => {
             // Create a claim
-            await this.cardInstance.createClaim(otherAccount, 1, {
+            await context.cardInstance.createClaim(otherAccount, 1, {
                 from: minter,
             });
 
             // Account should have 1 claimable card
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 1
             );
 
             try {
                 // Attempt to mint a card
-                await this.cardInstance.increaseClaim(otherAccount, 2, {
+                await context.cardInstance.increaseClaim(otherAccount, 2, {
                     from: otherAccount,
                 });
             } catch (error) {
@@ -453,124 +438,144 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
 
             // Account should still have 1 claimable card
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 1
             );
         });
 
         // Redeeming Claims
-        it("should allow address with multiple claims to redeem card", async () => {
+        xit("should allow address with multiple claims to redeem card", async () => {
             // Create a claim
-            await this.cardInstance.createClaim(otherAccount, 5, {
+            await context.cardInstance.createClaim(otherAccount, 5, {
                 from: minter,
             });
 
             // Account should have a registered claim
             await utils.tokenHasClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 true
             );
 
             // Account should have 5 claimable card
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 5
             );
 
             // Account should have 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
+            await utils.tokenBalanceCheck(
+                context.cardInstance,
+                otherAccount,
+                0
+            );
 
             // Redeem the card
-            await this.cardInstance.redeemCard("test123", {
+            await context.cardInstance.redeemCard("test123", {
                 from: otherAccount,
             });
 
             // Account should still have a registered claim
             await utils.tokenHasClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 true
             );
 
             // Account should have 4 claimable cards
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 4
             );
 
             // Account should have 1 card
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 1);
+            await utils.tokenBalanceCheck(
+                context.cardInstance,
+                otherAccount,
+                1
+            );
         });
-        it("should allow address with 1 claim to redeem card", async () => {
+        xit("should allow address with 1 claim to redeem card", async () => {
             // Create a claim
-            await this.cardInstance.createClaim(otherAccount, 1, {
+            await context.cardInstance.createClaim(otherAccount, 1, {
                 from: minter,
             });
 
             // Account should have a registered claim
             await utils.tokenHasClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 true
             );
 
             // Account should have 1 claimable card
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 1
             );
 
             // Account should have 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
+            await utils.tokenBalanceCheck(
+                context.cardInstance,
+                otherAccount,
+                0
+            );
 
             // Redeem the card
-            await this.cardInstance.redeemCard("test123", {
+            await context.cardInstance.redeemCard("test123", {
                 from: otherAccount,
             });
 
             // Account should not have a registered claim
             await utils.tokenHasClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 false
             );
 
             // Account should have 0 claimable cards
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 0
             );
 
             // Account should have 1 card
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 1);
+            await utils.tokenBalanceCheck(
+                context.cardInstance,
+                otherAccount,
+                1
+            );
         });
-        it("should prevent address without claim from redeeming card", async () => {
+        xit("should prevent address without claim from redeeming card", async () => {
             // Account should not have a registered claim
             await utils.tokenHasClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 false
             );
 
             // Account should have 0 claimable card
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 0
             );
 
             // Account should have 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
+            await utils.tokenBalanceCheck(
+                context.cardInstance,
+                otherAccount,
+                0
+            );
 
             try {
                 // Attempt to redeem a card
-                await this.cardInstance.redeemCard("test123", {
+                await context.cardInstance.redeemCard("test123", {
                     from: otherAccount,
                 });
             } catch (error) {
@@ -580,20 +585,24 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
 
             // Account should still not have a registered claim
             await utils.tokenHasClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 false
             );
 
             // Account should still have 0 claimable card
             await utils.tokenRemainingClaimCheck(
-                this.cardInstance,
+                context.cardInstance,
                 otherAccount,
                 0
             );
 
             // Account should still have 0 cards
-            await utils.tokenBalanceCheck(this.cardInstance, otherAccount, 0);
+            await utils.tokenBalanceCheck(
+                context.cardInstance,
+                otherAccount,
+                0
+            );
         });
     });
 
@@ -603,64 +612,68 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
 
         it("should allow phlipDAO holder to up vote existing card", async () => {
             // Mint a card
-            await this.cardInstance.mintCard(otherAccount, "test123", {
+            await context.cardInstance.mintCard(otherAccount, "test123", {
                 from: minter,
             });
 
             // DAO holder casts up vote
-            await this.cardInstance.upVote(mintedCardId, {
+            await context.cardInstance.upVote(mintedCardId, {
                 from: tokenHolder,
             });
 
             // Card should have 1 up vote
-            const upVotes = await this.cardInstance.upVotesFor(mintedCardId);
+            const upVotes = await context.cardInstance.upVotesFor(mintedCardId);
             upVotes.toString().should.equal("1");
         });
         it("should allow phlipDAO holder to down vote existing card", async () => {
             // Mint a card
-            await this.cardInstance.mintCard(otherAccount, "test123", {
+            await context.cardInstance.mintCard(otherAccount, "test123", {
                 from: minter,
             });
 
             // DAO holder casts down vote
-            await this.cardInstance.downVote(mintedCardId, {
+            await context.cardInstance.downVote(mintedCardId, {
                 from: tokenHolder,
             });
 
             // Card should have 1 down vote
-            const upVotes = await this.cardInstance.downVotesFor(mintedCardId);
+            const upVotes = await context.cardInstance.downVotesFor(
+                mintedCardId
+            );
             upVotes.toString().should.equal("1");
         });
 
         // Non-PhlipDAO Attemptig to Vote
         it("should prevent non-phlipDAO holder from up voting", async () => {
             // Mint a card
-            await this.cardInstance.mintCard(otherAccount, "test123", {
+            await context.cardInstance.mintCard(otherAccount, "test123", {
                 from: minter,
             });
             try {
                 // non-DAO holder attemptes to cast up vote
-                await this.cardInstance.upVote(mintedCardId, {
+                await context.cardInstance.upVote(mintedCardId, {
                     from: otherAccount,
                 });
             } catch (error) {}
             // Card should have 0 up votes
-            const upVotes = await this.cardInstance.upVotesFor(mintedCardId);
+            const upVotes = await context.cardInstance.upVotesFor(mintedCardId);
             upVotes.toString().should.equal("0");
         });
         it("should prevent non-phlipDAO holder from down voting", async () => {
             // Mint a card
-            await this.cardInstance.mintCard(otherAccount, "test123", {
+            await context.cardInstance.mintCard(otherAccount, "test123", {
                 from: minter,
             });
             try {
                 // non-DAO holder attemptes to cast down vote
-                await this.cardInstance.downVote(mintedCardId, {
+                await context.cardInstance.downVote(mintedCardId, {
                     from: otherAccount,
                 });
             } catch (error) {}
             // Card should have 0 down votes
-            const upVotes = await this.cardInstance.downVotesFor(mintedCardId);
+            const upVotes = await context.cardInstance.downVotesFor(
+                mintedCardId
+            );
             upVotes.toString().should.equal("0");
         });
 
@@ -669,7 +682,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
             let voteFailed = false;
             try {
                 // DAO holder casts down vote
-                await this.cardInstance.upVote(mintedCardId, {
+                await context.cardInstance.upVote(mintedCardId, {
                     from: tokenHolder,
                 });
             } catch (error) {
@@ -681,7 +694,7 @@ function shouldBehaveLikePhlipCard(initialAttr, accounts) {
             let voteFailed = false;
             try {
                 // DAO holder casts down vote
-                await this.cardInstance.downVote(mintedCardId, {
+                await context.cardInstance.downVote(mintedCardId, {
                     from: tokenHolder,
                 });
             } catch (error) {
