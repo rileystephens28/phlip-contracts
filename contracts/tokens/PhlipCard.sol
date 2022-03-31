@@ -197,7 +197,7 @@ contract PhlipCard is
     function redeemCard(string memory _uri)
         external
         whenNotPaused
-        onlyBeneficiary
+        onlyClaimers
     {
         // Get the first claimable token ID, then remove
         // it from the claimable tokens to prevent reentrance
