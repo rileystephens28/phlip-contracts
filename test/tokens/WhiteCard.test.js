@@ -9,7 +9,7 @@ contract("WhiteCard", (accounts) => {
         name: "Phlip White Card",
         symbol: "WPC",
         baseUri: "https.ipfs.moralis.io/ipfs/",
-        maxDownvotes: new BN(20),
+        maxDownVotes: new BN(2),
         maxUriChanges: new BN(5),
         minDaoTokensRequired: new BN(100),
     };
@@ -24,7 +24,7 @@ contract("WhiteCard", (accounts) => {
         context.tokenInstance = await ERC20Mock.new({ from: accounts[0] });
         context.cardInstance = await WhiteCard.new(
             cardAttributes.baseUri,
-            cardAttributes.maxDownvotes,
+            cardAttributes.maxDownVotes,
             cardAttributes.maxUriChanges,
             cardAttributes.minDaoTokensRequired,
             context.tokenInstance.address,
@@ -37,7 +37,7 @@ contract("WhiteCard", (accounts) => {
         });
 
         // Send some tokens to token holder account
-        context.tokenInstance.transfer(accounts[1], new BN(100), {
+        context.tokenInstance.transfer(accounts[1], new BN(200), {
             from: accounts[0],
         });
 
@@ -46,7 +46,6 @@ contract("WhiteCard", (accounts) => {
             from: accounts[0],
         });
 
-        // Create claim for claim holder with amount = 2
         await context.cardInstance.createClaim(accounts[3], new BN(2), {
             from: accounts[0],
         });
