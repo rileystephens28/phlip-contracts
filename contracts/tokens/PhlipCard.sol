@@ -94,8 +94,8 @@ contract PhlipCard is
 
         // Set constants
         setBaseURI(_baseUri);
-        setDownVoteMax(_maxDownvotes);
-        setUriChangeMax(_maxUriChanges);
+        setMaxDownvotes(_maxDownvotes);
+        setMaxUriChanges(_maxUriChanges);
         setMinDaoTokensRequired(_minDaoTokensRequired);
         setDaoTokenAddress(_daoTokenAddress);
     }
