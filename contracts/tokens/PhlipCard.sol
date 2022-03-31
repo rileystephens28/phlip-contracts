@@ -293,7 +293,7 @@ contract PhlipCard is
      * before it is marked unplayable.
      * @param _newMax The new max number of downvotes allowed
      */
-    function setDownVoteMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
+    function setMaxDownvotes(uint256 _newMax) public onlyRole(MINTER_ROLE) {
         MAX_DOWNVOTES = _newMax;
     }
 
@@ -301,7 +301,7 @@ contract PhlipCard is
      * @dev Allows MINTER to set max number of times minter can change the URI of a card.
      * @param _newMax New max changes allowed
      */
-    function setUriChangeMax(uint256 _newMax) public onlyRole(MINTER_ROLE) {
+    function setMaxUriChanges(uint256 _newMax) public onlyRole(MINTER_ROLE) {
         MAX_URI_CHANGES = _newMax;
     }
 
