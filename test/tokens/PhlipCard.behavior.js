@@ -59,6 +59,12 @@ function shouldBehaveLikePhlipCard(
         );
     };
 
+    const redeemCard = async (account = claimHolder, uri = "redeemed123") => {
+        return await context.cardInstance.redeemCard(uri, {
+            from: account,
+        });
+    };
+
     const verifyBaseUri = async (val) => {
         const baseUri = await context.cardInstance.BASE_URI();
         baseUri.should.be.equal(val);
@@ -117,7 +123,7 @@ function shouldBehaveLikePhlipCard(
         );
     };
 
-    describe.skip("Token Attributes", () => {
+    describe("Token Attributes", () => {
         it("has the correct name", async function () {
             const name = await context.cardInstance.name();
             name.should.equal(initialAttr.name);
@@ -145,7 +151,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe.skip("Setter Functions", () => {
+    describe("Setter Functions", () => {
         const newBaseUri = "https://test.com/";
         const newMaxDownvotes = new BN(200);
         const newMaxUriChanges = new BN(10);
@@ -236,7 +242,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe.skip("Pausing Tranfers", () => {
+    describe("Pausing Tranfers", () => {
         const revertReason = getRoleRevertReason(otherAccount, PAUSER);
         // Failing cases
         it("should fail to pause when msg.sender != pauser", async () => {
@@ -281,7 +287,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe.skip("Blocking Addresses", () => {
+    describe("Blocking Addresses", () => {
         const revertReason = getRoleRevertReason(otherAccount, BLOCKER);
         // Failing cases
         it("should fail to blacklist when msg.sender != blocker", async () => {
@@ -336,7 +342,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe.skip("Minting Cards", () => {
+    describe("Minting Cards", () => {
         // Failing cases
         it("should fail when msg.sender != minter", async () => {
             const revertReason = getRoleRevertReason(tokenHolder, MINTER);
@@ -367,7 +373,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe.skip("Creating Card Claims", () => {
+    describe("Creating Card Claims", () => {
         // Failing cases
         it("should fail when msg.sender != minter", async () => {
             const revertReason = getRoleRevertReason(tokenHolder, MINTER);
@@ -436,165 +442,47 @@ function shouldBehaveLikePhlipCard(
     });
 
     describe("Redeeming Card Claims", () => {
-        // Redeeming Claims
-        xit("should allow address with multiple claims to redeem card", async () => {
-            // Create a claim
-            await context.cardInstance.createClaim(otherAccount, 5, {
-                from: minter,
-            });
-
-            // Account should have a registered claim
-            await utils.tokenHasClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                true
-            );
-
-            // Account should have 5 claimable card
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                5
-            );
-
-            // Account should have 0 cards
-            await utils.tokenBalanceCheck(
-                context.cardInstance,
-                otherAccount,
-                0
-            );
-
-            // Redeem the card
-            await context.cardInstance.redeemCard("test123", {
-                from: otherAccount,
-            });
-
-            // Account should still have a registered claim
-            await utils.tokenHasClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                true
-            );
-
-            // Account should have 4 claimable cards
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                4
-            );
-
-            // Account should have 1 card
-            await utils.tokenBalanceCheck(
-                context.cardInstance,
-                otherAccount,
-                1
+        // Failing cases
+        it("should fail when msg.sender does not have claim", async () => {
+            await expectRevert(
+                redeemCard(otherAccount),
+                "Claimable: Address does not have a claim."
             );
         });
-        xit("should allow address with 1 claim to redeem card", async () => {
-            // Create a claim
-            await context.cardInstance.createClaim(otherAccount, 1, {
-                from: minter,
-            });
 
-            // Account should have a registered claim
-            await utils.tokenHasClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                true
-            );
+        it("should fail when contract is paused", async () => {
+            // Pause the contract
+            await context.cardInstance.pause({ from: pauser });
 
-            // Account should have 1 claimable card
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                1
-            );
+            // Contract should be paused
+            await verifyPause(true);
 
-            // Account should have 0 cards
-            await utils.tokenBalanceCheck(
-                context.cardInstance,
-                otherAccount,
-                0
-            );
-
-            // Redeem the card
-            await context.cardInstance.redeemCard("test123", {
-                from: otherAccount,
-            });
-
-            // Account should not have a registered claim
-            await utils.tokenHasClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                false
-            );
-
-            // Account should have 0 claimable cards
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                0
-            );
-
-            // Account should have 1 card
-            await utils.tokenBalanceCheck(
-                context.cardInstance,
-                otherAccount,
-                1
-            );
+            await expectRevert(redeemCard(), "Pausable: paused");
         });
-        xit("should prevent address without claim from redeeming card", async () => {
-            // Account should not have a registered claim
-            await utils.tokenHasClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                false
-            );
 
-            // Account should have 0 claimable card
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                0
+        it("should fail when claim has been emptied", async () => {
+            // Redeem all cards owed to claimHolder
+            const claimBalance = await context.cardInstance.remainingClaims(
+                claimHolder
             );
-
-            // Account should have 0 cards
-            await utils.tokenBalanceCheck(
-                context.cardInstance,
-                otherAccount,
-                0
-            );
-
-            try {
-                // Attempt to redeem a card
-                await context.cardInstance.redeemCard("test123", {
-                    from: otherAccount,
-                });
-            } catch (error) {
-                // Expect not beneficiary exception to be thrown
-                error.message.should.includes("not a beneficiary");
+            for (let i = 0; i < claimBalance; i++) {
+                await redeemCard();
             }
-
-            // Account should still not have a registered claim
-            await utils.tokenHasClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                false
+            // Should treat claimHolder account as if it has no claim
+            await expectRevert(
+                redeemCard(),
+                "Claimable: Address does not have a claim."
             );
+        });
 
-            // Account should still have 0 claimable card
-            await utils.tokenRemainingClaimCheck(
-                context.cardInstance,
-                otherAccount,
-                0
-            );
+        // Passing cases
+        it("should pass when msg.sender has a claim amount > 0", async () => {
+            // Claim one of the cards owed to claimHolder
+            await redeemCard();
 
-            // Account should still have 0 cards
-            await utils.tokenBalanceCheck(
-                context.cardInstance,
-                otherAccount,
-                0
-            );
+            // claimHolder should now have 1 card and 1 claim left
+            await verifyCardBalance(claimHolder, 1);
+            await verifyClaimBalance(claimHolder, 1);
         });
     });
 
