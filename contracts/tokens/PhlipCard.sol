@@ -101,6 +101,15 @@ contract PhlipCard is
     }
 
     /**
+     * @dev View function to see if card is playable
+     * @param _tokenID The ID of the token to check
+     * @return True if card is playable, false otherwise
+     */
+    function isPlayable(uint256 _tokenID) public view returns (bool) {
+        return _cards[_tokenID].playable;
+    }
+
+    /**
      * @dev Allow address with PAUSER role to pause token transfers
      */
     function pause() external onlyRole(PAUSER_ROLE) {
@@ -244,7 +253,11 @@ contract PhlipCard is
         tokenExists(_tokenID)
     {
         require(
-            isDaoTokenHolder(msg.sender),
+            ownerOf(_tokenID) != msg.sender,
+            "PhlipCard: Cannot vote on your own card."
+        );
+        require(
+            holdsMinDaoTokens(msg.sender),
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow upvotes on unplayable cards?
@@ -264,7 +277,11 @@ contract PhlipCard is
         tokenExists(_tokenID)
     {
         require(
-            isDaoTokenHolder(msg.sender),
+            ownerOf(_tokenID) != msg.sender,
+            "PhlipCard: Cannot vote on your own card."
+        );
+        require(
+            holdsMinDaoTokens(msg.sender),
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow downvotes on unplayable cards?
@@ -282,8 +299,8 @@ contract PhlipCard is
      * @param _account Address to check.
      * @return Wether the address has any PhlipDAO tokens.
      */
-    function isDaoTokenHolder(address _account) public view returns (bool) {
-        return DAO_TOKEN.balanceOf(_account) > 0;
+    function holdsMinDaoTokens(address _account) public view returns (bool) {
+        return DAO_TOKEN.balanceOf(_account) > MIN_DAO_TOKENS_REQUIRED;
     }
 
     /**
