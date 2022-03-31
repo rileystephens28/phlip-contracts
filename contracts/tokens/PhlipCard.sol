@@ -163,6 +163,10 @@ contract PhlipCard is
         external
         onlyRole(MINTER_ROLE)
     {
+        require(
+            _amount > 0,
+            "PhlipCard: Can only increase claim by amount greater than 0."
+        );
         for (uint256 i = 0; i < _amount; i++) {
             uint256 tokenId = _tokenIdCounter.current();
             _tokenIdCounter.increment();
