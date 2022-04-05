@@ -10,7 +10,7 @@ contract("WhiteCard", (accounts) => {
         symbol: "WPC",
         baseUri: "https.ipfs.moralis.io/ipfs/",
         maxDownVotes: new BN(2),
-        maxUriChanges: new BN(5),
+        maxUriChanges: new BN(1),
         minDaoTokensRequired: new BN(100),
     };
 
@@ -41,11 +41,12 @@ contract("WhiteCard", (accounts) => {
             from: accounts[0],
         });
 
-        // Mint 1 card to card holder
-        await context.cardInstance.mintCard(accounts[2], "test123", {
+        // Mint 1 card to card holder. Card ID is 0.
+        await context.cardInstance.mintCard(accounts[2], "base123", {
             from: accounts[0],
         });
 
+        // Creates a claim for two cards. Takes card IDs 1 and 2.
         await context.cardInstance.createClaim(accounts[3], new BN(2), {
             from: accounts[0],
         });
@@ -61,7 +62,7 @@ contract("WhiteCard", (accounts) => {
 
     shouldBehaveLikePhlipCard(context, cardAttributes, ...accounts);
 
-    describe("Recording Game Wins", async () => {
+    describe.skip("Recording Game Wins", async () => {
         // Failure cases
         it("should fail when card ID is out of bounds", async () => {});
         it("should fail when msg.sender != recorder", async () => {});
@@ -70,7 +71,7 @@ contract("WhiteCard", (accounts) => {
         it("should pass when msg.sender is recorder and card ID is valid", async () => {});
     });
 
-    describe("Recording Game Losses", async () => {
+    describe.skip("Recording Game Losses", async () => {
         // Failure cases
         it("should fail when card ID is out of bounds", async () => {});
         it("should fail when msg.sender != recorder", async () => {});

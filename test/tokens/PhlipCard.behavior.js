@@ -23,7 +23,8 @@ function shouldBehaveLikePhlipCard(
     const minter = admin;
     const pauser = admin;
     const blocker = admin;
-    baseCid = "test123";
+    baseCid = "base123";
+    testCid = "test123";
 
     const mintCard = async (
         from = minter,
@@ -59,9 +60,19 @@ function shouldBehaveLikePhlipCard(
         );
     };
 
-    const redeemCard = async (account = claimHolder, uri = "redeemed123") => {
+    const redeemCard = async (uri = testCid, from = claimHolder) => {
         return await context.cardInstance.redeemCard(uri, {
-            from: account,
+            from: from,
+        });
+    };
+
+    const updateCardURI = async (
+        cardID = 0,
+        uri = testCid,
+        from = cardHolder
+    ) => {
+        return await context.cardInstance.updateCardURI(cardID, uri, {
+            from: from,
         });
     };
 
@@ -98,6 +109,11 @@ function shouldBehaveLikePhlipCard(
         minDaoTokensRequired.should.be.bignumber.equal(val);
     };
 
+    const verifyDaoTokenAddress = async (val) => {
+        const token = await context.cardInstance.DAO_TOKEN();
+        token.should.be.equal(val);
+    };
+
     const verifyPause = async (bool) => {
         const paused = await context.cardInstance.paused();
         paused.should.be.equal(bool);
@@ -106,6 +122,21 @@ function shouldBehaveLikePhlipCard(
     const verifyBlacklisted = async (address, bool) => {
         const blacklisted = await context.cardInstance.isBlacklisted(address);
         blacklisted.should.be.equal(bool);
+    };
+
+    const verifyCardURI = async (cardId, uri) => {
+        const cardURI = await context.cardInstance.tokenURI(new BN(cardId));
+        cardURI.should.be.equal(uri);
+    };
+
+    const verifyCardMinter = async (cardId, address) => {
+        const cardMinter = await context.cardInstance.minterOf(new BN(cardId));
+        cardMinter.should.be.equal(address);
+    };
+
+    const verifyCardOwner = async (cardId, address) => {
+        const cardOwner = await context.cardInstance.ownerOf(new BN(cardId));
+        cardOwner.should.be.equal(address);
     };
 
     const verifyCardBalance = async (address, amount) => {
@@ -180,6 +211,7 @@ function shouldBehaveLikePhlipCard(
         const newMaxDownvotes = new BN(200);
         const newMaxUriChanges = new BN(10);
         const newMinTokenReq = new BN(300);
+        const newDaoTokenAddress = "0x0000000000000000000000000000000000000001";
         const revertReason = getRoleRevertReason(otherAccount, MINTER);
 
         // Failing cases
@@ -228,6 +260,17 @@ function shouldBehaveLikePhlipCard(
             // Min DAO tokens required should still equal initial min DAO tokens required
             await verifyMinTokenReq(initialAttr.minDaoTokensRequired);
         });
+        it("should fail to set DAO token address when msg.sender != minter", async () => {
+            // Set min require DAO tokens
+            await expectRevert(
+                context.cardInstance.setDaoTokenAddress(newDaoTokenAddress, {
+                    from: otherAccount,
+                }),
+                revertReason
+            );
+            // Min DAO tokens required should still equal initial min DAO tokens required
+            await verifyDaoTokenAddress(context.tokenInstance.address);
+        });
 
         // Passing cases
         it("should set base URI for cards when msg.sender = minter", async () => {
@@ -255,7 +298,7 @@ function shouldBehaveLikePhlipCard(
             // Max should equal new max
             await verifyMaxUriChanges(newMaxUriChanges);
         });
-        it("should set min number of DAO tokens required to vote", async () => {
+        it("should set min number of DAO tokens required to vote when msg.sender = minter", async () => {
             // Set min require DAO tokens
             await context.cardInstance.setMinDaoTokensRequired(newMinTokenReq, {
                 from: minter,
@@ -264,9 +307,18 @@ function shouldBehaveLikePhlipCard(
             // Min should equal new min
             await verifyMinTokenReq(newMinTokenReq);
         });
+        it("should set DAO token address when msg.sender = minter", async () => {
+            // Set DAO token address
+            await context.cardInstance.setDaoTokenAddress(newDaoTokenAddress, {
+                from: minter,
+            });
+
+            // DAO token address should equal new DAO token address
+            await verifyDaoTokenAddress(newDaoTokenAddress);
+        });
     });
 
-    describe("Pausing Tranfers", () => {
+    describe("Pausing Contract", () => {
         const revertReason = getRoleRevertReason(otherAccount, PAUSER);
         // Failing cases
         it("should fail to pause when msg.sender != pauser", async () => {
@@ -386,14 +438,81 @@ function shouldBehaveLikePhlipCard(
                 mintCard(minter, otherAccount, ""),
                 "PhlipCard: Cannot mint with empty URI."
             );
+            // account should have 0 cards
+            await verifyCardBalance(otherAccount, 0);
         });
 
         // Passing cases
         it("should pass when msg.sender = minter", async () => {
+            // Mints new card with ID = 3. (IDs 0, 1, 2 are used in before() function)
             await mintCard();
 
-            // token holder should have 1 card
+            // account should have 1 card
             await verifyCardBalance(otherAccount, 1);
+
+            // Verify card minter and URI are correct
+            await verifyCardMinter(3, otherAccount);
+            await verifyCardURI(3, initialAttr.baseUri + baseCid);
+        });
+    });
+
+    describe.skip("Transfering Cards", () => {
+        // Failing cases
+        it("should fail when from address is not card owner", async () => {});
+        it("should fail when to address is 0x0", async () => {});
+        it("should fail when contract is paused", async () => {});
+
+        // Passing cases
+        it("should pass when card's vesting capsule has not reached cliff", async () => {});
+        it("should pass when card's vesting capsule is partially vested", async () => {});
+        it("should pass when card's vesting capsule is fully vested", async () => {});
+    });
+
+    describe("Updating Card Metadata", () => {
+        // Failing cases
+        it("should fail when card ID is out of bounds", async () => {
+            await expectRevert(
+                updateCardURI(3),
+                "PhlipCard: Token does not exist."
+            );
+        });
+        it("should fail when msg.sender != owner", async () => {
+            await expectRevert(
+                updateCardURI(0, testCid, tokenHolder),
+                "PhlipCard: Address does not own this card."
+            );
+            await verifyCardURI(0, initialAttr.baseUri + baseCid);
+        });
+
+        it("should fail when msg.sender != minter", async () => {
+            // Tranfer card to new owner
+            await context.cardInstance.transferFrom(
+                cardHolder,
+                otherAccount,
+                0,
+                { from: cardHolder }
+            );
+
+            await verifyCardOwner(0, otherAccount);
+
+            await expectRevert(
+                updateCardURI(0, testCid, otherAccount),
+                "PhlipCard: Only the minter can update the URI."
+            );
+            await verifyCardURI(0, initialAttr.baseUri + baseCid);
+        });
+        it("should fail when metadata has been updated max number of times", async () => {
+            await updateCardURI();
+            await expectRevert(
+                updateCardURI(),
+                "PhlipCard: Maximum number of URI changes reached."
+            );
+        });
+
+        // Passing cases
+        it("should pass when msg.sender is owner/minter and metadata updates < max number of times", async () => {
+            await updateCardURI();
+            await verifyCardURI(0, initialAttr.baseUri + testCid);
         });
     });
 
@@ -465,11 +584,13 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe("Redeeming Card Claims", () => {
+    describe.only("Redeeming Card Claims", () => {
         // Failing cases
         it("should fail when msg.sender does not have claim", async () => {
+            await verifyClaimBalance(otherAccount, 0);
+
             await expectRevert(
-                redeemCard(otherAccount),
+                redeemCard(baseCid, otherAccount),
                 "Claimable: Address does not have a claim."
             );
         });
@@ -510,46 +631,47 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe("Up/Down Voting", () => {
+    describe("Up Voting", () => {
         // Failing cases
-        it("should fail to up vote when msg.sender owns card", async () => {
+        it("should fail when msg.sender owns card", async () => {
             await expectRevert(
                 upVote(cardHolder),
                 "PhlipCard: Cannot vote on your own card."
             );
+            // Verify that the card has no upvotes
+            await verifyUpVotes(0, 0);
         });
-        it("should fail to down vote when msg.sender owns card", async () => {
-            await expectRevert(
-                downVote(cardHolder),
-                "PhlipCard: Cannot vote on your own card."
-            );
-        });
-        it("should fail to up vote when msg.sender does not hold enough tokens", async () => {
+        it("should fail when msg.sender does not hold enough tokens", async () => {
             await expectRevert(
                 upVote(otherAccount),
                 "PhlipCard: Must own PhlipDAO tokens to vote."
             );
+            // Verify that the card has no upvotes
+            await verifyUpVotes(0, 0);
         });
+        it("should fail when msg.sender is blacklisted", async () => {
+            // Blacklist address
+            await context.cardInstance.blacklistAddress(tokenHolder, {
+                from: blocker,
+            });
 
-        it("should fail to down vote when msg.sender does not hold enough tokens", async () => {
+            // Address should be blacklisted
+            await verifyBlacklisted(tokenHolder, true);
+
             await expectRevert(
-                downVote(otherAccount),
-                "PhlipCard: Must own PhlipDAO tokens to vote."
+                upVote(tokenHolder),
+                "Blacklistable: Blacklisted addresses are forbidden"
             );
+            // Verify that the card has no upvotes
+            await verifyUpVotes(0, 0);
         });
-
-        it("should fail to up vote when card does not exist", async () => {
+        it("should fail when card does not exist", async () => {
             await expectRevert(
                 upVote(tokenHolder, 1),
                 "PhlipCard: Token does not exist."
             );
-        });
-
-        it("should fail to down vote when card does not exist", async () => {
-            await expectRevert(
-                downVote(tokenHolder, 1),
-                "PhlipCard: Token does not exist."
-            );
+            // Verify that the card has no upvotes
+            await verifyUpVotes(0, 0);
         });
 
         // Passing cases
@@ -559,15 +681,60 @@ function shouldBehaveLikePhlipCard(
             // Verify up vote was successful
             await verifyUpVotes(0, 1);
         });
+    });
 
-        it("should down vote when msg.sender does not own card and has enough tokens", async () => {
+    describe("Down Voting", () => {
+        // Failing cases
+        it("should fail when msg.sender owns card", async () => {
+            await expectRevert(
+                downVote(cardHolder),
+                "PhlipCard: Cannot vote on your own card."
+            );
+            // Verify that the card has no down votes
+            await verifyDownVotes(0, 0);
+        });
+        it("should fail when msg.sender does not hold enough tokens", async () => {
+            await expectRevert(
+                downVote(otherAccount),
+                "PhlipCard: Must own PhlipDAO tokens to vote."
+            );
+            // Verify that the card has no down votes
+            await verifyDownVotes(0, 0);
+        });
+        it("should fail when msg.sender is blacklisted", async () => {
+            // Blacklist address
+            await context.cardInstance.blacklistAddress(tokenHolder, {
+                from: blocker,
+            });
+
+            // Address should be blacklisted
+            await verifyBlacklisted(tokenHolder, true);
+
+            await expectRevert(
+                downVote(tokenHolder),
+                "Blacklistable: Blacklisted addresses are forbidden"
+            );
+            // Verify that the card has no down votes
+            await verifyDownVotes(0, 0);
+        });
+        it("should fail when card does not exist", async () => {
+            await expectRevert(
+                downVote(tokenHolder, 1),
+                "PhlipCard: Token does not exist."
+            );
+            // Verify that the card has no down votes
+            await verifyDownVotes(0, 0);
+        });
+
+        // Passing cases
+        it("should pass when msg.sender does not own card and has enough tokens", async () => {
             // Down vote cardHolder's card
             await downVote();
             // Verify down vote was successful
             await verifyDownVotes(0, 1);
         });
 
-        it("should make card unplayable if card is down voted more than max allowed", async () => {
+        it("should make card unplayable if down votes count >= max down votes allowed", async () => {
             // Doen vote card twice (testing max)
             await downVote(tokenHolder);
             await downVote(minter);
