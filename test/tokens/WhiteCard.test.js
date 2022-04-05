@@ -60,4 +60,22 @@ contract("WhiteCard", (accounts) => {
     });
 
     shouldBehaveLikePhlipCard(context, cardAttributes, ...accounts);
+
+    describe("Recording Game Wins", async () => {
+        // Failure cases
+        it("should fail when card ID is out of bounds", async () => {});
+        it("should fail when msg.sender != recorder", async () => {});
+
+        // Passing cases
+        it("should pass when msg.sender is recorder and card ID is valid", async () => {});
+    });
+
+    describe("Recording Game Losses", async () => {
+        // Failure cases
+        it("should fail when card ID is out of bounds", async () => {});
+        it("should fail when msg.sender != recorder", async () => {});
+
+        // Passing cases
+        it("should pass when msg.sender is recorder and card ID is valid", async () => {});
+    });
 });
