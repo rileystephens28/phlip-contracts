@@ -10,7 +10,7 @@ contract("PinkCard", (accounts) => {
         symbol: "PPC",
         baseUri: "https.ipfs.moralis.io/ipfs/",
         maxDownVotes: new BN(2),
-        maxUriChanges: new BN(5),
+        maxUriChanges: new BN(1),
         minDaoTokensRequired: new BN(100),
     };
 
@@ -42,7 +42,7 @@ contract("PinkCard", (accounts) => {
         });
 
         // Mint 1 card to card holder
-        await context.cardInstance.mintCard(accounts[2], "test123", {
+        await context.cardInstance.mintCard(accounts[2], "base123", {
             from: accounts[0],
         });
 
