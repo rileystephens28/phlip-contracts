@@ -60,20 +60,20 @@ contract PhlipCard is
 
     struct Card {
         string uri;
-        address minter;
         uint256 uriChangeCount;
         bool playable;
     }
 
-    Counters.Counter private _tokenIdCounter;
+    Counters.Counter private _cardIdCounter;
     mapping(uint256 => Card) private _cards;
+    mapping(uint256 => address) private _minters;
 
     /**
      * @dev Requires that token has been minted and reverts if not
-     * @param _tokenID The ID of the token to check
+     * @param _cardID The ID of the token to check
      */
-    modifier tokenExists(uint256 _tokenID) {
-        require(_exists(_tokenID), "PhlipCard: Token does not exist.");
+    modifier tokenExists(uint256 _cardID) {
+        require(_exists(_cardID), "PhlipCard: Token does not exist.");
         _;
     }
 
@@ -101,23 +101,45 @@ contract PhlipCard is
     }
 
     /**
-     * @dev View function to see if card is playable
-     * @param _tokenID The ID of the token to check
-     * @return True if card is playable, false otherwise
+     * @dev Accessor function to get address of card minter
+     * @param _cardID The ID of the card to check
+     * @return Address that minted the card
      */
-    function isPlayable(uint256 _tokenID) public view returns (bool) {
-        return _cards[_tokenID].playable;
+    function minterOf(uint256 _cardID) public view returns (address) {
+        address minter = _minters[_cardID];
+        require(
+            minter != address(0),
+            "PhlipCard: Minter query for nonexistent token"
+        );
+        return minter;
     }
 
     /**
-     * @dev Allow address with PAUSER role to pause token transfers
+     * @dev View function to see if card is playable
+     * @param _cardID The ID of the card to check
+     * @return True if card is playable, false otherwise
+     */
+    function isPlayable(uint256 _cardID) public view returns (bool) {
+        return _cards[_cardID].playable;
+    }
+
+    /**
+     * @dev View function to see number of minted cards
+     * @return Number of cards minted - number of cards burned
+     */
+    function getCardCount() public view returns (uint256) {
+        return _cardIdCounter.current();
+    }
+
+    /**
+     * @dev Allow address with PAUSER role to pause card transfers
      */
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
     /**
-     * @dev Allow address with PAUSER role to unpause token transfers
+     * @dev Allow address with PAUSER role to unpause card transfers
      */
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
@@ -156,8 +178,8 @@ contract PhlipCard is
     {
         uint256[] memory claimableTokenIds = new uint256[](_amount);
         for (uint256 i = 0; i < _amount; i++) {
-            uint256 tokenId = _tokenIdCounter.current();
-            _tokenIdCounter.increment();
+            uint256 tokenId = _cardIdCounter.current();
+            _cardIdCounter.increment();
             claimableTokenIds[i] = tokenId;
         }
         _createClaim(_address, claimableTokenIds);
@@ -177,8 +199,8 @@ contract PhlipCard is
             "PhlipCard: Can only increase claim by amount greater than 0."
         );
         for (uint256 i = 0; i < _amount; i++) {
-            uint256 tokenId = _tokenIdCounter.current();
-            _tokenIdCounter.increment();
+            uint256 tokenId = _cardIdCounter.current();
+            _cardIdCounter.increment();
             _addToClaim(_address, tokenId);
         }
     }
@@ -193,8 +215,8 @@ contract PhlipCard is
         onlyRole(MINTER_ROLE)
     {
         // Get the next token ID then increment the counter
-        uint256 tokenId = _tokenIdCounter.current();
-        _tokenIdCounter.increment();
+        uint256 tokenId = _cardIdCounter.current();
+        _cardIdCounter.increment();
         _mintCard(tokenId, _to, _uri);
     }
 
@@ -221,19 +243,22 @@ contract PhlipCard is
      * @dev Allows owner of a card to update the URI of their card. Requires
      * that the owner is also the minter of the card and has not already updated
      * the card's metadata before.
-     * @param _tokenID The ID of the card to update
+     * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
-    function updateCardURI(uint256 _tokenID, string memory _uri) external {
+    function updateCardURI(uint256 _cardID, string memory _uri)
+        external
+        tokenExists(_cardID)
+    {
         require(
-            ownerOf(_tokenID) == msg.sender,
-            "PhlipCard: Address does not own this token."
+            msg.sender == ownerOf(_cardID),
+            "PhlipCard: Address does not own this card."
         );
-        Card storage card = _cards[_tokenID];
         require(
-            card.minter == msg.sender,
+            msg.sender == minterOf(_cardID),
             "PhlipCard: Only the minter can update the URI."
         );
+        Card storage card = _cards[_cardID];
         require(
             card.uriChangeCount < MAX_URI_CHANGES,
             "PhlipCard: Maximum number of URI changes reached."
@@ -245,15 +270,15 @@ contract PhlipCard is
     /**
      * @dev Records upvote for a card. Requires that the voter
      * is not the owner and has not voted on the card already
-     * @param _tokenID The ID of the token upvoted
+     * @param _cardID The ID of the token upvoted
      */
-    function upVote(uint256 _tokenID)
+    function upVote(uint256 _cardID)
         external
         noBlacklisters
-        tokenExists(_tokenID)
+        tokenExists(_cardID)
     {
         require(
-            ownerOf(_tokenID) != msg.sender,
+            ownerOf(_cardID) != msg.sender,
             "PhlipCard: Cannot vote on your own card."
         );
         require(
@@ -261,7 +286,7 @@ contract PhlipCard is
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow upvotes on unplayable cards?
-        _castUpVote(_tokenID);
+        _castUpVote(_cardID);
     }
 
     /**
@@ -269,15 +294,15 @@ contract PhlipCard is
      * is not the owner and has not voted on the card already. If the
      * card has been downvoted more than the allowed number of times,
      * it should be marked unplayable.
-     * @param _tokenID The ID of the token upvoted
+     * @param _cardID The ID of the token upvoted
      */
-    function downVote(uint256 _tokenID)
+    function downVote(uint256 _cardID)
         external
         noBlacklisters
-        tokenExists(_tokenID)
+        tokenExists(_cardID)
     {
         require(
-            ownerOf(_tokenID) != msg.sender,
+            ownerOf(_cardID) != msg.sender,
             "PhlipCard: Cannot vote on your own card."
         );
         require(
@@ -285,11 +310,11 @@ contract PhlipCard is
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow downvotes on unplayable cards?
-        _castDownVote(_tokenID);
+        _castDownVote(_cardID);
 
         // NOTE - Need to take into account the number of upvotes
-        if (downVotesFor(_tokenID) >= MAX_DOWNVOTES) {
-            Card storage card = _cards[_tokenID];
+        if (downVotesFor(_cardID) >= MAX_DOWNVOTES) {
+            Card storage card = _cards[_cardID];
             card.playable = false;
         }
     }
@@ -385,12 +410,12 @@ contract PhlipCard is
 
     /**
      * @dev Mints card to the given address and initilizes a ballot for it.
-     * @param _tokenID The ID of card being minted
+     * @param _cardID The ID of card being minted
      * @param _to The address to mint card to
      * @param _uri The IPFS CID referencing the new card's metadata
      */
     function _mintCard(
-        uint256 _tokenID,
+        uint256 _cardID,
         address _to,
         string memory _uri
     ) internal {
@@ -399,11 +424,12 @@ contract PhlipCard is
             "PhlipCard: Cannot mint with empty URI."
         );
         // Store the new card data then mint the token
-        _cards[_tokenID] = Card(_uri, _to, 0, true);
-        _safeMint(_to, _tokenID, "");
+        _cards[_cardID] = Card(_uri, 0, true);
+        _minters[_cardID] = _to;
+        _safeMint(_to, _cardID, "");
 
         // Create a ballot for the new card
-        _createBallot(_tokenID);
+        _createBallot(_cardID);
     }
 
     /**
