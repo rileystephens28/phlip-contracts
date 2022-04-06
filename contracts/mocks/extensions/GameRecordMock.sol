@@ -4,12 +4,6 @@ pragma solidity 0.8.11;
 import "../../extensions/GameRecord.sol";
 
 contract GameRecordMock is GameRecord {
-    bool public didProtectedAction;
-
-    constructor() {
-        didProtectedAction = false;
-    }
-
     function createGameRecord(uint256 _id) public {
         _createGameRecord(_id);
     }
