@@ -83,7 +83,7 @@ contract("PhlipProfile", (accounts) => {
         });
     });
 
-    describe("Creating Teams", async () => {
+    describe.skip("Creating Teams", async () => {
         // Failure cases
         it("should fail when team name is blank", async () => {});
         it("should fail when msg.sender does not have a profile", async () => {});
@@ -92,7 +92,7 @@ contract("PhlipProfile", (accounts) => {
         it("should pass when msg.sender has a profile and team name is not blank", async () => {});
     });
 
-    describe("Joining Teams", async () => {
+    describe.skip("Joining Teams", async () => {
         // Failure cases
         it("should fail when team ID is out of bounds", async () => {});
         it("should fail when msg.sender does not have a profile", async () => {});
@@ -101,7 +101,7 @@ contract("PhlipProfile", (accounts) => {
         it("should pass when msg.sender has a profile and team ID is valid", async () => {});
     });
 
-    describe("Adding Friends", async () => {
+    describe.skip("Adding Friends", async () => {
         // Failure cases
         it("should fail when friend ID is out of bounds", async () => {});
         it("should fail when msg.sender does not have a profile", async () => {});
@@ -110,7 +110,7 @@ contract("PhlipProfile", (accounts) => {
         it("should pass when msg.sender has a profile and friend ID is valid", async () => {});
     });
 
-    describe("Removing Friends", async () => {
+    describe.skip("Removing Friends", async () => {
         // Failure cases
         it("should fail when friend index is out of bounds", async () => {});
         it("should fail when msg.sender does not have a profile", async () => {});
@@ -119,7 +119,7 @@ contract("PhlipProfile", (accounts) => {
         it("should pass when msg.sender has a profile and friend index is valid", async () => {});
     });
 
-    describe("Recording Game Wins", async () => {
+    describe.skip("Recording Game Wins", async () => {
         // Failure cases
         it("should fail when profile ID is out of bounds", async () => {});
         it("should fail when msg.sender != recorder", async () => {});
@@ -128,7 +128,7 @@ contract("PhlipProfile", (accounts) => {
         it("should pass when msg.sender is recorder and profile ID is valid", async () => {});
     });
 
-    describe("Recording Game Losses", async () => {
+    describe.skip("Recording Game Losses", async () => {
         // Failure cases
         it("should fail when profile ID is out of bounds", async () => {});
         it("should fail when msg.sender != recorder", async () => {});

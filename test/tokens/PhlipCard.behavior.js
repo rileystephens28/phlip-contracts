@@ -584,7 +584,7 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe.only("Redeeming Card Claims", () => {
+    describe("Redeeming Card Claims", () => {
         // Failing cases
         it("should fail when msg.sender does not have claim", async () => {
             await verifyClaimBalance(otherAccount, 0);
