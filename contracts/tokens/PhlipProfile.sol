@@ -25,27 +25,27 @@ contract PhlipProfile is ERC721, AccessControlGameRecord {
     struct Team {
         string name;
         address founder;
-        address[] members;
+        uint256 numMembers;
     }
 
     struct Profile {
         string uri;
         uint256 gamesWon;
         uint256 gamesLost;
-        uint256 totalGameWinnings;
         uint256 currentTeam;
-        uint256[] mintedCards;
-        uint256[] friends;
+        uint256 numFriends;
     }
 
     Counters.Counter private _teamIdCounter;
     Counters.Counter private _tokenIdCounter;
 
     mapping(uint256 => Profile) private _profiles;
-    mapping(uint256 => Team) private _teams;
+    mapping(uint256 => uint256[]) private _cardMints;
+    mapping(uint256 => uint256[]) private _friends;
 
-    mapping(address => uint256) private _profileOwners;
+    mapping(uint256 => Team) private _teams;
     mapping(uint256 => bool) private _registeredTeams;
+    mapping(uint256 => uint256[]) private _teamMembers;
 
     /**
      * @dev Requires profile has been minted by contract and reverts if not.
@@ -56,7 +56,7 @@ contract PhlipProfile is ERC721, AccessControlGameRecord {
         _;
     }
 
-    constructor() ERC721("PhlipProfile", "USER") {
+    constructor() ERC721("PhlipProfile", "USER") AccessControlGameRecord() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(RECORDER_ROLE, msg.sender);
 
@@ -81,23 +81,54 @@ contract PhlipProfile is ERC721, AccessControlGameRecord {
     function getProfile(uint256 _profileID)
         public
         view
-        profileExists(_profileID)
         returns (Profile memory)
     {
+        require(_exists(_profileID), "PhlipProfile: Profile does not exist.");
         return _profiles[_profileID];
     }
 
     /**
-     * @dev Accessor method to get the details of a profile.
+     * @dev Accessor method to get the friends of a profile.
+     * @param _profileID ID of the profile to query.
+     * @return An array of profile IDs (friends) of the given profile.
+     */
+    function getFriends(uint256 _profileID)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        require(_exists(_profileID), "PhlipProfile: Profile does not exist.");
+        return _friends[_profileID];
+    }
+
+    /**
+     * @dev Accessor method to get the details of a team.
      * @param _teamID ID of the team to query.
      * @return The profile struct data for the given profile ID.
      */
-    function getTeam(uint256 _teamID) public view returns (Team memory) {
+    function getTeamInfo(uint256 _teamID) public view returns (Team memory) {
         require(
             _registeredTeams[_teamID],
             "PhlipProfile: Team does not exist."
         );
         return _teams[_teamID];
+    }
+
+    /**
+     * @dev Accessor method to get the array of addresses that belong to team.
+     * @param _teamID ID of the team to query.
+     * @return The address array of all team members
+     */
+    function getTeamMembers(uint256 _teamID)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        require(
+            _registeredTeams[_teamID],
+            "PhlipProfile: Team does not exist."
+        );
+        return _teamMembers[_teamID];
     }
 
     /**
@@ -117,9 +148,6 @@ contract PhlipProfile is ERC721, AccessControlGameRecord {
         Profile memory newProfile;
         newProfile.uri = _uri;
         _profiles[tokenId] = newProfile;
-
-        // register address as owner of profile
-        _profileOwners[msg.sender] = tokenId;
 
         // Mint token to sender
         _safeMint(msg.sender, tokenId);
@@ -141,65 +169,82 @@ contract PhlipProfile is ERC721, AccessControlGameRecord {
         );
         uint256 teamId = _teamIdCounter.current();
         _teamIdCounter.increment();
-        _registeredTeams[teamId] = true;
 
-        Team memory newTeam;
-        newTeam.name = _name;
-        newTeam.founder = msg.sender;
-        _teams[teamId] = newTeam;
+        // Register and save team
+        _registeredTeams[teamId] = true;
+        _teams[teamId] = Team(_name, msg.sender, 0);
     }
 
     /**
      * @dev Sets the currentTeam of an existing profile.
+     * @param _profileID The ID of the profile joining a team.
      * @param _teamID ID of the team to join
      */
-    function joinTeam(uint256 _teamID) external {
+    function joinTeam(uint256 _profileID, uint256 _teamID) external {
         require(
-            hasProfile(msg.sender),
-            "PhlipProfile: Address does not have a profile."
+            ownerOf(_profileID) == msg.sender,
+            "PhlipProfile: Only profile owner can join teams"
         );
         require(
             _registeredTeams[_teamID],
             "PhlipProfile: Team does not exist."
         );
-        uint256 profileID = _profileOwners[msg.sender];
-        Profile storage profile = _profiles[profileID];
+        Profile storage profile = _profiles[_profileID];
+        require(
+            profile.currentTeam != _teamID,
+            "PhlipProfile: Profile has already joined this team."
+        );
+
+        // Set current team and increment team member count
         profile.currentTeam = _teamID;
+        _teams[_teamID].numMembers += 1;
     }
 
     /**
      * @dev Appends an address to the friends array of an existing profile.
+     * @param _profileID The ID of the profile to add friend to.
      * @param _friendID The ID of the profile being adding as a friend.
      */
-    function addFriend(uint256 _friendID) external profileExists(_friendID) {
+    function addFriend(uint256 _profileID, uint256 _friendID) external {
         require(
-            hasProfile(msg.sender),
-            "PhlipProfile: Address does not have a profile."
+            ownerOf(_profileID) == msg.sender,
+            "PhlipProfile: Only profile owner can add friends"
         );
-        uint256 profileID = _profileOwners[msg.sender];
-        require(
-            ownerOf(profileID) == msg.sender,
-            "PhlipProfile: Only owner can add friends."
-        );
-        Profile storage profile = _profiles[profileID];
-        profile.friends.push(_friendID);
+        require(_exists(_friendID), "PhlipProfile: Profile does not exist.");
+
+        // Add friend ID to array and increment friend count
+        _friends[_profileID].push(_friendID);
+        _profiles[_profileID].numFriends += 1;
     }
 
     /**
      * @dev Remove an address from the friends array of an existing profile.
+     * @param _profileID The ID of the profile to remove a friend from.
      * @param _friendIndex The index of the friend in the friends array.
      */
-    function removeFriend(uint256 _friendIndex) external {
-        // Sender must be the owner of the profile
-        uint256 profileID = _profileOwners[msg.sender];
+    function removeFriend(uint256 _profileID, uint256 _friendIndex) external {
         require(
-            ownerOf(profileID) == msg.sender,
-            "PhlipProfile: Only owner can remove friends."
+            ownerOf(_profileID) == msg.sender,
+            "PhlipProfile: Only profile owner can remove friends"
         );
 
-        Profile storage profile = _profiles[profileID];
-        require(_friendIndex < profile.friends.length);
-        delete profile.friends[_friendIndex];
+        uint256[] memory friends = _friends[_profileID];
+        require(
+            _friendIndex < friends.length,
+            "PhlipProfile: Friend index is out of bounds."
+        );
+
+        // Resort memory array so that the friend to remove is at the end
+        for (uint256 i = _friendIndex; i < friends.length - 1; i++) {
+            friends[i] = friends[i + 1];
+        }
+
+        // Set friend array to resorted memory array then pop last element
+        _friends[_profileID] = friends;
+        _friends[_profileID].pop();
+
+        // Decrement friend count
+        _profiles[_profileID].numFriends -= 1;
     }
 
     /**
