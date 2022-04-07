@@ -74,7 +74,7 @@ contract GameRecord {
     {
         require(
             _registeredRecords[_recordID],
-            "GameRecord: Game record does not exist."
+            "GameRecord: Game record does not exist"
         );
         return _tokenWinnings[_recordID][_token];
     }
@@ -92,7 +92,7 @@ contract GameRecord {
     {
         require(
             _registeredRecords[_recordID],
-            "GameRecord: Game record does not exist."
+            "GameRecord: Game record does not exist"
         );
         return _ethWinnings[_recordID];
     }
@@ -117,7 +117,7 @@ contract GameRecord {
     function _recordWin(uint256 _recordID) internal virtual {
         require(
             _registeredRecords[_recordID],
-            "GameRecord: Game record does not exists"
+            "GameRecord: Game record does not exist"
         );
         Record storage gameRecord = _gameRecords[_recordID];
         gameRecord.wins += 1;
@@ -170,7 +170,7 @@ contract GameRecord {
     function _recordLoss(uint256 _recordID) internal virtual {
         require(
             _registeredRecords[_recordID],
-            "GameRecord: Record does not exists"
+            "GameRecord: Game record does not exist"
         );
         Record storage gameRecord = _gameRecords[_recordID];
         gameRecord.losses += 1;
