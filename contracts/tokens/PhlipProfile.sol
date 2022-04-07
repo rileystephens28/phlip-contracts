@@ -4,6 +4,7 @@ pragma solidity 0.8.11;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "../presets/AccessControlGameRecord.sol";
 
 /**
  * @title UserProfile
@@ -18,10 +19,8 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * join too. Joining a team does not provide any direct game benefits to Players. However, teams that
  * frequently win can rise through the leaderboards and gain a lot of publicity (play-to-advertise model).
  */
-contract PhlipProfile is ERC721, AccessControl {
+contract PhlipProfile is ERC721, AccessControlGameRecord {
     using Counters for Counters.Counter;
-
-    bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
 
     struct Team {
         string name;
@@ -201,35 +200,6 @@ contract PhlipProfile is ERC721, AccessControl {
         Profile storage profile = _profiles[profileID];
         require(_friendIndex < profile.friends.length);
         delete profile.friends[_friendIndex];
-    }
-
-    /**
-     * @dev Incrememnts the gamesWon counter by 1 and adds the value (in ETH or DAO tokens?)
-     * to an existing profile's totalGameWinnings.
-     * @param _profileID The ID of the token to record.
-     * @param _winnings The amount the owner of the token won from the game.
-     */
-    function recordWin(uint256 _profileID, uint256 _winnings)
-        external
-        profileExists(_profileID)
-        onlyRole(RECORDER_ROLE)
-    {
-        Profile storage profile = _profiles[_profileID];
-        profile.gamesWon += 1;
-        profile.totalGameWinnings += _winnings;
-    }
-
-    /**
-     * @dev Incrememnts the gamesLost counter by 1 for an existing profile.
-     * @param _profileID The ID of the token to record.
-     */
-    function recordLoss(uint256 _profileID)
-        external
-        profileExists(_profileID)
-        onlyRole(RECORDER_ROLE)
-    {
-        Profile storage profile = _profiles[_profileID];
-        profile.gamesLost += 1;
     }
 
     /**
