@@ -418,7 +418,7 @@ contract PhlipCard is
         uint256 _cardID,
         address _to,
         string memory _uri
-    ) internal {
+    ) internal virtual {
         require(
             bytes(_uri).length > 0,
             "PhlipCard: Cannot mint with empty URI."
