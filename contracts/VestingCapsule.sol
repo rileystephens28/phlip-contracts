@@ -46,8 +46,7 @@ contract VestingCapsule is Context, AccessControl {
      * Capsule is transferred to a new owner, the claimedAmount no longer represents the amount
      * of tokens that have actually been claimed, but rather the total amount of tokens that have vested
      * up until the transfer. The difference between the actual claimed amount and the total vested amount
-     * is stuck into a DormantCapusle so the previous owner can still withdraw the tokens that vested
-     * under their onwership of the capsule.
+     * is tranferred to the prior owner.
      * @param scheduleId The ID of the VestingSchedule associated with this capsule
      * @param startTime Time at which cliff period begins
      * @param endTime Time at which capsule is fully vested
@@ -363,9 +362,8 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @dev Allow Capsule owner to transfer ownership to another address. If the current
-     * owner has not claimed all of the vested tokens, a DormantCapsule is created to store
-     * remaining tokens owned to the current owner.
+     * @dev Allow Capsule owner to transfer ownership to another address.
+     * The amount of unclaimed vested tokens are transferred to the prior owner.
      * @param _capsuleID ID of the Capsule to be transferred.
      * @param _to Address to the list of token beneficiaries.
      */
