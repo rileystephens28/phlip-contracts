@@ -464,6 +464,7 @@ contract PhlipCard is
     function supportsInterface(bytes4 interfaceId)
         public
         view
+        virtual
         override(ERC721, AccessControl)
         returns (bool)
     {

@@ -253,6 +253,7 @@ contract PhlipProfile is ERC721, AccessControlGameRecord {
     function supportsInterface(bytes4 interfaceId)
         public
         view
+        virtual
         override(ERC721, AccessControl)
         returns (bool)
     {
