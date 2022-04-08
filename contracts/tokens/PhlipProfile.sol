@@ -30,8 +30,6 @@ contract PhlipProfile is ERC721, AdminGameRecord {
 
     struct Profile {
         string uri;
-        uint256 gamesWon;
-        uint256 gamesLost;
         uint256 currentTeam;
         uint256 numFriends;
     }
@@ -151,6 +149,9 @@ contract PhlipProfile is ERC721, AdminGameRecord {
 
         // Mint token to sender
         _safeMint(msg.sender, tokenId);
+
+        // Create a game record for the new card
+        _createGameRecord(tokenId);
     }
 
     /**

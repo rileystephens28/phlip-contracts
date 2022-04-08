@@ -42,7 +42,7 @@ contract WhiteCard is PhlipCard, AdminGameRecord {
     ) internal override {
         super._mintCard(_cardID, _to, _uri);
 
-        // Create a ballot for the new card
+        // Create a game record for the new card
         _createGameRecord(_cardID);
     }
 

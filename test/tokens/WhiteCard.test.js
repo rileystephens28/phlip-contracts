@@ -4,7 +4,7 @@ const { BN, snapshot } = require("@openzeppelin/test-helpers");
 const { shouldBehaveLikePhlipCard } = require("./PhlipCard.behavior");
 const {
     shouldBehaveLikeAdminGameRecord,
-} = require("./AdminGameRecord.behavior");
+} = require("../presets/AdminGameRecord.behavior");
 
 require("chai").should();
 
@@ -64,7 +64,7 @@ contract("WhiteCard", (accounts) => {
         await this.snapshot.restore();
     });
 
-    // shouldBehaveLikePhlipCard(context, cardAttributes, ...accounts);
+    shouldBehaveLikePhlipCard(context, cardAttributes, ...accounts);
     shouldBehaveLikeAdminGameRecord(
         context,
         "cardInstance",
