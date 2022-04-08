@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
-import "../../presets/AdminGameRecord.sol";
+import "../presets/AdminGameRecord.sol";
 
 /**
  * @title AdminGameRecordMock
