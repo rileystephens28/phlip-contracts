@@ -73,9 +73,6 @@ contract VestingCapsule is Context, AccessControl {
     // Maps capsules to their owners
     mapping(uint256 => address) private _capsuleOwners;
 
-    // scheduleId -> value locked in capsules using specific schedule (will be denominated in token)
-    mapping(uint256 => uint256) private _valueLockedInSchedules;
-
     /**
      * @dev Create a new VestingCapsule instance and grant msg.sender TREASURER role.
      */
@@ -95,6 +92,47 @@ contract VestingCapsule is Context, AccessControl {
         returns (VestingSchedule memory)
     {
         return _vestingSchedules[_scheduleID];
+    }
+
+    /**
+     * @dev Accessor function for total reserves of specified schedule.
+     * @param _scheduleID The ID of the schedule to be queried.
+     * @return The total amount of schedule denominated tokens held by contract
+     */
+    function totalReservesOf(uint256 _scheduleID)
+        public
+        view
+        returns (uint256)
+    {
+        return _totalScheduleReserves[_scheduleID];
+    }
+
+    /**
+     * @dev Accessor function for available reserves of specified schedule.
+     * @param _scheduleID The ID of the schedule to be queried.
+     * @return The amount of schedule denominated tokens available to create capsules with
+     */
+    function availableReservesOf(uint256 _scheduleID)
+        public
+        view
+        returns (uint256)
+    {
+        return _availableScheduleReserves[_scheduleID];
+    }
+
+    /**
+     * @dev Calculates amount of schedule reserves locked in capsules
+     * @param _scheduleID The ID of the schedule to be queried.
+     * @return The amount of schedule denominated tokens locked in capsules
+     */
+    function lockedReservesOf(uint256 _scheduleID)
+        public
+        view
+        returns (uint256)
+    {
+        return
+            _totalScheduleReserves[_scheduleID] -
+            _availableScheduleReserves[_scheduleID];
     }
 
     /**
@@ -145,8 +183,7 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @dev Deposits enought tokens to fill a specified number of capsules.
-     * Requires that TREASURER approves this contract to spend schedule tokens.
+     * @dev Deposits tokens to schedule reserves for future capsules.
      * @param _scheduleID The ID of the schedule to fill.
      * @param _fillAmount Schedule amount multiplier.
      * Example: If the schedule amount is 100 and _fillAmount is 2, then
@@ -156,27 +193,7 @@ contract VestingCapsule is Context, AccessControl {
         external
         onlyRole(TREASURER_ROLE)
     {
-        require(
-            _scheduleID < _scheduleIDCounter.current(),
-            "VestingCapsule: Schedule does not exist"
-        );
-        require(
-            _fillAmount > 0,
-            "VestingCapsule: fill amount must be greater than 0"
-        );
-
-        VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
-        uint256 tokenAmount = schedule.amount * _fillAmount;
-
-        // Updates reserve values
-        _totalScheduleReserves[_scheduleID] += tokenAmount;
-        _availableScheduleReserves[_scheduleID] += tokenAmount;
-
-        IERC20(schedule.token).safeTransferFrom(
-            msg.sender,
-            address(this),
-            tokenAmount
-        );
+        _fillReserves(_scheduleID, _fillAmount);
     }
 
     /**
@@ -271,6 +288,39 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
+     * @dev Deposits enought tokens to fill a specified number of capsules.
+     * Requires that TREASURER approves this contract to spend schedule tokens.
+     * @param _scheduleID The ID of the schedule to fill.
+     * @param _fillAmount Schedule amount multiplier.
+     */
+    function _fillReserves(uint256 _scheduleID, uint256 _fillAmount)
+        internal
+        virtual
+    {
+        require(
+            _scheduleID < _scheduleIDCounter.current(),
+            "VestingCapsule: Schedule does not exist"
+        );
+        require(
+            _fillAmount > 0,
+            "VestingCapsule: fill amount must be greater than 0"
+        );
+
+        VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
+        uint256 tokenAmount = schedule.amount * _fillAmount;
+
+        // Updates reserve values
+        _totalScheduleReserves[_scheduleID] += tokenAmount;
+        _availableScheduleReserves[_scheduleID] += tokenAmount;
+
+        IERC20(schedule.token).safeTransferFrom(
+            msg.sender,
+            address(this),
+            tokenAmount
+        );
+    }
+
+    /**
      * @dev Creates a new Capsule for the given address if the contract holds
      * enough tokens to cover the amount of tokens required for the vesting schedule.
      * @param _scheduleID The ID of the schedule to be used for the capsule.
@@ -281,7 +331,7 @@ contract VestingCapsule is Context, AccessControl {
         uint256 _scheduleID,
         uint256 _startTime,
         address _owner
-    ) internal {
+    ) internal virtual {
         require(
             _owner != address(0),
             "VestingCapsule: Beneficiary cannot be 0x0"
@@ -324,7 +374,7 @@ contract VestingCapsule is Context, AccessControl {
      * @dev Tranfers the amount of tokens in a Capsule that have vested to the owner of the capsule.
      * @param _capsuleID ID of the Capsule to be claimed.
      */
-    function _claim(uint256 _capsuleID) internal {
+    function _claim(uint256 _capsuleID) internal virtual {
         require(
             ownerOf(_capsuleID) == msg.sender,
             "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
