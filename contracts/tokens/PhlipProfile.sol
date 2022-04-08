@@ -4,7 +4,7 @@ pragma solidity 0.8.11;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../presets/AccessControlGameRecord.sol";
+import "../presets/AdminGameRecord.sol";
 
 /**
  * @title UserProfile
@@ -19,7 +19,7 @@ import "../presets/AccessControlGameRecord.sol";
  * join too. Joining a team does not provide any direct game benefits to Players. However, teams that
  * frequently win can rise through the leaderboards and gain a lot of publicity (play-to-advertise model).
  */
-contract PhlipProfile is ERC721, AccessControlGameRecord {
+contract PhlipProfile is ERC721, AdminGameRecord {
     using Counters for Counters.Counter;
 
     struct Team {
@@ -56,7 +56,7 @@ contract PhlipProfile is ERC721, AccessControlGameRecord {
         _;
     }
 
-    constructor() ERC721("PhlipProfile", "USER") AccessControlGameRecord() {
+    constructor() ERC721("PhlipProfile", "USER") AdminGameRecord() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(RECORDER_ROLE, msg.sender);
 

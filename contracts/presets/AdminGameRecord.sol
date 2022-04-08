@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "../extensions/GameRecord.sol";
 
 /**
- * @title AccessControlGameRecord
+ * @title AdminGameRecord
  * @author Riley Stephens
  * @dev Contract that provides default game recording functionality with role based access control.
  */
-contract AccessControlGameRecord is AccessControl, GameRecord {
+contract AdminGameRecord is AccessControl, GameRecord {
     bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
 
     constructor() {

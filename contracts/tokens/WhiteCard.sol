@@ -2,14 +2,14 @@
 pragma solidity 0.8.11;
 
 import "./PhlipCard.sol";
-import "../presets/AccessControlGameRecord.sol";
+import "../presets/AdminGameRecord.sol";
 
 /**
  * @title WhiteCard
  * @author Riley Stephens
  * @dev Implementation of a PhlipCard with with basic game recording functionality.
  */
-contract WhiteCard is PhlipCard, AccessControlGameRecord {
+contract WhiteCard is PhlipCard, AdminGameRecord {
     constructor(
         string memory _baseUri,
         uint256 _maxDownvotes,
@@ -26,7 +26,7 @@ contract WhiteCard is PhlipCard, AccessControlGameRecord {
             _minDaoTokensRequired,
             _daoTokenAddress
         )
-        AccessControlGameRecord()
+        AdminGameRecord()
     {}
 
     /**
