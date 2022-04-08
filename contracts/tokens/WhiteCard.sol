@@ -2,16 +2,14 @@
 pragma solidity 0.8.11;
 
 import "./PhlipCard.sol";
-import "../extensions/GameRecord.sol";
+import "../presets/AccessControlGameRecord.sol";
 
 /**
  * @title WhiteCard
  * @author Riley Stephens
  * @dev Implementation of a PhlipCard with with basic game recording functionality.
  */
-contract WhiteCard is PhlipCard, GameRecord {
-    bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
-
+contract WhiteCard is PhlipCard, AccessControlGameRecord {
     constructor(
         string memory _baseUri,
         uint256 _maxDownvotes,
@@ -28,9 +26,8 @@ contract WhiteCard is PhlipCard, GameRecord {
             _minDaoTokensRequired,
             _daoTokenAddress
         )
-    {
-        _grantRole(RECORDER_ROLE, msg.sender);
-    }
+        AccessControlGameRecord()
+    {}
 
     /**
      * @dev Overrides PhlipCard._mintCard() to include game recording functionality.
@@ -50,48 +47,15 @@ contract WhiteCard is PhlipCard, GameRecord {
     }
 
     /**
-     * @dev Records a game win (NO REWARDS)
-     * @param _cardID The ID of the card to record.
+     * @dev Override of PhlipCard and AccessControl supportsInterface
      */
-    function recordWin(uint256 _cardID) external onlyRole(RECORDER_ROLE) {
-        // NOTE - Should we explicitly prevent recording wins on unplayable cards?
-        _recordWin(_cardID);
-    }
-
-    /**
-     * @dev Records a game win (ETH REWARDS)
-     * @param _cardID The ID of the card to record.
-     * @param _amount The amount of ETH won.
-     */
-    function recordWin(uint256 _cardID, uint256 _amount)
-        external
-        onlyRole(RECORDER_ROLE)
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(PhlipCard, AccessControl)
+        returns (bool)
     {
-        // NOTE - Should we explicitly prevent recording wins on unplayable cards?
-        _recordEthWin(_cardID, _amount);
-    }
-
-    /**
-     * @dev Records a game win (TOKEN REWARDS)
-     * @param _cardID The ID of the card to record.
-     * @param _token The address of token rewarded for winning.
-     * @param _amount The amount of tokens won.
-     */
-    function recordWin(
-        uint256 _cardID,
-        address _token,
-        uint256 _amount
-    ) external onlyRole(RECORDER_ROLE) {
-        // NOTE - Should we explicitly prevent recording wins on unplayable cards?
-        _recordTokenWin(_cardID, _token, _amount);
-    }
-
-    /**
-     * @dev Records a game loss for a given card
-     * @param _cardID The ID of the card to record.
-     */
-    function recordLoss(uint256 _cardID) external onlyRole(RECORDER_ROLE) {
-        // NOTE - Should we explicitly prevent recording losses on unplayable cards?
-        _recordLoss(_cardID);
+        return super.supportsInterface(interfaceId);
     }
 }
