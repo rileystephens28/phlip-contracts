@@ -8,14 +8,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
- * @title VestingCapsule
+ * @title CapsuleManager
  * @author Riley Stephens
- * @dev VestingCapsule is a protocol for creating custom vesting schedules and transferable vesting
+ * @dev CapsuleManager is a protocol for creating custom vesting schedules and transferable vesting
  * capsules. This contract will hold ERC20 tokens on behalf of vesting beneficiaries and control the rate at which
  * beneficiaries can withdraw them. When a capsule is tranferred, the tokens owed to the prior owner
  * are also transferred to them.
  */
-contract VestingCapsule is Context, AccessControl {
+contract CapsuleManager is Context, AccessControl {
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
 
@@ -74,7 +74,7 @@ contract VestingCapsule is Context, AccessControl {
     mapping(uint256 => address) private _capsuleOwners;
 
     /**
-     * @dev Create a new VestingCapsule instance and grant msg.sender TREASURER role.
+     * @dev Create a new CapsuleManager instance and grant msg.sender TREASURER role.
      */
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -259,19 +259,19 @@ contract VestingCapsule is Context, AccessControl {
     ) internal {
         require(
             _token != address(0),
-            "VestingCapsule: Token address cannot be 0x0"
+            "CapsuleManager: Token address cannot be 0x0"
         );
         require(
             _durationSeconds > 0,
-            "VestingCapsule: Duration must be greater than 0"
+            "CapsuleManager: Duration must be greater than 0"
         );
         require(
             _tokenRatePerSecond > 0,
-            "VestingCapsule: Token release rate must be greater than 0"
+            "CapsuleManager: Token release rate must be greater than 0"
         );
         require(
             _cliffSeconds < _durationSeconds,
-            "VestingCapsule: Cliff must be less than duration."
+            "CapsuleManager: Cliff must be less than duration."
         );
 
         uint256 currentScheduleId = _scheduleIDCounter.current();
@@ -297,11 +297,11 @@ contract VestingCapsule is Context, AccessControl {
     {
         require(
             _scheduleID < _scheduleIDCounter.current(),
-            "VestingCapsule: Schedule does not exist"
+            "CapsuleManager: Schedule does not exist"
         );
         require(
             _fillAmount > 0,
-            "VestingCapsule: Fill amount must be greater than 0"
+            "CapsuleManager: Fill amount must be greater than 0"
         );
 
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
@@ -331,21 +331,21 @@ contract VestingCapsule is Context, AccessControl {
     ) internal virtual {
         require(
             _owner != address(0),
-            "VestingCapsule: Beneficiary cannot be 0x0"
+            "CapsuleManager: Beneficiary cannot be 0x0"
         );
         require(
             _startTime >= block.timestamp,
-            "VestingCapsule: Capsule startTime cannot be in the past."
+            "CapsuleManager: Capsule startTime cannot be in the past."
         );
         require(
             _scheduleID < _scheduleIDCounter.current(),
-            "VestingCapsule: Invalid scheduleId"
+            "CapsuleManager: Invalid scheduleId"
         );
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
 
         require(
             _availableScheduleReserves[_scheduleID] >= schedule.amount,
-            "VestingCapsule: Schedule has insufficient token reserves for new capsule."
+            "CapsuleManager: Schedule has insufficient token reserves for new capsule."
         );
 
         // Get current ID and increment
@@ -374,16 +374,16 @@ contract VestingCapsule is Context, AccessControl {
     function _claim(uint256 _capsuleID) internal virtual {
         require(
             _capsuleID < _capsuleIdCounter.current(),
-            "VestingCapsule: Invalid capsule ID"
+            "CapsuleManager: Invalid capsule ID"
         );
         require(
             ownerOf(_capsuleID) == msg.sender,
-            "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
+            "CapsuleManager: Cannot claim capsule because msg.sender is not the owner."
         );
         uint256 claimAmount = vestedBalanceOf(_capsuleID);
         require(
             claimAmount > 0,
-            "VestingCapsule: Capsule has no tokens to claim."
+            "CapsuleManager: Capsule has no tokens to claim."
         );
 
         Capsule storage capsule = _capsules[_capsuleID];
@@ -417,25 +417,25 @@ contract VestingCapsule is Context, AccessControl {
     function _transfer(uint256 _capsuleID, address _to) internal virtual {
         require(
             _capsuleID < _capsuleIdCounter.current(),
-            "VestingCapsule: Invalid capsule ID"
+            "CapsuleManager: Invalid capsule ID"
         );
         require(
             _to != address(0),
-            "VestingCapsule: Cannot transfer capsule to 0x0."
+            "CapsuleManager: Cannot transfer capsule to 0x0."
         );
         require(
             _to != msg.sender,
-            "VestingCapsule: Cannot transfer capsule to self."
+            "CapsuleManager: Cannot transfer capsule to self."
         );
         require(
             ownerOf(_capsuleID) == msg.sender,
-            "VestingCapsule: Cannot transfer capsule because msg.sender is not the owner."
+            "CapsuleManager: Cannot transfer capsule because msg.sender is not the owner."
         );
 
         Capsule storage capsule = _capsules[_capsuleID];
         require(
             capsule.endTime > block.timestamp,
-            "VestingCapsule: Cannot transfer capsule because it has already been fully vested."
+            "CapsuleManager: Cannot transfer capsule because it has already been fully vested."
         );
 
         // Register _to address as new owner
