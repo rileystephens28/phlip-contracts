@@ -224,8 +224,16 @@ contract CapsuleManager is Context, AccessControl {
         address _owner,
         uint256 _scheduleID,
         uint256 _startTime
-    ) external onlyRole(TREASURER_ROLE) {
-        _createCapsule(_scheduleID, _startTime, _owner);
+    ) external onlyRole(TREASURER_ROLE) returns (uint256) {
+        return _createCapsule(_scheduleID, _startTime, _owner);
+    }
+
+    /**
+     * @dev Allows capsule owner to delete their Capsule and release its funds back to reserves.
+     * @param _capsuleID Capsule ID to delete.
+     */
+    function destroyCapsule(uint256 _capsuleID) external {
+        _destroyCapsule(_capsuleID);
     }
 
     /**
@@ -328,7 +336,7 @@ contract CapsuleManager is Context, AccessControl {
         uint256 _scheduleID,
         uint256 _startTime,
         address _owner
-    ) internal virtual {
+    ) internal virtual returns (uint256) {
         require(
             _owner != address(0),
             "CapsuleManager: Beneficiary cannot be 0x0"
@@ -365,6 +373,36 @@ contract CapsuleManager is Context, AccessControl {
             _startTime,
             0
         );
+        return currentId;
+    }
+
+    /**
+     * @dev Allows capsule owner to delete their Capsule and release its funds back to reserves.
+     * @param _capsuleID Capsule ID to delete.
+     */
+    function _destroyCapsule(uint256 _capsuleID) internal virtual {
+        require(
+            _capsuleID < _capsuleIdCounter.current(),
+            "CapsuleManager: Invalid capsule ID"
+        );
+        require(
+            ownerOf(_capsuleID) == msg.sender,
+            "CapsuleManager: Cannot destory capsule because msg.sender is not the owner."
+        );
+
+        Capsule storage capsule = _capsules[_capsuleID];
+        VestingSchedule storage schedule = _vestingSchedules[
+            capsule.scheduleId
+        ];
+
+        uint256 fundsToRelease = schedule.amount - capsule.claimedAmount;
+
+        // Return funds to schedule reserves
+        _availableScheduleReserves[capsule.scheduleId] += fundsToRelease;
+
+        // Delete capsule and owner reference
+        delete _capsules[_capsuleID];
+        delete _capsuleOwners[_capsuleID];
     }
 
     /**
