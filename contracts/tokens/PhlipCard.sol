@@ -43,7 +43,6 @@ contract PhlipCard is
     Pausable,
     AccessControl,
     Blacklistable,
-    Claimable,
     UpDownVote
 {
     using Counters for Counters.Counter;
@@ -62,6 +61,7 @@ contract PhlipCard is
     struct Card {
         string uri;
         uint256 uriChangeCount;
+        bool blank;
         bool playable;
     }
 
@@ -123,11 +123,28 @@ contract PhlipCard is
     }
 
     /**
-     * @dev View function to see number of minted cards
+     * @dev View function to see if card is blank (no URI)
+     * @param _cardID The ID of the card to check
+     * @return True if card is blank, false otherwise
+     */
+    function isBlank(uint256 _cardID) public view returns (bool) {
+        return _cards[_cardID].blank;
+    }
+
+    /**
+     * @dev View function to see number of cards in circulation
      * @return Number of cards minted - number of cards burned
      */
-    function getCardCount() public view returns (uint256) {
-        return _cardIdCounter.current();
+    function getCirculatingCardCount() public view returns (uint256) {
+        return _totalInCirculation.current();
+    }
+
+    /**
+     * @dev View function to see number of cards in that are playable
+     * @return Number of cards in circulation that are not blank and have been voted out
+     */
+    function getPlayableCardCount() public view returns (uint256) {
+        return _playableInCirculation.current();
     }
 
     /**
@@ -167,44 +184,6 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Create a claim for >=1 card(s) for given address.
-     * @param _address The beneficiary of the claim.
-     * @param _amount The number of cards that can be claimed.
-     */
-    function createClaim(address _address, uint256 _amount)
-        external
-        onlyRole(MINTER_ROLE)
-    {
-        uint256[] memory claimableTokenIds = new uint256[](_amount);
-        for (uint256 i = 0; i < _amount; i++) {
-            uint256 tokenId = _cardIdCounter.current();
-            _cardIdCounter.increment();
-            claimableTokenIds[i] = tokenId;
-        }
-        _createClaim(_address, claimableTokenIds);
-    }
-
-    /**
-     * @dev Increase the number of claimable cards for an existing claim.
-     * @param _address The beneficiary of the existing claim.
-     * @param _amount The number of claimable tokens to add to the claim.
-     */
-    function increaseClaim(address _address, uint256 _amount)
-        external
-        onlyRole(MINTER_ROLE)
-    {
-        require(
-            _amount > 0,
-            "PhlipCard: Can only increase claim by amount greater than 0."
-        );
-        for (uint256 i = 0; i < _amount; i++) {
-            uint256 tokenId = _cardIdCounter.current();
-            _cardIdCounter.increment();
-            _addToClaim(_address, tokenId);
-        }
-    }
-
-    /**
      * @dev Allow address with MINTER role to mint tokens to a given address.
      * @param _to The address to mint tokens to.
      * @param _uri The IPFS CID referencing the new tokens metadata.
@@ -221,28 +200,10 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Mint card to msg.sender and reduce claimable cards by 1.
-     * Requires that msg.sender has a claim for >=1 card(s).
-     * @param _uri The IPFS CID referencing the new tokens metadata
-     */
-    function redeemCard(string memory _uri)
-        external
-        whenNotPaused
-        onlyClaimers
-    {
-        // Get the first claimable token ID, then remove
-        // it from the claimable tokens to prevent reentrance
-        uint256 claimableTokenId = nextClaimableID(msg.sender);
-
-        // NOTE claiming the last index (instead of 0) saves gas
-        _removeFromClaim(msg.sender, 0);
-        _mintCard(claimableTokenId, msg.sender, _uri);
-    }
-
-    /**
      * @dev Allows owner of a card to update the URI of their card. Requires
      * that the owner is also the minter of the card and has not already updated
-     * the card's metadata before.
+     * the card's metadata before. If the URI was not set during mint, this function
+     * allows the owner to set it without it counting towards the number of URI changes.
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
@@ -264,7 +225,15 @@ contract PhlipCard is
             "PhlipCard: Maximum number of URI changes reached."
         );
         card.uri = _uri;
-        card.uriChangeCount += 1;
+
+        if (card.blank) {
+            // If card is blank, mark as playable and not blank
+            card.blank = false;
+            _playableInCirculation.increment();
+        } else {
+            // If card is not blank, increment URI change count
+            card.uriChangeCount += 1;
+        }
     }
 
     /**
@@ -420,47 +389,38 @@ contract PhlipCard is
         uint256 _scheduleID,
         string memory _uri
     ) internal virtual {
-        require(
-            bytes(_uri).length > 0,
-            "PhlipCard: Cannot mint with empty URI."
-        );
-        // Store the new card data then mint the token
-        _cards[_cardID] = Card(_uri, 0, true);
-        _minters[_cardID] = _to;
         _safeMint(_to, _cardID, _scheduleID, "");
+
+        // Check if card is minted blank
+        bool blank = bytes(_uri).length == 0;
+
+        // Store the new card data then mint the token
+        _cards[_cardID] = Card(_uri, 0, blank, !blank);
+        _minters[_cardID] = _to;
 
         // Create a ballot for the new card
         _createBallot(_cardID);
+
+        // Update card counters
+        _totalInCirculation.increment();
+        if (!blank) {
+            _playableInCirculation.increment();
+        }
     }
 
     /**
-     * @dev Function called before tokens are transferred. Override to
-     * make sure that token tranfers have not been paused and to track
-     * the total number of cards in circulation and the number of playable ones.
-     * @param _from The address tokens will be transferred from
-     * @param _to The address tokens will be transferred  to
-     * @param _tokenId The ID of the token to transfer
+     * @dev Override of ERC721._baseURI
      */
-    function _beforeTokenTransfer(
-        address _from,
-        address _to,
-        uint256 _tokenId
-    ) internal override whenNotPaused {
-        super._beforeTokenTransfer(_from, _to, _tokenId);
+    function _burn(uint256 tokenId) internal override {
+        // Update card counters
+        _totalInCirculation.decrement();
 
-        if (_from == address(0)) {
-            // If the from address is 0, it is a mint
-            _totalInCirculation.increment();
-            _playableInCirculation.increment();
-        } else if (_to == address(0)) {
-            // If the to address is 0, it is a burn
-            _totalInCirculation.decrement();
-
-            // If card is  playable, decrement the playable count
-            if (isPlayable(_tokenId)) {
-                _playableInCirculation.decrement();
-            }
+        // If card is  playable, decrement the playable count
+        if (_cards[tokenId].playable) {
+            _playableInCirculation.decrement();
         }
+
+        super._burn(tokenId);
     }
 
     /**
