@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "../extensions/Blacklistable.sol";
 import "../extensions/Claimable.sol";
 import "../extensions/UpDownVote.sol";
-import "../VestingCapsule.sol";
+import "./VestingCapsule.sol";
 
 /**
  * @title PhlipCard
@@ -39,7 +39,7 @@ import "../VestingCapsule.sol";
  *
  */
 contract PhlipCard is
-    ERC721,
+    VestingCapsule,
     Pausable,
     AccessControl,
     Blacklistable,
@@ -58,7 +58,6 @@ contract PhlipCard is
     uint256 public MIN_DAO_TOKENS_REQUIRED;
 
     IERC20 public daoToken;
-    VestingCapsule public vestingCapsule;
 
     struct Card {
         string uri;
@@ -90,7 +89,7 @@ contract PhlipCard is
         uint256 _minDaoTokensRequired,
         address _daoTokenAddress,
         address _vestingCapsuleAddress
-    ) ERC721(_name, _symbol) {
+    ) VestingCapsule(_name, _symbol, _vestingCapsuleAddress) {
         // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -98,14 +97,11 @@ contract PhlipCard is
         _grantRole(BLOCKER_ROLE, msg.sender);
 
         // Set constants
-        setBaseURI(_baseUri);
-        setMaxDownvotes(_maxDownvotes);
-        setMaxUriChanges(_maxUriChanges);
-        setMinDaoTokensRequired(_minDaoTokensRequired);
-        setDaoTokenAddress(_daoTokenAddress);
-
-        // This contracts address will need to be added as a treasurer to the VestingCapsule contract
-        vestingCapsule = VestingCapsule(_vestingCapsuleAddress);
+        BASE_URI = _baseUri;
+        MAX_DOWNVOTES = _maxDownvotes;
+        MAX_URI_CHANGES = _maxUriChanges;
+        MIN_DAO_TOKENS_REQUIRED = _minDaoTokensRequired;
+        daoToken = IERC20(_daoTokenAddress);
     }
 
     /**
@@ -114,12 +110,7 @@ contract PhlipCard is
      * @return Address that minted the card
      */
     function minterOf(uint256 _cardID) public view returns (address) {
-        address minter = _minters[_cardID];
-        require(
-            minter != address(0),
-            "PhlipCard: Minter query for nonexistent token"
-        );
-        return minter;
+        return _minters[_cardID];
     }
 
     /**
@@ -218,14 +209,15 @@ contract PhlipCard is
      * @param _to The address to mint tokens to.
      * @param _uri The IPFS CID referencing the new tokens metadata.
      */
-    function mintCard(address _to, string memory _uri)
-        external
-        onlyRole(MINTER_ROLE)
-    {
+    function mintCard(
+        address _to,
+        uint256 _scheduleId,
+        string memory _uri
+    ) external onlyRole(MINTER_ROLE) {
         // Get the next token ID then increment the counter
         uint256 tokenId = _cardIdCounter.current();
         _cardIdCounter.increment();
-        _mintCard(tokenId, _to, _uri);
+        _mintCard(tokenId, _to, _scheduleId, _uri);
     }
 
     /**
@@ -425,6 +417,7 @@ contract PhlipCard is
     function _mintCard(
         uint256 _cardID,
         address _to,
+        uint256 _scheduleID,
         string memory _uri
     ) internal virtual {
         require(
@@ -434,22 +427,16 @@ contract PhlipCard is
         // Store the new card data then mint the token
         _cards[_cardID] = Card(_uri, 0, true);
         _minters[_cardID] = _to;
-        _safeMint(_to, _cardID, "");
+        _safeMint(_to, _cardID, _scheduleID, "");
 
         // Create a ballot for the new card
         _createBallot(_cardID);
     }
 
     /**
-     * @dev Override of ERC721._baseURI
-     */
-    function _burn(uint256 tokenId) internal override {
-        super._burn(tokenId);
-    }
-
-    /**
      * @dev Function called before tokens are transferred. Override to
-     * make sure that token tranfers have not been paused. This will
+     * make sure that token tranfers have not been paused and to track
+     * the total number of cards in circulation and the number of playable ones.
      * @param _from The address tokens will be transferred from
      * @param _to The address tokens will be transferred  to
      * @param _tokenId The ID of the token to transfer
@@ -473,8 +460,6 @@ contract PhlipCard is
             if (isPlayable(_tokenId)) {
                 _playableInCirculation.decrement();
             }
-        } else if (_from != _to) {
-            // If the from and to addresses are different, it is a transfer
         }
     }
 
