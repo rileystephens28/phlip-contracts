@@ -185,9 +185,7 @@ contract VestingCapsule is Context, AccessControl {
     /**
      * @dev Deposits tokens to schedule reserves for future capsules.
      * @param _scheduleID The ID of the schedule to fill.
-     * @param _fillAmount Schedule amount multiplier.
-     * Example: If the schedule amount is 100 and _fillAmount is 2, then
-     * the schedule reserves will be filled with 200 tokens.
+     * @param _fillAmount Amount of tokens that will be deposited from treasurer.
      */
     function fillReserves(uint256 _scheduleID, uint256 _fillAmount)
         external
@@ -288,10 +286,10 @@ contract VestingCapsule is Context, AccessControl {
     }
 
     /**
-     * @dev Deposits enought tokens to fill a specified number of capsules.
+     * @dev Deposits tokens to fill a future capsules for a specified schedule.
      * Requires that TREASURER approves this contract to spend schedule tokens.
      * @param _scheduleID The ID of the schedule to fill.
-     * @param _fillAmount Schedule amount multiplier.
+     * @param _fillAmount Amount of tokens transfered from sender to contract.
      */
     function _fillReserves(uint256 _scheduleID, uint256 _fillAmount)
         internal
@@ -303,20 +301,19 @@ contract VestingCapsule is Context, AccessControl {
         );
         require(
             _fillAmount > 0,
-            "VestingCapsule: fill amount must be greater than 0"
+            "VestingCapsule: Fill amount must be greater than 0"
         );
 
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
-        uint256 tokenAmount = schedule.amount * _fillAmount;
 
         // Updates reserve values
-        _totalScheduleReserves[_scheduleID] += tokenAmount;
-        _availableScheduleReserves[_scheduleID] += tokenAmount;
+        _totalScheduleReserves[_scheduleID] += _fillAmount;
+        _availableScheduleReserves[_scheduleID] += _fillAmount;
 
         IERC20(schedule.token).safeTransferFrom(
             msg.sender,
             address(this),
-            tokenAmount
+            _fillAmount
         );
     }
 
@@ -376,12 +373,12 @@ contract VestingCapsule is Context, AccessControl {
      */
     function _claim(uint256 _capsuleID) internal virtual {
         require(
-            ownerOf(_capsuleID) == msg.sender,
-            "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
-        );
-        require(
             _capsuleID < _capsuleIdCounter.current(),
             "VestingCapsule: Invalid capsule ID"
+        );
+        require(
+            ownerOf(_capsuleID) == msg.sender,
+            "VestingCapsule: Cannot claim capsule because msg.sender is not the owner."
         );
         uint256 claimAmount = vestedBalanceOf(_capsuleID);
         require(
@@ -408,7 +405,7 @@ contract VestingCapsule is Context, AccessControl {
         _totalScheduleReserves[capsule.scheduleId] -= claimAmount;
 
         // Transfer tokens to capsule owner
-        IERC20(schedule.token).safeTransfer(msg.sender, claimAmount);
+        IERC20(schedule.token).transfer(msg.sender, claimAmount);
     }
 
     /**
@@ -418,10 +415,6 @@ contract VestingCapsule is Context, AccessControl {
      * @param _to Address to the list of token beneficiaries.
      */
     function _transfer(uint256 _capsuleID, address _to) internal virtual {
-        require(
-            ownerOf(_capsuleID) == msg.sender,
-            "VestingCapsule: Cannot transfer capsule because msg.sender is not the owner."
-        );
         require(
             _capsuleID < _capsuleIdCounter.current(),
             "VestingCapsule: Invalid capsule ID"
@@ -433,6 +426,10 @@ contract VestingCapsule is Context, AccessControl {
         require(
             _to != msg.sender,
             "VestingCapsule: Cannot transfer capsule to self."
+        );
+        require(
+            ownerOf(_capsuleID) == msg.sender,
+            "VestingCapsule: Cannot transfer capsule because msg.sender is not the owner."
         );
 
         Capsule storage capsule = _capsules[_capsuleID];
@@ -461,7 +458,7 @@ contract VestingCapsule is Context, AccessControl {
                 _totalScheduleReserves[capsule.scheduleId] -= balance;
 
                 // Tranfer unclaimed vested tokens to previous owner
-                IERC20(schedule.token).safeTransfer(_to, balance);
+                IERC20(schedule.token).transfer(msg.sender, balance);
             }
         }
     }
