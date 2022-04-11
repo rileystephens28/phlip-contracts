@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "../extensions/Blacklistable.sol";
 import "../extensions/Claimable.sol";
 import "../extensions/UpDownVote.sol";
+import "../VestingCapsule.sol";
 
 /**
  * @title PhlipCard
@@ -56,7 +57,8 @@ contract PhlipCard is
     uint256 public MAX_URI_CHANGES;
     uint256 public MIN_DAO_TOKENS_REQUIRED;
 
-    IERC20 public DAO_TOKEN;
+    IERC20 public daoToken;
+    VestingCapsule public vestingCapsule;
 
     struct Card {
         string uri;
@@ -65,6 +67,8 @@ contract PhlipCard is
     }
 
     Counters.Counter private _cardIdCounter;
+    Counters.Counter private _totalInCirculation;
+    Counters.Counter private _playableInCirculation;
     mapping(uint256 => Card) private _cards;
     mapping(uint256 => address) private _minters;
 
@@ -84,7 +88,8 @@ contract PhlipCard is
         uint256 _maxDownvotes,
         uint256 _maxUriChanges,
         uint256 _minDaoTokensRequired,
-        address _daoTokenAddress
+        address _daoTokenAddress,
+        address _vestingCapsuleAddress
     ) ERC721(_name, _symbol) {
         // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -98,6 +103,9 @@ contract PhlipCard is
         setMaxUriChanges(_maxUriChanges);
         setMinDaoTokensRequired(_minDaoTokensRequired);
         setDaoTokenAddress(_daoTokenAddress);
+
+        // This contracts address will need to be added as a treasurer to the VestingCapsule contract
+        vestingCapsule = VestingCapsule(_vestingCapsuleAddress);
     }
 
     /**
@@ -314,8 +322,8 @@ contract PhlipCard is
 
         // NOTE - Need to take into account the number of upvotes
         if (downVotesFor(_cardID) >= MAX_DOWNVOTES) {
-            Card storage card = _cards[_cardID];
-            card.playable = false;
+            _cards[_cardID].playable = false;
+            _playableInCirculation.decrement();
         }
     }
 
@@ -325,7 +333,7 @@ contract PhlipCard is
      * @return Wether the address has any PhlipDAO tokens.
      */
     function holdsMinDaoTokens(address _account) public view returns (bool) {
-        return DAO_TOKEN.balanceOf(_account) > MIN_DAO_TOKENS_REQUIRED;
+        return daoToken.balanceOf(_account) > MIN_DAO_TOKENS_REQUIRED;
     }
 
     /**
@@ -372,7 +380,7 @@ contract PhlipCard is
         public
         onlyRole(MINTER_ROLE)
     {
-        DAO_TOKEN = IERC20(_daoTokenAddress);
+        daoToken = IERC20(_daoTokenAddress);
     }
 
     /**
@@ -441,7 +449,7 @@ contract PhlipCard is
 
     /**
      * @dev Function called before tokens are transferred. Override to
-     * make sure that token tranfers have not been paused.
+     * make sure that token tranfers have not been paused. This will
      * @param _from The address tokens will be transferred from
      * @param _to The address tokens will be transferred  to
      * @param _tokenId The ID of the token to transfer
@@ -452,6 +460,22 @@ contract PhlipCard is
         uint256 _tokenId
     ) internal override whenNotPaused {
         super._beforeTokenTransfer(_from, _to, _tokenId);
+
+        if (_from == address(0)) {
+            // If the from address is 0, it is a mint
+            _totalInCirculation.increment();
+            _playableInCirculation.increment();
+        } else if (_to == address(0)) {
+            // If the to address is 0, it is a burn
+            _totalInCirculation.decrement();
+
+            // If card is  playable, decrement the playable count
+            if (isPlayable(_tokenId)) {
+                _playableInCirculation.decrement();
+            }
+        } else if (_from != _to) {
+            // If the from and to addresses are different, it is a transfer
+        }
     }
 
     /**
