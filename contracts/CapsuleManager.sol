@@ -12,8 +12,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * @author Riley Stephens
  * @dev CapsuleManager is a protocol for creating custom vesting schedules and transferable vesting
  * capsules. This contract will hold ERC20 tokens on behalf of vesting beneficiaries and control the rate at which
- * beneficiaries can withdraw them. When a capsule is tranferred, the tokens owed to the prior owner
- * are also transferred to them.
+ * beneficiaries can withdraw them. When a capsule is transferred, the tokens owed to the prior owner
+ * are stored in leftover reserves waiting to be claimed.
  */
 contract CapsuleManager is Context, AccessControl {
     using SafeERC20 for IERC20;
@@ -46,7 +46,7 @@ contract CapsuleManager is Context, AccessControl {
      * Capsule is transferred to a new owner, the claimedAmount no longer represents the amount
      * of tokens that have actually been claimed, but rather the total amount of tokens that have vested
      * up until the transfer. The difference between the actual claimed amount and the total vested amount
-     * is tranferred to the prior owner.
+     * is stored in leftover reserves waiting to be claimed.
      * @param scheduleId The ID of the VestingSchedule associated with this capsule
      * @param startTime Time at which cliff period begins
      * @param endTime Time at which capsule is fully vested
@@ -67,11 +67,17 @@ contract CapsuleManager is Context, AccessControl {
     mapping(uint256 => uint256) private _totalScheduleReserves;
     mapping(uint256 => uint256) private _availableScheduleReserves;
 
+    // The amount of tokens this contract holds that are waiting for withdrawal
+    mapping(address => uint256) private _leftoverReserves;
+
     // Maps addresses to their capsules
     mapping(uint256 => Capsule) private _capsules;
 
     // Maps capsules to their owners
     mapping(uint256 => address) private _capsuleOwners;
+
+    // Maps prior capsule owners to tokens that vested in their capsules before being to transferred
+    mapping(address => mapping(address => uint256)) private _leftoverBalance;
 
     /**
      * @dev Create a new CapsuleManager instance and grant msg.sender TREASURER role.
@@ -80,6 +86,10 @@ contract CapsuleManager is Context, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(TREASURER_ROLE, msg.sender);
     }
+
+    /***********************************|
+    |          View Functions           |
+    |__________________________________*/
 
     /**
      * @dev Accessor function for specified VestingSchedule details.
@@ -136,6 +146,15 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
+     * @dev Accessor function for leftover reserves of specified token.
+     * @param _token The address of the token to be queried.
+     * @return The amount of specified tokens waiting to be withdrawn (no longer in capsules)
+     */
+    function leftoverReservesOf(address _token) public view returns (uint256) {
+        return _leftoverReserves[_token];
+    }
+
+    /**
      * @dev Accessor function for specified Capsule details.
      * @param _capsuleID The ID of the Capsule to be queried.
      * @return The struct values of the actve capsule
@@ -183,6 +202,24 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
+     * @dev (Capsule) Calculates the total amount of tokens that have vested up until a the current time
+     * @param _owner The address of account whose balance to query
+     * @param _token The address of a token to query
+     * @return The amount of specified tokens leftover after capsule transfer
+     */
+    function leftoverBalanceOf(address _owner, address _token)
+        public
+        view
+        returns (uint256)
+    {
+        return _leftoverBalance[_owner][_token];
+    }
+
+    /***********************************|
+    |       Treasurer Functions         |
+    |__________________________________*/
+
+    /**
      * @dev Deposits tokens to schedule reserves for future capsules.
      * @param _scheduleID The ID of the schedule to fill.
      * @param _fillAmount Amount of tokens that will be deposited from treasurer.
@@ -225,8 +262,12 @@ contract CapsuleManager is Context, AccessControl {
         uint256 _scheduleID,
         uint256 _startTime
     ) external onlyRole(TREASURER_ROLE) returns (uint256) {
-        return _createCapsule(_scheduleID, _startTime, _owner);
+        return _createCapsule(_owner, _scheduleID, _startTime);
     }
+
+    /***********************************|
+    |       External Functions          |
+    |__________________________________*/
 
     /**
      * @dev Allows capsule owner to delete their Capsule and release its funds back to reserves.
@@ -239,19 +280,31 @@ contract CapsuleManager is Context, AccessControl {
     /**
      * @dev Transfers capsule ownership to a new address.
      * @param _capsuleID ID of the Capsule to be transferred.
-     * @param _to Address to tranfer to.
+     * @param _to Address to transfer to.
      */
     function transfer(uint256 _capsuleID, address _to) external {
         _transfer(_capsuleID, _to);
     }
 
     /**
-     * @dev Tranfers vested tokens to capsule owner.
+     * @dev transfers vested tokens to capsule owner.
      * @param _capsuleID ID of the Capsule to be claimed.
      */
     function claim(uint256 _capsuleID) external {
         _claim(_capsuleID);
     }
+
+    /**
+     * @dev Transfers leftover vested tokens from previously owned capsule
+     * @param _token Address of token leftovers to claim
+     */
+    function withdrawLeftovers(address _token) external {
+        _withdrawLeftovers(_token);
+    }
+
+    /***********************************|
+    |        Private Functions          |
+    |__________________________________*/
 
     /**
      * @dev Creates a new VestingSchedule that can be used by future Capsules.
@@ -333,9 +386,9 @@ contract CapsuleManager is Context, AccessControl {
      * @param _owner Address able to claim the tokens in the capsule.
      */
     function _createCapsule(
+        address _owner,
         uint256 _scheduleID,
-        uint256 _startTime,
-        address _owner
+        uint256 _startTime
     ) internal virtual returns (uint256) {
         require(
             _owner != address(0),
@@ -406,7 +459,7 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
-     * @dev Tranfers the amount of tokens in a Capsule that have vested to the owner of the capsule.
+     * @dev Transfers the amount of tokens in a Capsule that have vested to the owner of the capsule.
      * @param _capsuleID ID of the Capsule to be claimed.
      */
     function _claim(uint256 _capsuleID) internal virtual {
@@ -444,6 +497,27 @@ contract CapsuleManager is Context, AccessControl {
 
         // Transfer tokens to capsule owner
         IERC20(schedule.token).transfer(msg.sender, claimAmount);
+    }
+
+    /**
+     * @dev Transfers the amount of tokens leftover owed to previous
+     * capsule owner after capsule transfer(s).
+     * @param _token ID of the Capsule to be claimed.
+     */
+    function _withdrawLeftovers(address _token) internal virtual {
+        require(_token != address(0), "CapsuleManager: Token cannot be 0x0");
+
+        uint256 leftoverBalance = _leftoverBalance[msg.sender][_token];
+        require(
+            leftoverBalance > 0,
+            "CapsuleManager: No leftover tokens to withdraw."
+        );
+        // Reduce the leftover reserves and leftover balance of caller
+        _leftoverReserves[_token] -= leftoverBalance;
+        _leftoverBalance[msg.sender][_token] -= leftoverBalance;
+
+        // Transfer tokens to capsule owner
+        IERC20(_token).transfer(msg.sender, leftoverBalance);
     }
 
     /**
@@ -492,11 +566,12 @@ contract CapsuleManager is Context, AccessControl {
                 capsule.claimedAmount += balance;
                 capsule.lastClaimedTimestamp = block.timestamp;
 
-                // Reduce the total reserves by amount owed to prior owner
+                // Reduce the total schedule reserves by leftover balance
                 _totalScheduleReserves[capsule.scheduleId] -= balance;
 
-                // Tranfer unclaimed vested tokens to previous owner
-                IERC20(schedule.token).transfer(msg.sender, balance);
+                // Add unclaimed vested tokens to previous owners leftover balance
+                _leftoverBalance[msg.sender][schedule.token] += balance;
+                _leftoverReserves[schedule.token] += balance;
             }
         }
     }
