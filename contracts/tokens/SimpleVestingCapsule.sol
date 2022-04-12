@@ -5,13 +5,16 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "../CapsuleManager.sol";
 
 /**
- * @title VestingCapsule
+ * @title SimpleVestingCapsule
  * @author Riley Stephens
- * @dev This is an implementation of an ERC721 token that supports a vesting scheme.
- * This contract address will need to be granted CapsuleManager treasurer role
+ * @dev The SimpleVestingCapsule is an implementation of an ERC721 token that supports
+ * a single global vesting scheme. The vesting scheme can be updated but will always be
+ * limited to one vesting scheme at a time.
+ *
+ * NOTE - This contract address will need to be granted CapsuleManager treasurer role
  * to allow for proper interaction.
  */
-contract VestingCapsule is ERC721 {
+contract SimpleVestingCapsule is ERC721 {
     using Address for address;
 
     // Mapping from token ID to owner address
