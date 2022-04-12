@@ -22,15 +22,28 @@ contract VestingCapsule is ERC721 {
 
     mapping(uint256 => uint256) private _capsuleLookup;
 
+    // The ID of the schedule to be used during mint
+    uint256 private _vestingScheduleId;
+
     CapsuleManager private _capsuleManager;
+
+    /***********************************|
+    |          Initialization           |
+    |__________________________________*/
 
     constructor(
         string memory _name,
         string memory _symbol,
-        address _capsuleManagerAddress
+        address _capsuleManagerAddress,
+        uint256 _scheduleId
     ) ERC721(_name, _symbol) {
-        _capsuleManager = CapsuleManager(_capsuleManagerAddress);
+        _setCapsuleManager(_capsuleManagerAddress);
+        _setVestingSchedule(_scheduleId);
     }
+
+    /***********************************|
+    |          View Functions           |
+    |__________________________________*/
 
     /**
      * @dev Accessor for the CapsuleManager contract address
@@ -40,192 +53,73 @@ contract VestingCapsule is ERC721 {
     }
 
     /**
-     * @dev Setter for the address of the CapsuleManager contract
+     * @dev Accessor for the Vesting Schedule ID
+     */
+    function getVestingScheduleId() public view returns (uint256) {
+        return _vestingScheduleId;
+    }
+
+    /***********************************|
+    |        Private Functions          |
+    |__________________________________*/
+
+    /**
+     * @dev Setter for the address of the CapsuleManager contract.
      * @param _address Address of the CapsuleManager contract
      */
-    function setCapsuleManager(address _address) public {
+    function _setCapsuleManager(address _address) internal virtual {
         _capsuleManager = CapsuleManager(_address);
     }
 
     /**
-     * @dev Safely mints `tokenId` and transfers it to `to`.
-     *
-     * Requirements:
-     *
-     * - `tokenId` must not exist.
-     * - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
-     *
-     * Emits a {Transfer} event.
+     * @dev Setter for the ID of the schedule to be used during mint.
+     * @param _id ID of the new schedule
      */
-    function _safeMint(
-        address to,
-        uint256 tokenId,
-        uint256 scheduleId
-    ) internal virtual {
-        _safeMint(to, tokenId, scheduleId, "");
-    }
-
-    /**
-     * @dev Same as {xref-ERC721-_safeMint-address-uint256-}[`_safeMint`], with an additional `data` parameter which is
-     * forwarded in {IERC721Receiver-onERC721Received} to contract recipients.
-     */
-    function _safeMint(
-        address to,
-        uint256 tokenId,
-        uint256 scheduleId,
-        bytes memory _data
-    ) internal virtual {
-        _mint(to, tokenId, scheduleId);
+    function _setVestingSchedule(uint256 _id) internal virtual {
         require(
-            _checkOnERC721Received(address(0), to, tokenId, _data),
-            "ERC721: transfer to non ERC721Receiver implementer"
+            _capsuleManager.scheduleExists(_id),
+            "VestingCapsule: Schedule does not exist"
         );
+        _vestingScheduleId = _id;
     }
 
     /**
-     * @dev Mints `tokenId` and transfers it to `to`.
+     * @dev Hook that is called after tokens are transferred. This function
+     * handles interaction with capsule manager.
      *
-     * WARNING: Direct usage of this method is discouraged, use {_safeMint} whenever possible
+     * Calling conditions:
      *
-     * Requirements:
+     * - When `from` and `to` are both non-zero, ``from``'s `tokenId` will be
+     *   transferred to `to`.
+     * - When `from` is zero, `tokenId` will be minted for `to`.
+     * - When `to` is zero, ``from``'s `tokenId` will be burned.
+     * - `from` and `to` are never both zero.
      *
-     * - `tokenId` must not exist.
-     * - `to` cannot be the zero address.
-     *
-     * Emits a {Transfer} event.
+     * @param _from The address tokens will be transferred from
+     * @param _to The address tokens will be transferred  to
+     * @param _tokenId The ID of the token to transfer
      */
-    function _mint(
-        address to,
-        uint256 tokenId,
-        uint256 scheduleId
-    ) internal virtual {
-        require(to != address(0), "ERC721: mint to the zero address");
-        require(!_exists(tokenId), "ERC721: token already minted");
-
-        _beforeTokenTransfer(address(0), to, tokenId);
-
-        _balances[to] += 1;
-        _owners[tokenId] = to;
-
-        // Create capsule and store reference
-        uint256 capsuleId = _capsuleManager.createCapsule(
-            to,
-            scheduleId,
-            block.timestamp
-        );
-        _capsuleLookup[tokenId] = capsuleId;
-
-        emit Transfer(address(0), to, tokenId);
-
-        _afterTokenTransfer(address(0), to, tokenId);
-    }
-
-    /**
-     * @dev Destroys `tokenId`.
-     * The approval is cleared when the token is burned.
-     *
-     * Requirements:
-     *
-     * - `tokenId` must exist.
-     *
-     * Emits a {Transfer} event.
-     */
-    function _burn(uint256 tokenId) internal virtual override {
-        address owner = ERC721.ownerOf(tokenId);
-
-        _beforeTokenTransfer(owner, address(0), tokenId);
-
-        // Clear approvals
-        _approve(address(0), tokenId);
-
-        _balances[owner] -= 1;
-        delete _owners[tokenId];
-
-        delete _capsuleLookup[tokenId];
-        _capsuleManager.destroyCapsule(tokenId);
-
-        emit Transfer(owner, address(0), tokenId);
-
-        _afterTokenTransfer(owner, address(0), tokenId);
-    }
-
-    /**
-     * @dev Transfers `tokenId` from `from` to `to`.
-     *  As opposed to {transferFrom}, this imposes no restrictions on msg.sender.
-     *
-     * Requirements:
-     *
-     * - `to` cannot be the zero address.
-     * - `tokenId` token must be owned by `from`.
-     *
-     * Emits a {Transfer} event.
-     */
-    function _transfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal virtual override {
-        require(
-            ERC721.ownerOf(tokenId) == from,
-            "ERC721: transfer from incorrect owner"
-        );
-        require(to != address(0), "ERC721: transfer to the zero address");
-
-        _beforeTokenTransfer(from, to, tokenId);
-
-        // Clear approvals from the previous owner
-        _approve(address(0), tokenId);
-
-        _balances[from] -= 1;
-        _balances[to] += 1;
-        _owners[tokenId] = to;
-
-        _capsuleManager.transfer(tokenId, to);
-
-        emit Transfer(from, to, tokenId);
-
-        _afterTokenTransfer(from, to, tokenId);
-    }
-
-    /**
-     * @dev Internal function to invoke {IERC721Receiver-onERC721Received} on a target address.
-     * The call is not executed if the target address is not a contract.
-     *
-     * @param from address representing the previous owner of the given token ID
-     * @param to target address that will receive the tokens
-     * @param tokenId uint256 ID of the token to be transferred
-     * @param _data bytes optional data to send along with the call
-     * @return bool whether the call correctly returned the expected magic value
-     */
-    function _checkOnERC721Received(
-        address from,
-        address to,
-        uint256 tokenId,
-        bytes memory _data
-    ) private override returns (bool) {
-        if (to.isContract()) {
-            try
-                IERC721Receiver(to).onERC721Received(
-                    _msgSender(),
-                    from,
-                    tokenId,
-                    _data
-                )
-            returns (bytes4 retval) {
-                return retval == IERC721Receiver.onERC721Received.selector;
-            } catch (bytes memory reason) {
-                if (reason.length == 0) {
-                    revert(
-                        "ERC721: transfer to non ERC721Receiver implementer"
-                    );
-                } else {
-                    assembly {
-                        revert(add(32, reason), mload(reason))
-                    }
-                }
-            }
-        } else {
-            return true;
+    function _afterTokenTransfer(
+        address _from,
+        address _to,
+        uint256 _tokenId
+    ) internal override {
+        super._afterTokenTransfer(_from, _to, _tokenId);
+        if (_from == address(0)) {
+            // MINT - Call manager to create capsule and store reference
+            uint256 capsuleId = _capsuleManager.createCapsule(
+                _to,
+                _vestingScheduleId,
+                block.timestamp
+            );
+            _capsuleLookup[_tokenId] = capsuleId;
+        } else if (_to == address(0)) {
+            // BURN - Call manager to destroy capsule and delete reference
+            delete _capsuleLookup[_tokenId];
+            _capsuleManager.destroyCapsule(_tokenId);
+        } else if (_from != _to) {
+            // TRANSFER - Call manager to tranfer capsule
+            _capsuleManager.transfer(_tokenId, _to);
         }
     }
 }
