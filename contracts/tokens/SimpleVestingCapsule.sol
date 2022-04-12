@@ -3,32 +3,24 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "../CapsuleManager.sol";
+import "./AbstractVestingCapsule.sol";
 
 /**
  * @title SimpleVestingCapsule
  * @author Riley Stephens
- * @dev The SimpleVestingCapsule is an implementation of an ERC721 token that supports
+ * @dev The SimpleVestingCapsule is an implementation of an AbstractVestingCapsule that supports
  * a single global vesting scheme. The vesting scheme can be updated but will always be
  * limited to one vesting scheme at a time.
  *
  * NOTE - This contract address will need to be granted CapsuleManager treasurer role
  * to allow for proper interaction.
  */
-contract SimpleVestingCapsule is ERC721 {
-    using Address for address;
-
-    // Mapping from token ID to owner address
-    mapping(uint256 => address) private _owners;
-
-    // Mapping owner address to token count
-    mapping(address => uint256) private _balances;
-
+contract SimpleVestingCapsule is AbstractVestingCapsule {
+    // Mapping from token ID to corresponding capsule ID
     mapping(uint256 => uint256) private _capsuleLookup;
 
     // The ID of the schedule to be used during mint
     uint256 private _vestingScheduleId;
-
-    CapsuleManager private _capsuleManager;
 
     /***********************************|
     |          Initialization           |
@@ -39,8 +31,7 @@ contract SimpleVestingCapsule is ERC721 {
         string memory _symbol,
         address _capsuleManagerAddress,
         uint256 _scheduleId
-    ) ERC721(_name, _symbol) {
-        _setCapsuleManager(_capsuleManagerAddress);
+    ) AbstractVestingCapsule(_name, _symbol, _capsuleManagerAddress) {
         _setVestingSchedule(_scheduleId);
     }
 
@@ -49,30 +40,28 @@ contract SimpleVestingCapsule is ERC721 {
     |__________________________________*/
 
     /**
-     * @dev Accessor for the CapsuleManager contract address
+     * @dev Accessor for the Vesting Schedule ID
      */
-    function getCapsuleManager() public view returns (address) {
-        return address(_capsuleManager);
+    function getVestingSchedule() public view returns (uint256) {
+        return _vestingScheduleId;
     }
 
     /**
-     * @dev Accessor for the Vesting Schedule ID
+     * @dev Accessor to get the vested balance for a specified token.
+     * Must be implemented by child contract.
      */
-    function getVestingScheduleId() public view returns (uint256) {
-        return _vestingScheduleId;
+    function vestedBalanceOf(uint256 _capsuleID)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        return _capsuleManager.vestedBalanceOf(_capsuleID);
     }
 
     /***********************************|
     |        Private Functions          |
     |__________________________________*/
-
-    /**
-     * @dev Setter for the address of the CapsuleManager contract.
-     * @param _address Address of the CapsuleManager contract
-     */
-    function _setCapsuleManager(address _address) internal virtual {
-        _capsuleManager = CapsuleManager(_address);
-    }
 
     /**
      * @dev Setter for the ID of the schedule to be used during mint.
@@ -84,6 +73,7 @@ contract SimpleVestingCapsule is ERC721 {
             "VestingCapsule: Schedule does not exist"
         );
         _vestingScheduleId = _id;
+        _scheduleIsSet = true;
     }
 
     /**
