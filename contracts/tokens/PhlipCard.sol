@@ -3,11 +3,9 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../extensions/Blacklistable.sol";
-import "../extensions/Claimable.sol";
+import "../presets/BlockerPauser.sol";
 import "../extensions/UpDownVote.sol";
 import "./VestingCapsule.sol";
 
@@ -38,18 +36,10 @@ import "./VestingCapsule.sol";
  * Card will stop receiving vested payouts.
  *
  */
-contract PhlipCard is
-    VestingCapsule,
-    Pausable,
-    AccessControl,
-    Blacklistable,
-    UpDownVote
-{
+contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
     using Counters for Counters.Counter;
 
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BLOCKER_ROLE = keccak256("BLOCKER_ROLE");
 
     string public BASE_URI;
     uint256 public MAX_DOWNVOTES;
@@ -89,12 +79,10 @@ contract PhlipCard is
         uint256 _minDaoTokensRequired,
         address _daoTokenAddress,
         address _vestingCapsuleAddress
-    ) VestingCapsule(_name, _symbol, _vestingCapsuleAddress) {
+    ) VestingCapsule(_name, _symbol, _vestingCapsuleAddress) BlockerPauser() {
         // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(BLOCKER_ROLE, msg.sender);
 
         // Set constants
         BASE_URI = _baseUri;
@@ -145,42 +133,6 @@ contract PhlipCard is
      */
     function getPlayableCardCount() public view returns (uint256) {
         return _playableInCirculation.current();
-    }
-
-    /**
-     * @dev Allow address with PAUSER role to pause card transfers
-     */
-    function pause() external onlyRole(PAUSER_ROLE) {
-        _pause();
-    }
-
-    /**
-     * @dev Allow address with PAUSER role to unpause card transfers
-     */
-    function unpause() external onlyRole(PAUSER_ROLE) {
-        _unpause();
-    }
-
-    /**
-     * @dev Allow address with BLOCKER role to add an address to the blacklist
-     * @param _address The address to add to the blacklist
-     */
-    function blacklistAddress(address _address)
-        external
-        onlyRole(BLOCKER_ROLE)
-    {
-        _addToBlacklist(_address);
-    }
-
-    /**
-     * @dev Allow address with BLOCKER role to remove an address from the blacklist
-     * @param _address The address to remove from the blacklist
-     */
-    function unblacklistAddress(address _address)
-        external
-        onlyRole(BLOCKER_ROLE)
-    {
-        _removeFromBlacklist(_address);
     }
 
     /**
