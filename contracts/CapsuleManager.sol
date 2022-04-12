@@ -214,18 +214,22 @@ contract CapsuleManager is Context, AccessControl {
     /**
      * @dev Calculates the amount of tokens that have vested for several capsules.
      * @param _capsuleIDs Array of IDs of capsules to be queried
-     * @return Array of vested balances for respective capsules
+     * @return (array of token addresses, array of vested balances for respective tokens)
      */
     function vestedBalancesOf(uint256[] calldata _capsuleIDs)
         public
         view
-        returns (uint256[] memory)
+        returns (address[] memory, uint256[] memory)
     {
+        address[] memory tokens = new address[](_capsuleIDs.length);
         uint256[] memory balances = new uint256[](_capsuleIDs.length);
+
         for (uint256 i = 0; i < _capsuleIDs.length; i++) {
             balances[i] = vestedBalanceOf(_capsuleIDs[i]);
+            tokens[i] = _vestingSchedules[_capsules[_capsuleIDs[i]].scheduleId]
+                .token;
         }
-        return balances;
+        return (tokens, balances);
     }
 
     /**
@@ -352,7 +356,7 @@ contract CapsuleManager is Context, AccessControl {
     |__________________________________*/
 
     /**
-     * @dev Creates a batch of new Capsules.
+     * @dev (Overloaded) Creates a batch of new Capsules from array params.
      * @param _owners Array of beneficiaries of vesting capsules.
      * @param _scheduleIDs Array of schedule IDs of the associated vesting schedule.
      * @param _startTimes Array of times at which cliff periods begin.
@@ -383,6 +387,32 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
+     * @dev (Overloaded) Creates a batch of new Capsules for a single owner, all with same start time.
+     * @param _owner Single beneficiary of new vesting capsules.
+     * @param _scheduleIDs Array of schedule IDs of the associated vesting schedule.
+     * @param _startTime Time at which cliff periods begin.
+     */
+    function batchCreateCapsules(
+        address _owner,
+        uint256[] calldata _scheduleIDs,
+        uint256 _startTime
+    ) external onlyRole(TREASURER_ROLE) returns (uint256[] memory) {
+        require(
+            _scheduleIDs.length > 0,
+            "CapsuleManager: No vesting schedule IDs provided"
+        );
+        uint256[] memory newCapsuleIds = new uint256[](_scheduleIDs.length);
+        for (uint256 i = 0; i < _scheduleIDs.length; i++) {
+            newCapsuleIds[i] = _createCapsule(
+                _owner,
+                _scheduleIDs[i],
+                _startTime
+            );
+        }
+        return newCapsuleIds;
+    }
+
+    /**
      * @dev Destroys a batch of Capsules owned by the caller.
      * @param _capsuleIDs Array of capsule IDs to destoy.
      */
@@ -397,9 +427,9 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
-     * @dev Tranfers a batch of Capsules owned by the caller to new addresses.
+     * @dev (Overloaded) Tranfers a batch of Capsules owned by the caller to new addresses.
      * @param _capsuleIDs Array of capsule IDs to transfer.
-     * @param _capsuleIDs Array of addresses to receive capsules.
+     * @param _recipients Array of addresses to receive capsules.
      */
     function batchTranfer(
         uint256[] calldata _capsuleIDs,
@@ -415,6 +445,23 @@ contract CapsuleManager is Context, AccessControl {
         );
         for (uint256 i = 0; i < _capsuleIDs.length; i++) {
             _transfer(_capsuleIDs[i], _recipients[i]);
+        }
+    }
+
+    /**
+     * @dev (Overloaded) Tranfers a batch of Capsules owned by the caller to a single address.
+     * @param _capsuleIDs Array of capsule IDs to transfer.
+     * @param _recipient Address to receive all capsules.
+     */
+    function batchTranfer(uint256[] calldata _capsuleIDs, address _recipient)
+        external
+    {
+        require(
+            _capsuleIDs.length > 0,
+            "CapsuleManager: No capsule IDs provided"
+        );
+        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
+            _transfer(_capsuleIDs[i], _recipient);
         }
     }
 
