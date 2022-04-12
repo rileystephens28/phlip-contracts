@@ -62,6 +62,7 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     mapping(uint256 => VestingSchedule) private _vestingSchedules;
+    mapping(uint256 => bool) private _registeredSchedules;
 
     // The amount of tokens this contract holds for each schedule
     mapping(uint256 => uint256) private _totalScheduleReserves;
@@ -90,6 +91,15 @@ contract CapsuleManager is Context, AccessControl {
     /***********************************|
     |          View Functions           |
     |__________________________________*/
+
+    /**
+     * @dev Accessor function for checking if specified schedule is registered.
+     * @param _scheduleID The ID of the VestingSchedule to be queried.
+     * @return True if the schedule is registered, false otherwise.
+     */
+    function scheduleExists(uint256 _scheduleID) public view returns (bool) {
+        return _registeredSchedules[_scheduleID];
+    }
 
     /**
      * @dev Accessor function for specified VestingSchedule details.
@@ -436,6 +446,7 @@ contract CapsuleManager is Context, AccessControl {
 
         uint256 currentScheduleId = _scheduleIDCounter.current();
         _scheduleIDCounter.increment();
+        _registeredSchedules[currentScheduleId] = true;
         _vestingSchedules[currentScheduleId] = VestingSchedule(
             _token,
             _durationSeconds * _tokenRatePerSecond,
