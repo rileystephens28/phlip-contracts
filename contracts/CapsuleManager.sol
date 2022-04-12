@@ -303,6 +303,105 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /***********************************|
+    |    Batch Operation Functions      |
+    |__________________________________*/
+
+    /**
+     * @dev Creates a batch of new Capsules.
+     * @param _owners Array of beneficiaries of vesting capsules.
+     * @param _scheduleIDs Array of schedule IDs of the associated vesting schedule.
+     * @param _startTimes Array of times at which cliff periods begin.
+     */
+    function batchCreateCapsules(
+        address[] calldata _owners,
+        uint256[] calldata _scheduleIDs,
+        uint256[] calldata _startTimes
+    ) external onlyRole(TREASURER_ROLE) returns (uint256[] memory) {
+        require(_owners.length > 0, "CapsuleManager: No owners provided");
+        require(
+            _owners.length == _scheduleIDs.length,
+            "CapsuleManager: owners and schedule IDs must be the same length"
+        );
+        require(
+            _owners.length == _startTimes.length,
+            "CapsuleManager: owners and start times must be the same length"
+        );
+        uint256[] memory newCapsuleIds = new uint256[](_owners.length);
+        for (uint256 i = 0; i < _owners.length; i++) {
+            newCapsuleIds[i] = _createCapsule(
+                _owners[i],
+                _scheduleIDs[i],
+                _startTimes[i]
+            );
+        }
+        return newCapsuleIds;
+    }
+
+    /**
+     * @dev Destroys a batch of Capsules owned by the caller.
+     * @param _capsuleIDs Array of capsule IDs to destoy.
+     */
+    function batchDestoryCapsules(uint256[] calldata _capsuleIDs) external {
+        require(
+            _capsuleIDs.length > 0,
+            "CapsuleManager: No capsule IDs provided"
+        );
+        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
+            _destroyCapsule(_capsuleIDs[i]);
+        }
+    }
+
+    /**
+     * @dev Tranfers a batch of Capsules owned by the caller to new addresses.
+     * @param _capsuleIDs Array of capsule IDs to transfer.
+     * @param _capsuleIDs Array of addresses to receive capsules.
+     */
+    function batchTranfer(
+        uint256[] calldata _capsuleIDs,
+        address[] calldata _recipients
+    ) external {
+        require(
+            _capsuleIDs.length > 0,
+            "CapsuleManager: No capsule IDs provided"
+        );
+        require(
+            _capsuleIDs.length == _recipients.length,
+            "CapsuleManager: capsule IDs and _recipients must be the same length"
+        );
+        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
+            _transfer(_capsuleIDs[i], _recipients[i]);
+        }
+    }
+
+    /**
+     * @dev Claim a batch of Capsules owned by the caller.
+     * @param _capsuleIDs Array of capsule IDs to claim.
+     */
+    function batchClaim(uint256[] calldata _capsuleIDs) external {
+        require(
+            _capsuleIDs.length > 0,
+            "CapsuleManager: No capsule IDs provided"
+        );
+        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
+            _claim(_capsuleIDs[i]);
+        }
+    }
+
+    /**
+     * @dev Withdraw leftovers of several tokens owed to caller.
+     * @param _tokens Array of token address to withdraw from leftover reserves.
+     */
+    function batchWithdrawLeftovers(address[] calldata _tokens) external {
+        require(
+            _tokens.length > 0,
+            "CapsuleManager: No token addresses provided"
+        );
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            _withdrawLeftovers(_tokens[i]);
+        }
+    }
+
+    /***********************************|
     |        Private Functions          |
     |__________________________________*/
 
