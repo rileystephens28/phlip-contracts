@@ -416,7 +416,7 @@ contract CapsuleManager is Context, AccessControl {
      * @dev Destroys a batch of Capsules owned by the caller.
      * @param _capsuleIDs Array of capsule IDs to destoy.
      */
-    function batchDestoryCapsules(uint256[] calldata _capsuleIDs) external {
+    function batchDestroyCapsules(uint256[] calldata _capsuleIDs) external {
         require(
             _capsuleIDs.length > 0,
             "CapsuleManager: No capsule IDs provided"
@@ -427,11 +427,11 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
-     * @dev (Overloaded) Tranfers a batch of Capsules owned by the caller to new addresses.
+     * @dev (Overloaded) Transfers a batch of Capsules owned by the caller to new addresses.
      * @param _capsuleIDs Array of capsule IDs to transfer.
      * @param _recipients Array of addresses to receive capsules.
      */
-    function batchTranfer(
+    function batchTransfer(
         uint256[] calldata _capsuleIDs,
         address[] calldata _recipients
     ) external {
@@ -449,11 +449,11 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
-     * @dev (Overloaded) Tranfers a batch of Capsules owned by the caller to a single address.
+     * @dev (Overloaded) Transfers a batch of Capsules owned by the caller to a single address.
      * @param _capsuleIDs Array of capsule IDs to transfer.
      * @param _recipient Address to receive all capsules.
      */
-    function batchTranfer(uint256[] calldata _capsuleIDs, address _recipient)
+    function batchTransfer(uint256[] calldata _capsuleIDs, address _recipient)
         external
     {
         require(
