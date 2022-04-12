@@ -10,7 +10,7 @@ import "../CapsuleManager.sol";
  * @dev The AbstractVestingCapsule is an implementation of an ERC721 token that supports
  * an abstract vesting scheme.
  */
-abstract contract AbstractVestingCapsule is ERC721 {
+contract AbstractVestingCapsule is ERC721 {
     CapsuleManager internal _capsuleManager;
     bool internal _scheduleIsSet;
 
@@ -37,16 +37,6 @@ abstract contract AbstractVestingCapsule is ERC721 {
     function getCapsuleManager() public view returns (address) {
         return address(_capsuleManager);
     }
-
-    /**
-     * @dev Accessor to get the vested balance for a specified token.
-     * Must be implemented by child contract.
-     */
-    function vestedBalanceOf(uint256 _capsuleID)
-        public
-        virtual
-        returns (uint256)
-    {}
 
     /***********************************|
     |        Private Functions          |

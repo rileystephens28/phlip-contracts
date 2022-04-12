@@ -50,13 +50,12 @@ contract SimpleVestingCapsule is AbstractVestingCapsule {
      * @dev Accessor to get the vested balance for a specified token.
      * Must be implemented by child contract.
      */
-    function vestedBalanceOf(uint256 _capsuleID)
-        public
-        view
-        override
-        returns (uint256)
-    {
-        return _capsuleManager.vestedBalanceOf(_capsuleID);
+    function vestedBalanceOf(uint256 _tokenID) public view returns (uint256) {
+        require(
+            _exists(_tokenID),
+            "SimpleVestingCapsule: Querying vested balance of nonexistant token."
+        );
+        return _capsuleManager.vestedBalanceOf(_capsuleLookup[_tokenID]);
     }
 
     /***********************************|
