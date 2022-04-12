@@ -187,7 +187,7 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
-     * @dev (Capsule) Calculates the total amount of tokens that have vested up until a the current time
+     * @dev Calculates the amount of tokens that have vested for a given capsule.
      * @param _capsuleID The ID of the capsule to be queried
      * @return The amount of claimable tokens in a capsule
      */
@@ -212,17 +212,52 @@ contract CapsuleManager is Context, AccessControl {
     }
 
     /**
-     * @dev (Capsule) Calculates the total amount of tokens that have vested up until a the current time
-     * @param _owner The address of account whose balance to query
+     * @dev Calculates the amount of tokens that have vested for several capsules.
+     * @param _capsuleIDs Array of IDs of capsules to be queried
+     * @return Array of vested balances for respective capsules
+     */
+    function vestedBalancesOf(uint256[] calldata _capsuleIDs)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        uint256[] memory balances = new uint256[](_capsuleIDs.length);
+        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
+            balances[i] = vestedBalanceOf(_capsuleIDs[i]);
+        }
+        return balances;
+    }
+
+    /**
+     * @dev Accessor function for previous capsule owners leftover balance of given token.
+     * @param _prevOwner The address of previous owner whose balance to query
      * @param _token The address of a token to query
      * @return The amount of specified tokens leftover after capsule transfer
      */
-    function leftoverBalanceOf(address _owner, address _token)
+    function leftoverBalanceOf(address _prevOwner, address _token)
         public
         view
         returns (uint256)
     {
-        return _leftoverBalance[_owner][_token];
+        return _leftoverBalance[_prevOwner][_token];
+    }
+
+    /**
+     * @dev Accessor function for previous capsule owners leftover balance of several tokens.
+     * @param _prevOwner The address of account whose balance to query
+     * @param _tokens Array of token addresses to query
+     * @return The amount of specified tokens leftover after capsule transfer
+     */
+    function leftoverBalancesOf(address _prevOwner, address[] calldata _tokens)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        uint256[] memory balances = new uint256[](_tokens.length);
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            balances[i] = _leftoverBalance[_prevOwner][_tokens[i]];
+        }
+        return balances;
     }
 
     /***********************************|
