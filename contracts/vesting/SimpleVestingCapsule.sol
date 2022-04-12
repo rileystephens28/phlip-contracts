@@ -3,24 +3,23 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "./AbstractVestingCapsule.sol";
-import "../CapsuleManager.sol";
 
 /**
- * @title MultiScheduleVestingCapsule
+ * @title SimpleVestingCapsule
  * @author Riley Stephens
- * @dev The MultiScheduleVestingCapsule is an implementation of an AbstractVestingCapsule that supports
- * multiple vesting schemes per token. The vesting scheme group can be updated but each token only supports
- * the vesting scheme that was set when the token was minted.
+ * @dev The SimpleVestingCapsule is an implementation of an AbstractVestingCapsule that supports
+ * a single global vesting scheme. The vesting scheme can be updated but will always be
+ * limited to one vesting scheme at a time.
  *
  * NOTE - This contract address will need to be granted CapsuleManager treasurer role
  * to allow for proper interaction.
  */
-contract MultiScheduleVestingCapsule is AbstractVestingCapsule {
-    // Mapping from token ID to array of capsule IDs
-    mapping(uint256 => uint256[]) private _capsulesLookup;
+contract SimpleVestingCapsule is AbstractVestingCapsule {
+    // Mapping from token ID to corresponding capsule ID
+    mapping(uint256 => uint256) private _capsuleLookup;
 
-    // The IDs of the schedules to be used during mint
-    uint256[] private _vestingScheduleIds;
+    // The ID of the schedule to be used during mint
+    uint256 private _vestingScheduleId;
 
     /***********************************|
     |          Initialization           |
@@ -30,9 +29,9 @@ contract MultiScheduleVestingCapsule is AbstractVestingCapsule {
         string memory _name,
         string memory _symbol,
         address _capsuleManagerAddress,
-        uint256[] memory _scheduleIds
+        uint256 _scheduleId
     ) AbstractVestingCapsule(_name, _symbol, _capsuleManagerAddress) {
-        _setVestingSchedule(_scheduleIds);
+        _setVestingSchedule(_scheduleId);
     }
 
     /***********************************|
@@ -40,19 +39,22 @@ contract MultiScheduleVestingCapsule is AbstractVestingCapsule {
     |__________________________________*/
 
     /**
+     * @dev Accessor for the Vesting Schedule ID
+     */
+    function getVestingSchedule() public view returns (uint256) {
+        return _vestingScheduleId;
+    }
+
+    /**
      * @dev Accessor to get the vested balance for a specified token.
      * Must be implemented by child contract.
      */
-    function vestedBalanceOf(uint256 _tokenID)
-        public
-        view
-        returns (address[] memory, uint256[] memory)
-    {
+    function vestedBalanceOf(uint256 _tokenID) public view returns (uint256) {
         require(
             _exists(_tokenID),
-            "MultiScheduleVestingCapsule: Querying vested balance of nonexistant token."
+            "SimpleVestingCapsule: Querying vested balance of nonexistant token."
         );
-        return _capsuleManager.vestedBalancesOf(_capsulesLookup[_tokenID]);
+        return _capsuleManager.vestedBalanceOf(_capsuleLookup[_tokenID]);
     }
 
     /***********************************|
@@ -61,16 +63,15 @@ contract MultiScheduleVestingCapsule is AbstractVestingCapsule {
 
     /**
      * @dev Setter for the ID of the schedule to be used during mint.
-     * @param _ids Array of vesting schedule IDs
+     * @param _id ID of the new schedule
      */
-    function _setVestingSchedule(uint256[] memory _ids) internal virtual {
-        for (uint256 i = 0; i < _ids.length; i++) {
-            require(
-                _capsuleManager.scheduleExists(_ids[i]),
-                "MultiScheduleVestingCapsule: Invalid schedule ID provided."
-            );
-        }
-        _vestingScheduleIds = _ids;
+    function _setVestingSchedule(uint256 _id) internal virtual {
+        require(
+            _capsuleManager.scheduleExists(_id),
+            "VestingCapsule: Schedule does not exist"
+        );
+        _vestingScheduleId = _id;
+        _scheduleIsSet = true;
     }
 
     /**
@@ -96,19 +97,20 @@ contract MultiScheduleVestingCapsule is AbstractVestingCapsule {
     ) internal override {
         super._afterTokenTransfer(_from, _to, _tokenId);
         if (_from == address(0)) {
-            // MINT - Call manager to batch create capsule and store reference
-            _capsulesLookup[_tokenId] = _capsuleManager.batchCreateCapsules(
+            // MINT - Call manager to create capsule and store reference
+            uint256 capsuleId = _capsuleManager.createCapsule(
                 _to,
-                _vestingScheduleIds,
+                _vestingScheduleId,
                 block.timestamp
             );
+            _capsuleLookup[_tokenId] = capsuleId;
         } else if (_to == address(0)) {
-            // BURN - Call manager to batch destroy capsule and delete reference
-            _capsuleManager.batchDestroyCapsules(_capsulesLookup[_tokenId]);
-            delete _capsulesLookup[_tokenId];
+            // BURN - Call manager to destroy capsule and delete reference
+            delete _capsuleLookup[_tokenId];
+            _capsuleManager.destroyCapsule(_tokenId);
         } else if (_from != _to) {
-            // TRANSFER - Call manager to batch transfer capsules
-            _capsuleManager.batchTransfer(_capsulesLookup[_tokenId], _to);
+            // TRANSFER - Call manager to tranfer capsule
+            _capsuleManager.transfer(_tokenId, _to);
         }
     }
 }
