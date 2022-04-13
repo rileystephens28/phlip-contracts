@@ -83,15 +83,6 @@ contract VestingVault {
     |__________________________________*/
 
     /**
-     * @dev Accessor function for checking if specified schedule is registered.
-     * @param _scheduleID The ID of the VestingSchedule to be queried.
-     * @return True if the schedule is registered, false otherwise.
-     */
-    function scheduleExists(uint256 _scheduleID) public view returns (bool) {
-        return _registeredSchedules[_scheduleID];
-    }
-
-    /**
      * @dev Accessor function for specified VestingSchedule details.
      * @param _scheduleID The ID of the VestingSchedule to be queried.
      * @return The struct values of the vesting schedule
@@ -243,6 +234,20 @@ contract VestingVault {
     /***********************************|
     |     Private Getter Functions      |
     |__________________________________*/
+
+    /**
+     * @dev Accessor function for checking if specified schedule is registered.
+     * @param _scheduleID The ID of the VestingSchedule to be queried.
+     * @return True if the schedule is registered, false otherwise.
+     */
+    function _scheduleExists(uint256 _scheduleID)
+        internal
+        view
+        virtual
+        returns (bool)
+    {
+        return _registeredSchedules[_scheduleID];
+    }
 
     /**
      * @dev Calculates the amount of tokens that have vested for a given capsule.
