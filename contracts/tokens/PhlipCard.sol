@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "../presets/BlockerPauser.sol";
 import "../extensions/UpDownVote.sol";
-import "../vesting/VestingCapsule.sol";
-import "../vesting/GuardedVestingVault.sol";
+import "../vesting/capsules/GuardedVestingCapsule.sol";
+import "./CardSettingsControl.sol";
 
 /**
  * @title PhlipCard
@@ -39,21 +39,14 @@ import "../vesting/GuardedVestingVault.sol";
  */
 contract PhlipCard is
     AccessControl,
-    VestingCapsule,
-    GuardedVestingVault,
+    GuardedVestingCapsule,
+    CardSettingsControl,
     BlockerPauser,
     UpDownVote
 {
     using Counters for Counters.Counter;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-
-    string public BASE_URI;
-    uint256 public MAX_DOWNVOTES;
-    uint256 public MAX_URI_CHANGES;
-    uint256 public MIN_DAO_TOKENS_REQUIRED;
-
-    IERC20 public daoToken;
 
     struct Card {
         string uri;
@@ -85,17 +78,21 @@ contract PhlipCard is
         uint256 _maxUriChanges,
         uint256 _minDaoTokensRequired,
         address _daoTokenAddress
-    ) VestingCapsule(_name, _symbol) GuardedVestingVault() BlockerPauser() {
+    )
+        GuardedVestingCapsule(_name, _symbol)
+        CardSettingsControl()
+        BlockerPauser()
+    {
         // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
 
         // Set constants
-        BASE_URI = _baseUri;
-        MAX_DOWNVOTES = _maxDownvotes;
-        MAX_URI_CHANGES = _maxUriChanges;
-        MIN_DAO_TOKENS_REQUIRED = _minDaoTokensRequired;
-        daoToken = IERC20(_daoTokenAddress);
+        setBaseURI(_baseUri);
+        setMaxDownvotes(_maxDownvotes);
+        setMaxUriChanges(_maxUriChanges);
+        setMinDaoTokensRequired(_minDaoTokensRequired);
+        setDaoTokenAddress(_daoTokenAddress);
     }
 
     /**
@@ -208,7 +205,7 @@ contract PhlipCard is
             "PhlipCard: Cannot vote on your own card."
         );
         require(
-            holdsMinDaoTokens(msg.sender),
+            _holdsMinDaoTokens(msg.sender),
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow upvotes on unplayable cards?
@@ -232,7 +229,7 @@ contract PhlipCard is
             "PhlipCard: Cannot vote on your own card."
         );
         require(
-            holdsMinDaoTokens(msg.sender),
+            _holdsMinDaoTokens(msg.sender),
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow downvotes on unplayable cards?
@@ -243,62 +240,6 @@ contract PhlipCard is
             _cards[_cardID].playable = false;
             _playableInCirculation.decrement();
         }
-    }
-
-    /**
-     * @dev Checks if the given address has PhlipDAO token balance > 0
-     * @param _account Address to check.
-     * @return Wether the address has any PhlipDAO tokens.
-     */
-    function holdsMinDaoTokens(address _account) public view returns (bool) {
-        return daoToken.balanceOf(_account) > MIN_DAO_TOKENS_REQUIRED;
-    }
-
-    /**
-     * @dev Allows MINTER to set the base URI for all tokens created by this contract
-     * @param _newURI New base URI
-     */
-    function setBaseURI(string memory _newURI) public onlyRole(MINTER_ROLE) {
-        BASE_URI = _newURI;
-    }
-
-    /**
-     * @dev Allows MINTER to set the max number of downvotes a card can have
-     * before it is marked unplayable.
-     * @param _newMax The new max number of downvotes allowed
-     */
-    function setMaxDownvotes(uint256 _newMax) public onlyRole(MINTER_ROLE) {
-        MAX_DOWNVOTES = _newMax;
-    }
-
-    /**
-     * @dev Allows MINTER to set max number of times minter can change the URI of a card.
-     * @param _newMax New max changes allowed
-     */
-    function setMaxUriChanges(uint256 _newMax) public onlyRole(MINTER_ROLE) {
-        MAX_URI_CHANGES = _newMax;
-    }
-
-    /**
-     * @dev Allows MINTER to set minimum number of PhlipDAO tokens required to vote and mint.
-     * @param _newMin New min DAO tokens required
-     */
-    function setMinDaoTokensRequired(uint256 _newMin)
-        public
-        onlyRole(MINTER_ROLE)
-    {
-        MIN_DAO_TOKENS_REQUIRED = _newMin;
-    }
-
-    /**
-     * @dev Allows MINTER to set the address of the PhlipDAO token contract
-     * @param _daoTokenAddress New contract address
-     */
-    function setDaoTokenAddress(address _daoTokenAddress)
-        public
-        onlyRole(MINTER_ROLE)
-    {
-        daoToken = IERC20(_daoTokenAddress);
     }
 
     /**
@@ -412,11 +353,22 @@ contract PhlipCard is
         super._beforeTokenTransfer(_from, _to, _tokenId);
     }
 
+    /**
+     * @dev Checks if the given address has PhlipDAO token balance > 0
+     * @param _account Address to check.
+     * @return Wether the address has any PhlipDAO tokens.
+     */
+    function _holdsMinDaoTokens(address _account) internal view returns (bool) {
+        return
+            IERC20(DAO_TOKEN_ADDRESS).balanceOf(_account) >
+            MIN_DAO_TOKENS_REQUIRED;
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view
         virtual
-        override(ERC721, AccessControl)
+        override(GuardedVestingCapsule, AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
