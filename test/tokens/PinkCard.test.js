@@ -20,8 +20,17 @@ contract("PinkCard", (accounts) => {
         // Initialize contract state so tests have default cards, claims, etc
         // to interact with throughout the test suite.
 
-        // Create a new contract instance of erc20 and card contracts
+        const baseSchedule = {
+            cliff: new BN(100),
+            duration: new BN(1000),
+            rate: new BN(1),
+        };
+        let receipt;
         context.tokenInstance = await ERC20Mock.new({ from: accounts[0] });
+        context.tokenInstance2 = await ERC20Mock.new({ from: accounts[0] });
+
+        // Create a new contract instance of erc20 and card contracts
+
         context.cardInstance = await PinkCard.new(
             cardAttributes.baseUri,
             cardAttributes.maxDownVotes,
@@ -31,24 +40,81 @@ contract("PinkCard", (accounts) => {
             { from: accounts[0] }
         );
 
+        receipt = await context.cardInstance.createVestingSchedule(
+            context.tokenInstance.address,
+            baseSchedule.cliff,
+            baseSchedule.duration,
+            baseSchedule.rate,
+            {
+                from: accounts[0],
+            }
+        );
+        console.log(`Create Vesting Schedule: ${receipt.receipt.gasUsed}`);
+        await context.cardInstance.createVestingSchedule(
+            context.tokenInstance2.address,
+            baseSchedule.cliff,
+            baseSchedule.duration,
+            baseSchedule.rate,
+            {
+                from: accounts[0],
+            }
+        );
+
+        receipt = await context.cardInstance.setVestingSchedule([0, 1]);
+        console.log(`Set Vesting Schedule: ${receipt.receipt.gasUsed}`);
+
         // fund the deployer account with 10,000 tokens
-        await context.tokenInstance.mint(accounts[0], 10000, {
+        receipt = await context.tokenInstance.mint(accounts[0], 10000, {
+            from: accounts[0],
+        });
+        console.log(`Mint ERC20: ${receipt.receipt.gasUsed}`);
+
+        receipt = await context.tokenInstance2.mint(accounts[0], 10000, {
+            from: accounts[0],
+        });
+
+        receipt = await context.tokenInstance.approve(
+            context.cardInstance.address,
+            new BN(1000),
+            { from: accounts[0] }
+        );
+        console.log(`Approve ERC20: ${receipt.receipt.gasUsed}`);
+
+        receipt = await context.tokenInstance2.approve(
+            context.cardInstance.address,
+            new BN(1000),
+            { from: accounts[0] }
+        );
+
+        receipt = await context.cardInstance.fillReserves(0, new BN(1000), {
+            from: accounts[0],
+        });
+        console.log(`Fill Schedule Reserves: ${receipt.receipt.gasUsed}`);
+
+        receipt = await context.cardInstance.fillReserves(1, new BN(1000), {
             from: accounts[0],
         });
 
         // Send some tokens to token holder account
-        context.tokenInstance.transfer(accounts[1], new BN(200), {
-            from: accounts[0],
-        });
+        receipt = await context.tokenInstance.transfer(
+            accounts[1],
+            new BN(200),
+            {
+                from: accounts[0],
+            }
+        );
 
+        console.log(`Transfer ERC20: ${receipt.receipt.gasUsed}`);
         // Mint 1 card to card holder
-        await context.cardInstance.mintCard(accounts[2], "base123", {
+        receipt = await context.cardInstance.mintCard(accounts[2], "base123", {
             from: accounts[0],
+            gas: 9000000,
         });
+        console.log(`Mint Card: ${receipt.receipt.gasUsed}`);
 
-        await context.cardInstance.createClaim(accounts[3], new BN(2), {
-            from: accounts[0],
-        });
+        // await context.cardInstance.createClaim(accounts[3], new BN(2), {
+        //     from: accounts[0],
+        // });
     });
 
     beforeEach(async () => {

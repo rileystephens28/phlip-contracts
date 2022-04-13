@@ -7,7 +7,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "../presets/BlockerPauser.sol";
 import "../extensions/UpDownVote.sol";
-import "./VestingCapsule.sol";
+import "../vesting/VestingCapsule.sol";
+import "../vesting/GuardedVestingVault.sol";
 
 /**
  * @title PhlipCard
@@ -36,7 +37,13 @@ import "./VestingCapsule.sol";
  * Card will stop receiving vested payouts.
  *
  */
-contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
+contract PhlipCard is
+    AccessControl,
+    VestingCapsule,
+    GuardedVestingVault,
+    BlockerPauser,
+    UpDownVote
+{
     using Counters for Counters.Counter;
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -77,9 +84,8 @@ contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
         uint256 _maxDownvotes,
         uint256 _maxUriChanges,
         uint256 _minDaoTokensRequired,
-        address _daoTokenAddress,
-        address _vestingCapsuleAddress
-    ) VestingCapsule(_name, _symbol, _vestingCapsuleAddress) BlockerPauser() {
+        address _daoTokenAddress
+    ) VestingCapsule(_name, _symbol) GuardedVestingVault() BlockerPauser() {
         // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -140,15 +146,14 @@ contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
      * @param _to The address to mint tokens to.
      * @param _uri The IPFS CID referencing the new tokens metadata.
      */
-    function mintCard(
-        address _to,
-        uint256 _scheduleId,
-        string memory _uri
-    ) external onlyRole(MINTER_ROLE) {
+    function mintCard(address _to, string memory _uri)
+        external
+        onlyRole(MINTER_ROLE)
+    {
         // Get the next token ID then increment the counter
         uint256 tokenId = _cardIdCounter.current();
         _cardIdCounter.increment();
-        _mintCard(tokenId, _to, _scheduleId, _uri);
+        _mintCard(tokenId, _to, _uri);
     }
 
     /**
@@ -297,6 +302,17 @@ contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
     }
 
     /**
+     * @dev Allows MINTER to set the address of the PhlipDAO token contract
+     * @param _ids New contract address
+     */
+    function setVestingSchedule(uint256[] calldata _ids)
+        public
+        onlyRole(MINTER_ROLE)
+    {
+        _setVestingSchedule(_ids);
+    }
+
+    /**
      * @dev Accessor function for getting card's URI from ID
      * Modified implementation of ERC721URIStorage.tokenURI
      * @param _tokenId ID of the card to get URI of
@@ -338,10 +354,9 @@ contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
     function _mintCard(
         uint256 _cardID,
         address _to,
-        uint256 _scheduleID,
         string memory _uri
     ) internal virtual {
-        _safeMint(_to, _cardID, _scheduleID, "");
+        _safeMint(_to, _cardID, "");
 
         // Check if card is minted blank
         bool blank = bytes(_uri).length == 0;
@@ -363,7 +378,9 @@ contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
     /**
      * @dev Override of ERC721._baseURI
      */
-    function _burn(uint256 tokenId) internal override {
+    function _burnCard(uint256 tokenId) internal virtual {
+        _burn(tokenId);
+
         // Update card counters
         _totalInCirculation.decrement();
 
@@ -371,8 +388,6 @@ contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
         if (_cards[tokenId].playable) {
             _playableInCirculation.decrement();
         }
-
-        super._burn(tokenId);
     }
 
     /**
@@ -380,6 +395,21 @@ contract PhlipCard is VestingCapsule, AccessControl, BlockerPauser, UpDownVote {
      */
     function _baseURI() internal view virtual override returns (string memory) {
         return BASE_URI;
+    }
+
+    /**
+     * @dev Function called before tokens are transferred. Override to
+     * make sure that token tranfers have not been paused.
+     * @param _from The address tokens will be transferred from
+     * @param _to The address tokens will be transferred  to
+     * @param _tokenId The ID of the token to transfer
+     */
+    function _beforeTokenTransfer(
+        address _from,
+        address _to,
+        uint256 _tokenId
+    ) internal override(ERC721) whenNotPaused {
+        super._beforeTokenTransfer(_from, _to, _tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)

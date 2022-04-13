@@ -14,8 +14,7 @@ contract PinkCard is PhlipCard {
         uint256 _maxDownvotes,
         uint256 _maxUriChanges,
         uint256 _minDaoTokensRequired,
-        address _daoTokenAddress,
-        address _vestingCapsuleAddress
+        address _daoTokenAddress
     )
         PhlipCard(
             "Phlip Pink Card",
@@ -24,8 +23,7 @@ contract PinkCard is PhlipCard {
             _maxDownvotes,
             _maxUriChanges,
             _minDaoTokensRequired,
-            _daoTokenAddress,
-            _vestingCapsuleAddress
+            _daoTokenAddress
         )
     {}
 }

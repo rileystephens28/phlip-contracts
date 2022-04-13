@@ -15,8 +15,7 @@ contract WhiteCard is PhlipCard, AdminGameRecord {
         uint256 _maxDownvotes,
         uint256 _maxUriChanges,
         uint256 _minDaoTokensRequired,
-        address _daoTokenAddress,
-        address _vestingCapsuleAddress
+        address _daoTokenAddress
     )
         PhlipCard(
             "Phlip White Card",
@@ -25,8 +24,7 @@ contract WhiteCard is PhlipCard, AdminGameRecord {
             _maxDownvotes,
             _maxUriChanges,
             _minDaoTokensRequired,
-            _daoTokenAddress,
-            _vestingCapsuleAddress
+            _daoTokenAddress
         )
         AdminGameRecord()
     {}
