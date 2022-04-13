@@ -7,9 +7,9 @@ import "./VestingVault.sol";
 /**
  * @title GuardedVestingVault
  * @author Riley Stephens
- * @dev GuardedVestingVault is a standalone role based access-control protocol that
- * implements the VestingVault functionality. This contract will act as an external vesting
- * capsule manager controled by one or more treasurers.
+ * @dev GuardedVestingVault is a role based access-control implementation
+ * of the VestingVault protocol. This contract is managed by one or more treasurers
+ * and can act as external capsule manager or be extended by other contracts.
  */
 contract GuardedVestingVault is AccessControl, VestingVault {
     bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
