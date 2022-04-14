@@ -236,6 +236,63 @@ contract VestingVault {
     |__________________________________*/
 
     /**
+     * @dev Deposits tokens to schedule reserves for future capsules.
+     * @param _scheduleID The ID of the schedule to fill.
+     * @param _fillAmount Amount of tokens that will be deposited from treasurer.
+     */
+    function fillReserves(uint256 _scheduleID, uint256 _fillAmount) external {
+        _fillReserves(_scheduleID, _fillAmount);
+    }
+
+    /**
+     * @dev Creates a new VestingSchedule that can be used by Capsules.
+     * @param _token The token to be vested.
+     * @param _cliffSeconds The number of seconds after schedule starts and vesting begins.
+     * @param _tokenRatePerSecond The number of tokens to be vested per second.
+     */
+    function createVestingSchedule(
+        address _token,
+        uint256 _cliffSeconds,
+        uint256 _durationSeconds,
+        uint256 _tokenRatePerSecond
+    ) external {
+        _createSchedule(
+            _token,
+            _cliffSeconds,
+            _durationSeconds,
+            _tokenRatePerSecond
+        );
+    }
+
+    /**
+     * @dev Create a new Capsule with specified schedule ID for a given address.
+     * @param _owner Beneficiary of vesting tokens.
+     * @param _scheduleID Schedule ID of the associated vesting schedule.
+     * @param _startTime Time at which cliff period begins.
+     */
+    function createSingleCapsule(
+        address _owner,
+        uint256 _scheduleID,
+        uint256 _startTime
+    ) external returns (uint256) {
+        return _createSingleCapsule(_owner, _scheduleID, _startTime);
+    }
+
+    /**
+     * @dev Create multiple new Capsule with specified schedule ID for a given address.
+     * @param _owner Single beneficiary of new vesting capsules.
+     * @param _scheduleIDs Array of schedule IDs of the associated vesting schedule.
+     * @param _startTime Time at which cliff periods begin.
+     */
+    function createMultiCapsule(
+        address _owner,
+        uint256[] calldata _scheduleIDs,
+        uint256 _startTime
+    ) external returns (uint256[] memory) {
+        return _createMultiCapsule(_owner, _scheduleIDs, _startTime);
+    }
+
+    /**
      * @dev Allows capsule owner to delete one of their capsules and release its funds back to reserves.
      * @param _capsuleID Capsule ID to delete.
      */

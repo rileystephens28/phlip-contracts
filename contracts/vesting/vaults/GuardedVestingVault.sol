@@ -46,6 +46,7 @@ contract GuardedVestingVault is AccessControl, VestingVault {
      */
     function fillReserves(uint256 _scheduleID, uint256 _fillAmount)
         external
+        override
         onlyRole(TREASURER_ROLE)
     {
         _fillReserves(_scheduleID, _fillAmount);
@@ -62,7 +63,7 @@ contract GuardedVestingVault is AccessControl, VestingVault {
         uint256 _cliffSeconds,
         uint256 _durationSeconds,
         uint256 _tokenRatePerSecond
-    ) external onlyRole(TREASURER_ROLE) {
+    ) external override onlyRole(TREASURER_ROLE) {
         _createSchedule(
             _token,
             _cliffSeconds,
@@ -81,13 +82,13 @@ contract GuardedVestingVault is AccessControl, VestingVault {
         address _owner,
         uint256 _scheduleID,
         uint256 _startTime
-    ) external onlyRole(TREASURER_ROLE) returns (uint256) {
+    ) external override onlyRole(TREASURER_ROLE) returns (uint256) {
         return _createSingleCapsule(_owner, _scheduleID, _startTime);
     }
 
     /**
      * @dev Create multiple new Capsule with specified schedule ID for a given address.
-     @param _owner Single beneficiary of new vesting capsules.
+     * @param _owner Single beneficiary of new vesting capsules.
      * @param _scheduleIDs Array of schedule IDs of the associated vesting schedule.
      * @param _startTime Time at which cliff periods begin.
      */
@@ -95,7 +96,7 @@ contract GuardedVestingVault is AccessControl, VestingVault {
         address _owner,
         uint256[] calldata _scheduleIDs,
         uint256 _startTime
-    ) external onlyRole(TREASURER_ROLE) returns (uint256[] memory) {
+    ) external override onlyRole(TREASURER_ROLE) returns (uint256[] memory) {
         return _createMultiCapsule(_owner, _scheduleIDs, _startTime);
     }
 }
