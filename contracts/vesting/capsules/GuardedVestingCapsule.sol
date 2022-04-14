@@ -18,7 +18,7 @@ contract GuardedVestingCapsule is VestingCapsule, AccessControl {
      * @dev Create a new CapsuleManager instance and grant msg.sender TREASURER role.
      */
     constructor(string memory _name, string memory _symbol)
-        VestingCapsule(_name, _symbol)
+        ERC721(_name, _symbol)
     {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(TREASURER_ROLE, msg.sender);

@@ -13,20 +13,12 @@ import "../vaults/VestingVault.sol";
  *
  * NOTE - This contract is intended to hold ERC20 tokens on behalf of capsule owners.
  */
-contract VestingCapsule is ERC721, VestingVault {
+abstract contract VestingCapsule is ERC721, VestingVault {
     // Mapping from token ID to array of capsule IDs
     mapping(uint256 => uint256[]) private _capsulesLookup;
 
     // The IDs of the schedules to be used during mint
     uint256[] private _currentScheduleIds;
-
-    /***********************************|
-    |          Initialization           |
-    |__________________________________*/
-
-    constructor(string memory _name, string memory _symbol)
-        ERC721(_name, _symbol)
-    {}
 
     /***********************************|
     |          View Functions           |
