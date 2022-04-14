@@ -13,6 +13,7 @@ contract AdminGameRecord is AccessControl, GameRecord {
     bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
 
     constructor() {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(RECORDER_ROLE, msg.sender);
     }
 

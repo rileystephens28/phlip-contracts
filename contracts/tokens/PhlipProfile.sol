@@ -2,7 +2,6 @@
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "../presets/AdminGameRecord.sol";
 
@@ -55,10 +54,7 @@ contract PhlipProfile is ERC721, AdminGameRecord {
     }
 
     constructor() ERC721("PhlipProfile", "USER") AdminGameRecord() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(RECORDER_ROLE, msg.sender);
-
-        // team id counter should start at 1 becayse 0 is reserved for the default no team
+        // team ID counter should start at 1 because 0 is reserved for the default no team
         _teamIdCounter.increment();
     }
 
