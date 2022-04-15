@@ -67,7 +67,12 @@ contract("ERC721Lockable", (accounts) => {
         agreementStatus.should.be.bignumber.equal(new BN(status));
     };
 
-    const verifyLockOperator = async (tokenId, address) => {
+    const verifyHasOperator = async (tokenId, bool) => {
+        const hasOperator = await lockableInstance.hasLockOperator(tokenId);
+        hasOperator.should.be.equal(bool);
+    };
+
+    const verifyOperatorAddress = async (tokenId, address) => {
         const operator = await lockableInstance.lockOperatorOf(tokenId);
         operator.should.be.equal(address);
     };
@@ -119,8 +124,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
         it("should fail when pending operator is 0x0", async () => {
             await expectRevert(
@@ -131,8 +139,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
         it("should fail when pending operator is token owner", async () => {
             await expectRevert(
@@ -143,8 +154,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
         it("should fail when 0 < expiration < current time", async () => {
             const currentTimeSeconds = new Date().getTime() / 1000;
@@ -157,8 +171,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
         it("should fail when caller is not token owner", async () => {
             await expectRevert(
@@ -169,8 +186,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
 
         // Passing case
@@ -180,8 +200,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
         it("should pass when params are valid and expiration is in the future", async () => {
             const currentTimeSeconds = new Date().getTime() / 1000;
@@ -191,8 +214,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
         it("should pass when overriding pending operator agreement", async () => {
             // Create pending operator agreement
@@ -201,8 +227,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
 
             // Override pending operator agreement
             await initiateOperatorAgreement(0, otherAccount);
@@ -210,8 +239,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be set to other account
-            await verifyLockOperator(0, otherAccount);
+            await verifyOperatorAddress(0, otherAccount);
         });
         it("should pass when token has an existing expired operator agreement", async () => {
             // Create agreement that expires in one week
@@ -229,8 +261,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
 
             // Initiate new agreement
             await initiateOperatorAgreement();
@@ -238,8 +273,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
     });
 
@@ -253,8 +291,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
         it("should fail when caller is not pending operator of agreement", async () => {
             await initiateOperatorAgreement();
@@ -265,8 +306,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
 
         // Passing case
@@ -278,8 +322,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 2 (APPROVED)
             await verifyAgreementStatus(0, 2);
 
+            // Token should have an operator
+            await verifyHasOperator(0, true);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
     });
 
@@ -294,8 +341,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
         it("should fail when caller is not approved operator of agreement", async () => {
             // Create approved operator agreement
@@ -310,8 +360,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 2 (APPROVED)
             await verifyAgreementStatus(0, 2);
 
+            // Token should have an operator
+            await verifyHasOperator(0, true);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
 
         // Passing case
@@ -326,8 +379,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 3 (RESIGNATION_PENDING)
             await verifyAgreementStatus(0, 3);
 
+            // Token should have an operator
+            await verifyHasOperator(0, true);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
     });
     describe("Finalizing Lock Operator Resignation", async () => {
@@ -344,8 +400,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 3 (RESIGNATION_PENDING)
             await verifyAgreementStatus(0, 3);
 
+            // Token should have an operator
+            await verifyHasOperator(0, true);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
 
         it("should fail when token operator has not initiated resignation", async () => {
@@ -359,8 +418,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should be 2 (APPROVED)
             await verifyAgreementStatus(0, 2);
 
+            // Token should have an operator
+            await verifyHasOperator(0, true);
+
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
         });
 
         // Passing case
@@ -373,8 +435,11 @@ contract("ERC721Lockable", (accounts) => {
             // Operator agreement status should now be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
 
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
+
             // Operator should be zero address
-            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+            await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
         });
     });
 
@@ -440,6 +505,9 @@ contract("ERC721Lockable", (accounts) => {
 
             // Increase time past agreement expiration
             await time.increase(oneWeekFromNow + 1);
+
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
 
             await expectRevert(lock(), "ERC721Lockable: No approved operator");
 
@@ -525,7 +593,7 @@ contract("ERC721Lockable", (accounts) => {
             await verifyAgreementStatus(0, 2);
 
             // Operator should be set to lock operator
-            await verifyLockOperator(0, lockOperator);
+            await verifyOperatorAddress(0, lockOperator);
 
             // Lock token while agreement is valid
             await lock();
@@ -533,6 +601,9 @@ contract("ERC721Lockable", (accounts) => {
 
             // Increase time past agreement expiration
             await time.increase(oneWeekFromNow + 1);
+
+            // Token should not have an operator
+            await verifyHasOperator(0, false);
 
             // Token should be unlocked since agreement has expired
             await verifyUnlocked(0);
