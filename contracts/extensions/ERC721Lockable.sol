@@ -39,7 +39,7 @@ abstract contract ERC721Lockable is ERC721 {
      * @dev Require token is not locked and reverts if so.
      */
     modifier whenNotLocked(uint256 _tokenID) {
-        require(!_lockedByOperator[_tokenID], "Lockable: Token is locked");
+        require(!_isLocked(_tokenID), "ERC721Lockable: Token is locked");
         _;
     }
 
@@ -63,10 +63,19 @@ abstract contract ERC721Lockable is ERC721 {
      * @return Whether or not token has an approved lock operator
      */
     function hasLockOperator(uint256 _tokenID) public view returns (bool) {
-        return
-            _operatorAgreements[_tokenID].status == OperatorStatus.APPROVED ||
-            _operatorAgreements[_tokenID].status ==
-            OperatorStatus.RESIGNATION_PENDING;
+        return _hasValidOperator(_tokenID);
+    }
+
+    /**
+     * @dev Accessor to get agreement operator address
+     * @param _tokenID The ID of the token to check
+     * @return Address of tokens lock operator
+     */
+    function lockOperatorOf(uint256 _tokenID) public view returns (address) {
+        if (_agreementHasExpired(_tokenID)) {
+            return address(0);
+        }
+        return _operatorAgreements[_tokenID].operator;
     }
 
     /**
@@ -79,6 +88,9 @@ abstract contract ERC721Lockable is ERC721 {
      *  3 -> RESIGNATION_PENDING
      */
     function agreementStatusOf(uint256 _tokenID) public view returns (uint256) {
+        if (_agreementHasExpired(_tokenID)) {
+            return 0;
+        }
         return uint256(_operatorAgreements[_tokenID].status);
     }
 
@@ -92,8 +104,8 @@ abstract contract ERC721Lockable is ERC721 {
      */
     function lock(uint256 _tokenID) external virtual {
         require(
-            _lockedByOperator[_tokenID],
-            "Lockable: Token is already locked"
+            !_isLocked(_tokenID),
+            "ERC721Lockable: Token is already locked"
         );
         _setLock(_tokenID, true);
     }
@@ -104,8 +116,8 @@ abstract contract ERC721Lockable is ERC721 {
      */
     function unlock(uint256 _tokenID) external virtual {
         require(
-            !_lockedByOperator[_tokenID],
-            "Lockable: Token is already unlocked"
+            _isLocked(_tokenID),
+            "ERC721Lockable: Token is already unlocked"
         );
         _setLock(_tokenID, false);
     }
@@ -113,7 +125,7 @@ abstract contract ERC721Lockable is ERC721 {
     /**
      * @dev Set a tokens prospetive lock operator
      * @param _tokenID The ID of the token to add prospect for
-     * @param _prospect The address to set as tokens prospective operator
+     * @param _prospect The address to set as tokens pending operator
      * @param _expiration The time at which the operator agreement expires (0 = no expiration)
      */
     function initiateOperatorAgreement(
@@ -130,7 +142,7 @@ abstract contract ERC721Lockable is ERC721 {
     }
 
     /**
-     * @dev Set tokens prospective lock operator to approved
+     * @dev Set tokens pending lock operator to approved
      * @param _tokenID The ID of the token to approve operator for
      */
     function finalizeOperatorAgreement(uint256 _tokenID) external virtual {
@@ -141,7 +153,7 @@ abstract contract ERC721Lockable is ERC721 {
      * @dev Set process of resignation of approved lock operator in motion
      * @param _tokenID The ID of the token to operator is resigning for
      */
-    function initiateResignation(uint256 _tokenID) internal virtual {
+    function initiateResignation(uint256 _tokenID) external virtual {
         _initiateResignation(_tokenID, msg.sender);
     }
 
@@ -164,10 +176,39 @@ abstract contract ERC721Lockable is ERC721 {
      * @param _tokenID The ID of the token to check
      */
     function _isLocked(uint256 _tokenID) internal view virtual returns (bool) {
+        return !_agreementHasExpired(_tokenID) && _lockedByOperator[_tokenID];
+    }
+
+    /**
+     * @dev Accessor to check if a token has an approved lock operator
+     * Valid lock operator conditions:
+     * - Operator agreement status = APPROVED or RESIGNATION_PENDING
+     *   AND
+     * - Operator agreement has no expiration or it has not expired yet
+     * @param _tokenID The ID of the token to check
+     * @return Whether or not token has an approved lock operator
+     */
+    function _hasValidOperator(uint256 _tokenID) internal view returns (bool) {
+        OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
         return
-            _lockedByOperator[_tokenID] &&
-            (_operatorAgreements[_tokenID].expiration == 0 ||
-                _operatorAgreements[_tokenID].expiration > block.timestamp);
+            !_agreementHasExpired(_tokenID) &&
+            (agreement.status == OperatorStatus.APPROVED ||
+                agreement.status == OperatorStatus.RESIGNATION_PENDING);
+    }
+
+    /**
+     * @dev Accessor to check if lock operator agreement has expired
+     * @param _tokenID The ID of the token to check
+     * @return Whether or not lock operator agreement has expired
+     */
+    function _agreementHasExpired(uint256 _tokenID)
+        internal
+        view
+        returns (bool)
+    {
+        OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
+        return
+            agreement.expiration != 0 && agreement.expiration < block.timestamp;
     }
 
     /**
@@ -176,15 +217,14 @@ abstract contract ERC721Lockable is ERC721 {
      * @param _tokenID The ID of the token to check
      */
     function _setLock(uint256 _tokenID, bool _lockVal) internal virtual {
-        require(_exists(_tokenID), "Lockable: Token does not exist");
-        OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
+        require(_exists(_tokenID), "ERC721Lockable: Token does not exist");
         require(
-            agreement.status == OperatorStatus.APPROVED,
-            "Lockable: Token does not have approved operator"
+            _hasValidOperator(_tokenID),
+            "ERC721Lockable: No approved operator"
         );
         require(
-            agreement.operator == msg.sender,
-            "Lockable: Caller is not approved operator"
+            _operatorAgreements[_tokenID].operator == msg.sender,
+            "ERC721Lockable: Not approved operator"
         );
         _lockedByOperator[_tokenID] = _lockVal;
     }
@@ -192,7 +232,7 @@ abstract contract ERC721Lockable is ERC721 {
     /**
      * @dev Set a tokens prospetive lock operator
      * @param _tokenID The ID of the token to add prospect for
-     * @param _prospect The address to set as tokens prospective operator
+     * @param _prospect The address to set as tokens pending operator
      * @param _expiration The time at which the operator agreement expires (0 = no expiration)
      */
     function _initiateOperatorAgreement(
@@ -201,38 +241,37 @@ abstract contract ERC721Lockable is ERC721 {
         address _prospect,
         uint256 _expiration
     ) internal virtual {
-        require(_exists(_tokenID), "Lockable: Token does not exist");
+        require(_exists(_tokenID), "ERC721Lockable: Token does not exist");
+        require(
+            !_hasValidOperator(_tokenID),
+            "ERC721Lockable: Token has existing operator agreement"
+        );
         require(
             _prospect != address(0),
-            "Lockable: Prospective operator cannot be 0x0"
+            "ERC721Lockable: Pending operator cannot be 0x0"
         );
         require(
             _prospect != _owner,
-            "Lockable: Prospective operator cannot be owner"
+            "ERC721Lockable: Pending operator cannot be owner"
         );
         require(
             _expiration == 0 || _expiration > block.timestamp,
-            "Lockable: Invalid expiration"
+            "ERC721Lockable: Invalid expiration"
         );
         require(
             ownerOf(_tokenID) == _owner,
-            "Lockable: Owner must initiate operator agreement"
+            "ERC721Lockable: Owner must initiate operator agreement"
         );
         OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
-        require(
-            agreement.status == OperatorStatus.UNSET,
-            "Lockable: Token has existing operator agreement"
-        );
-
         agreement.operator = _prospect;
         agreement.status = OperatorStatus.APPROVAL_PENDING;
         agreement.expiration = _expiration;
     }
 
     /**
-     * @dev Set tokens prospective lock operator to approved
+     * @dev Set tokens pending lock operator to approved
      * @param _tokenID The ID of the token to approve operator for
-     * @param _operator The address of prospective operator to approve
+     * @param _operator The address of pending operator to approve
      */
     function _finalizeOperatorAgreement(uint256 _tokenID, address _operator)
         internal
@@ -241,11 +280,11 @@ abstract contract ERC721Lockable is ERC721 {
         OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
         require(
             agreement.status == OperatorStatus.APPROVAL_PENDING,
-            "Lockable: Token does not have prospective operator"
+            "ERC721Lockable: No pending operator agreement"
         );
         require(
             agreement.operator == _operator,
-            "Lockable: Operator does not match token prospective operator"
+            "ERC721Lockable: Not pending operator"
         );
         agreement.status = OperatorStatus.APPROVED;
     }
@@ -262,11 +301,11 @@ abstract contract ERC721Lockable is ERC721 {
         OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
         require(
             agreement.status == OperatorStatus.APPROVED,
-            "Lockable: Token does not have approved operator"
+            "ERC721Lockable: No approved operator"
         );
         require(
             agreement.operator == _operator,
-            "Lockable: Operator is not approved operator"
+            "ERC721Lockable: Not approved operator"
         );
         agreement.status = OperatorStatus.RESIGNATION_PENDING;
     }
@@ -283,12 +322,12 @@ abstract contract ERC721Lockable is ERC721 {
     {
         require(
             ownerOf(_tokenID) == _owner,
-            "Lockable: Must be owner to approve resignation"
+            "ERC721Lockable: Owner must approve resignation"
         );
         OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
         require(
             agreement.status == OperatorStatus.RESIGNATION_PENDING,
-            "Lockable: Prospective operator has not initiated resignation"
+            "ERC721Lockable: Operator has not initiated resignation"
         );
 
         // Ensure the token is not locked

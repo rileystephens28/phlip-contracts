@@ -2,6 +2,7 @@ const ERC721Lockable = artifacts.require("ERC721LockableMock");
 const {
     expectRevert,
     snapshot,
+    time,
     constants,
     BN,
 } = require("@openzeppelin/test-helpers");
@@ -24,13 +25,13 @@ contract("ERC721Lockable", (accounts) => {
 
     const initiateOperatorAgreement = async (
         tokenId = 0,
-        prospectiveOperator = lockOperator,
+        pendingOperator = lockOperator,
         expiration = 0,
         from = account
     ) => {
         return await lockableInstance.initiateOperatorAgreement(
             tokenId,
-            prospectiveOperator,
+            pendingOperator,
             new BN(expiration),
             {
                 from: from,
@@ -66,6 +67,11 @@ contract("ERC721Lockable", (accounts) => {
         agreementStatus.should.be.bignumber.equal(new BN(status));
     };
 
+    const verifyLockOperator = async (tokenId, address) => {
+        const operator = await lockableInstance.lockOperatorOf(tokenId);
+        operator.should.be.equal(address);
+    };
+
     const _shouldBeLocked = async (tokenId, bool) => {
         const isLocked = await lockableInstance.isLocked(tokenId);
         isLocked.should.be.equal(bool);
@@ -77,6 +83,11 @@ contract("ERC721Lockable", (accounts) => {
 
     const verifyUnlocked = async (tokenId) => {
         await _shouldBeLocked(tokenId, false);
+    };
+
+    const verifyOwner = async (tokenId, address) => {
+        const tokenOwner = await lockableInstance.ownerOf(tokenId);
+        tokenOwner.should.be.equal(address);
     };
 
     before(async () => {
@@ -97,58 +108,542 @@ contract("ERC721Lockable", (accounts) => {
         await this.snapshot.restore();
     });
 
-    describe.only("Initiating Lock Operator Agreement", async () => {
+    describe("Initiating Lock Operator Agreement", async () => {
         // Failure case
         it("should fail when token ID does not exist", async () => {
             await expectRevert(
                 initiateOperatorAgreement(1),
-                "Lockable: Token does not exist"
+                "ERC721Lockable: Token does not exist"
             );
+
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
         });
-        it("should fail when prospective operator is 0x0", async () => {
+        it("should fail when pending operator is 0x0", async () => {
             await expectRevert(
                 initiateOperatorAgreement(0, constants.ZERO_ADDRESS),
-                "Lockable: Prospective operator cannot be 0x0"
+                "ERC721Lockable: Pending operator cannot be 0x0"
             );
+
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
         });
-        it("should fail when prospective operator is token owner", async () => {
+        it("should fail when pending operator is token owner", async () => {
             await expectRevert(
                 initiateOperatorAgreement(0, account),
-                "Lockable: Prospective operator cannot be owner"
+                "ERC721Lockable: Pending operator cannot be owner"
             );
+
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
         });
         it("should fail when 0 < expiration < current time", async () => {
             const currentTimeSeconds = new Date().getTime() / 1000;
             const tenSecondsAgo = currentTimeSeconds - 10;
             await expectRevert(
                 initiateOperatorAgreement(0, lockOperator, tenSecondsAgo),
-                "Lockable: Invalid expiration"
+                "ERC721Lockable: Invalid expiration"
             );
+
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
         });
         it("should fail when caller is not token owner", async () => {
             await expectRevert(
                 initiateOperatorAgreement(0, lockOperator, 0, otherAccount),
-                "Lockable: Owner must initiate operator agreement"
+                "ERC721Lockable: Owner must initiate operator agreement"
             );
-        });
-        it("should fail when token has an existing operator agreement", async () => {
-            await initiateOperatorAgreement();
-            await expectRevert(
-                initiateOperatorAgreement(),
-                "Lockable: Token has existing operator agreement"
-            );
+
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
         });
 
         // Passing case
         it("should pass when params are valid and expiration is 0", async () => {
             await initiateOperatorAgreement();
+
+            // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
         });
         it("should pass when params are valid and expiration is in the future", async () => {
             const currentTimeSeconds = new Date().getTime() / 1000;
             const oneWeekFromNow = currentTimeSeconds + 604800;
             await initiateOperatorAgreement(0, lockOperator, oneWeekFromNow);
+
+            // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+        it("should pass when overriding pending operator agreement", async () => {
+            // Create pending operator agreement
+            await initiateOperatorAgreement();
+
+            // Operator agreement status should be 1 (APPROVAL_PENDING)
+            await verifyAgreementStatus(0, 1);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+
+            // Override pending operator agreement
+            await initiateOperatorAgreement(0, otherAccount);
+
+            // Operator agreement status should be 1 (APPROVAL_PENDING)
+            await verifyAgreementStatus(0, 1);
+
+            // Operator should be set to other account
+            await verifyLockOperator(0, otherAccount);
+        });
+        it("should pass when token has an existing expired operator agreement", async () => {
+            // Create agreement that expires in one week
+            const currentTimeSeconds = new Date().getTime() / 1000;
+            const oneWeekFromNow = currentTimeSeconds + 604800;
+            await initiateOperatorAgreement(0, lockOperator, oneWeekFromNow);
+            await finalizeOperatorAgreement();
+
+            // Operator agreement status should be 2 (APPROVED)
+            await verifyAgreementStatus(0, 2);
+
+            // Increase time to one week from now
+            await time.increase(oneWeekFromNow + 1);
+
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+
+            // Initiate new agreement
+            await initiateOperatorAgreement();
+
+            // Operator agreement status should be 1 (APPROVAL_PENDING)
+            await verifyAgreementStatus(0, 1);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+    });
+
+    describe("Finalizing Lock Operator Agreement", async () => {
+        // Failure case
+        it("should fail when token does not have pending agreement", async () => {
+            await expectRevert(
+                finalizeOperatorAgreement(),
+                "ERC721Lockable: No pending operator agreement"
+            );
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+        });
+        it("should fail when caller is not pending operator of agreement", async () => {
+            await initiateOperatorAgreement();
+            await expectRevert(
+                finalizeOperatorAgreement(0, otherAccount),
+                "ERC721Lockable: Not pending operator"
+            );
+            // Operator agreement status should be 1 (APPROVAL_PENDING)
+            await verifyAgreementStatus(0, 1);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+
+        // Passing case
+        it("should pass when params are valid and caller is pending operator", async () => {
+            // Create approved operator agreement
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Operator agreement status should be 2 (APPROVED)
+            await verifyAgreementStatus(0, 2);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+    });
+
+    describe("Initiating Lock Operator Resignation", async () => {
+        // Failure case
+        it("should fail when token does not have approved operator", async () => {
+            await expectRevert(
+                initiateResignation(),
+                "ERC721Lockable: No approved operator"
+            );
+
+            // Operator agreement status should be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+        });
+        it("should fail when caller is not approved operator of agreement", async () => {
+            // Create approved operator agreement
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            await expectRevert(
+                initiateResignation(0, otherAccount),
+                "ERC721Lockable: Not approved operator"
+            );
+
+            // Operator agreement status should be 2 (APPROVED)
+            await verifyAgreementStatus(0, 2);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+
+        // Passing case
+        it("should pass when params are valid and caller is approved operator", async () => {
+            // Create approved operator agreement
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Initiate operator resignation
+            await initiateResignation();
+
+            // Operator agreement status should be 3 (RESIGNATION_PENDING)
+            await verifyAgreementStatus(0, 3);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+    });
+    describe("Finalizing Lock Operator Resignation", async () => {
+        // Failure case
+        it("should fail when caller is not token owner", async () => {
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+            await initiateResignation();
+            await expectRevert(
+                finalizeResignation(0, otherAccount),
+                "ERC721Lockable: Owner must approve resignation"
+            );
+
+            // Operator agreement status should be 3 (RESIGNATION_PENDING)
+            await verifyAgreementStatus(0, 3);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+
+        it("should fail when token operator has not initiated resignation", async () => {
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+            await expectRevert(
+                finalizeResignation(),
+                "ERC721Lockable: Operator has not initiated resignation"
+            );
+
+            // Operator agreement status should be 2 (APPROVED)
+            await verifyAgreementStatus(0, 2);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+        });
+
+        // Passing case
+        it("should pass when params are valid and caller is approved operator", async () => {
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+            await initiateResignation();
+            await finalizeResignation();
+
+            // Operator agreement status should now be 0 (UNSET)
+            await verifyAgreementStatus(0, 0);
+
+            // Operator should be zero address
+            await verifyLockOperator(0, constants.ZERO_ADDRESS);
+        });
+    });
+
+    describe("Locking Token", async () => {
+        // Failure case
+        it("should fail when token ID does not exist", async () => {
+            // Create agreement for token 0
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+            await expectRevert(lock(1), "ERC721Lockable: Token does not exist");
+
+            // Token should still be unlocked
+            await verifyUnlocked(0);
+        });
+
+        it("should fail when token does not have approved operator", async () => {
+            await expectRevert(lock(), "ERC721Lockable: No approved operator");
+            // Token should still be unlocked
+            await verifyUnlocked(0);
+        });
+
+        it("should fail when caller is not approved lock operator", async () => {
+            // Create agreement for token 0
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            await expectRevert(
+                lock(0, otherAccount),
+                "ERC721Lockable: Not approved operator"
+            );
+            // Token should still be unlocked
+            await verifyUnlocked(0);
+        });
+        it("should fail when token is already locked", async () => {
+            // Create agreement for token 0
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Lock then verify token is locked
+            await lock();
+            await verifyLocked(0);
+
+            await expectRevert(
+                lock(),
+                "ERC721Lockable: Token is already locked"
+            );
+            // Token should still be unlocked
+            await verifyLocked(0);
+        });
+        it("should fail when operator agreement has expired", async () => {
+            // Create agreement that expires in one week
+            const currentTimeSeconds = new Date().getTime() / 1000;
+            const oneWeekFromNow = currentTimeSeconds + 604800;
+            await initiateOperatorAgreement(0, lockOperator, oneWeekFromNow);
+            await finalizeOperatorAgreement();
+
+            // Operator agreement status should be 2 (APPROVED)
+            await verifyAgreementStatus(0, 2);
+
+            // Lock token while agreement is valid
+            await lock();
+            await verifyLocked(0);
+
+            // Increase time past agreement expiration
+            await time.increase(oneWeekFromNow + 1);
+
+            await expectRevert(lock(), "ERC721Lockable: No approved operator");
+
+            // Token should be unlocked since agreement has expired
+            await verifyUnlocked(0);
+        });
+
+        // Passing case
+        it("should pass when params are valid and caller is approved operator", async () => {
+            // Create agreement and lock token
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+            await lock();
+
+            // Token should be locked
+            await verifyLocked(0);
+        });
+    });
+
+    describe("Unlocking Token", async () => {
+        // Failure case
+        it("should fail when token ID does not exist", async () => {
+            // Create agreement for token 0
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Nonexistant token defaults to be unlocked
+            await expectRevert(
+                unlock(1),
+                "ERC721Lockable: Token is already unlocked"
+            );
+
+            // Token should still be unlocked
+            await verifyUnlocked(0);
+        });
+
+        it("should fail when token does not have approved operator", async () => {
+            // Token with no operator defaults to be unlocked
+            await expectRevert(
+                unlock(),
+                "ERC721Lockable: Token is already unlocked"
+            );
+            // Token should still be unlocked
+            await verifyUnlocked(0);
+        });
+
+        it("should fail when caller is not approved lock operator", async () => {
+            // Create agreement for token 0
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Lock then verify token is locked
+            await lock();
+            await verifyLocked(0);
+
+            await expectRevert(
+                unlock(0, otherAccount),
+                "ERC721Lockable: Not approved operator"
+            );
+            // Token should still be unlocked
+            await verifyLocked(0);
+        });
+        it("should fail when token is already unlocked", async () => {
+            // Create agreement for token 0
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            await expectRevert(
+                unlock(),
+                "ERC721Lockable: Token is already unlocked"
+            );
+            // Token should still be unlocked
+            await verifyUnlocked(0);
+        });
+        it("should fail when operator agreement has expired", async () => {
+            // Create agreement that expires in one week
+            const currentTimeSeconds = new Date().getTime() / 1000;
+            const oneWeekFromNow = currentTimeSeconds + 604800;
+            await initiateOperatorAgreement(0, lockOperator, oneWeekFromNow);
+            await finalizeOperatorAgreement();
+
+            // Operator agreement status should be 2 (APPROVED)
+            await verifyAgreementStatus(0, 2);
+
+            // Operator should be set to lock operator
+            await verifyLockOperator(0, lockOperator);
+
+            // Lock token while agreement is valid
+            await lock();
+            await verifyLocked(0);
+
+            // Increase time past agreement expiration
+            await time.increase(oneWeekFromNow + 1);
+
+            // Token should be unlocked since agreement has expired
+            await verifyUnlocked(0);
+
+            await expectRevert(
+                unlock(),
+                "ERC721Lockable: Token is already unlocked"
+            );
+        });
+
+        // Passing case
+        it("should pass when params are valid and caller is approved operator", async () => {
+            // Create agreement and lock token
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Lock then verify token is locked
+            await lock();
+            await verifyLocked(0);
+
+            // Unlock then verify token is unlocked
+            await unlock();
+            await verifyUnlocked(0);
+        });
+    });
+
+    describe("Transfering Token", async () => {
+        // Failure case
+        it("should fail when token is locked", async () => {
+            // Create agreement for token 0
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Lock then verify token is locked
+            await lock();
+            await verifyLocked(0);
+
+            await expectRevert(
+                lockableInstance.transferFrom(account, otherAccount, 0, {
+                    from: account,
+                }),
+                "ERC721Lockable: Token is locked"
+            );
+
+            // Token should still be owned by account
+            await verifyOwner(0, account);
+        });
+
+        // Passing case
+        it("should pass when token has never been locked", async () => {
+            // Create agreement and lock token
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Token should be owned by account
+            await verifyOwner(0, account);
+
+            await lockableInstance.transferFrom(account, otherAccount, 0, {
+                from: account,
+            });
+
+            // Token should now be owned by other account
+            await verifyOwner(0, otherAccount);
+        });
+
+        it("should pass when token has been locked then unlocked", async () => {
+            // Create agreement and lock token
+            await initiateOperatorAgreement();
+            await finalizeOperatorAgreement();
+
+            // Lock then verify token is locked
+            await lock();
+            await verifyLocked(0);
+
+            // Unlock then verify token is unlocked
+            await unlock();
+            await verifyUnlocked(0);
+
+            // Token should be owned by account
+            await verifyOwner(0, account);
+
+            await lockableInstance.transferFrom(account, otherAccount, 0, {
+                from: account,
+            });
+
+            // Token should now be owned by other account
+            await verifyOwner(0, otherAccount);
+        });
+        it("should pass when locked tokens operator agreement has expired", async () => {
+            // Create agreement that expires in one week
+            const currentTimeSeconds = new Date().getTime() / 1000;
+            const oneWeekFromNow = currentTimeSeconds + 604800;
+            await initiateOperatorAgreement(0, lockOperator, oneWeekFromNow);
+            await finalizeOperatorAgreement();
+
+            // Lock token while agreement is valid
+            await lock();
+            await verifyLocked(0);
+
+            // Increase time past agreement expiration
+            await time.increase(oneWeekFromNow + 1);
+
+            // Token should be owned by account
+            await verifyOwner(0, account);
+
+            await lockableInstance.transferFrom(account, otherAccount, 0, {
+                from: account,
+            });
+
+            // Token should now be owned by other account
+            await verifyOwner(0, otherAccount);
         });
     });
 });
