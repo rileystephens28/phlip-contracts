@@ -240,7 +240,10 @@ contract VestingVault {
      * @param _scheduleID The ID of the schedule to fill.
      * @param _fillAmount Amount of tokens that will be deposited from treasurer.
      */
-    function fillReserves(uint256 _scheduleID, uint256 _fillAmount) external {
+    function fillReserves(uint256 _scheduleID, uint256 _fillAmount)
+        external
+        virtual
+    {
         _fillReserves(_scheduleID, _fillAmount);
     }
 
@@ -255,7 +258,7 @@ contract VestingVault {
         uint256 _cliffSeconds,
         uint256 _durationSeconds,
         uint256 _tokenRatePerSecond
-    ) external {
+    ) external virtual {
         _createSchedule(
             _token,
             _cliffSeconds,
@@ -274,7 +277,7 @@ contract VestingVault {
         address _owner,
         uint256 _scheduleID,
         uint256 _startTime
-    ) external returns (uint256) {
+    ) external virtual returns (uint256) {
         return _createSingleCapsule(_owner, _scheduleID, _startTime);
     }
 
@@ -288,7 +291,7 @@ contract VestingVault {
         address _owner,
         uint256[] calldata _scheduleIDs,
         uint256 _startTime
-    ) external returns (uint256[] memory) {
+    ) external virtual returns (uint256[] memory) {
         return _createMultiCapsule(_owner, _scheduleIDs, _startTime);
     }
 
@@ -296,7 +299,7 @@ contract VestingVault {
      * @dev Allows capsule owner to delete one of their capsules and release its funds back to reserves.
      * @param _capsuleID Capsule ID to delete.
      */
-    function destroySingleCapsule(uint256 _capsuleID) external {
+    function destroySingleCapsule(uint256 _capsuleID) external virtual {
         _destroySingleCapsule(_capsuleID);
     }
 
@@ -304,7 +307,10 @@ contract VestingVault {
      * @dev Destroys a batch of Capsules owned by the caller.
      * @param _capsuleIDs Array of capsule IDs to destoy.
      */
-    function destroyMultiCapsule(uint256[] calldata _capsuleIDs) external {
+    function destroyMultiCapsule(uint256[] calldata _capsuleIDs)
+        external
+        virtual
+    {
         _destroyMultiCapsule(_capsuleIDs);
     }
 
@@ -313,7 +319,10 @@ contract VestingVault {
      * @param _capsuleID ID of the Capsule to be transferred.
      * @param _to Address to transfer to.
      */
-    function transferSingleCapsule(uint256 _capsuleID, address _to) external {
+    function transferSingleCapsule(uint256 _capsuleID, address _to)
+        external
+        virtual
+    {
         _transferSingleCapsule(_capsuleID, _to);
     }
 
@@ -324,6 +333,7 @@ contract VestingVault {
      */
     function transferMultiCapsule(uint256[] calldata _capsuleIDs, address _to)
         external
+        virtual
     {
         _transferMultiCapsule(_capsuleIDs, _to);
     }
@@ -333,7 +343,7 @@ contract VestingVault {
      * vested to the owner of the capsule.
      * @param _capsuleID ID of the capsule to withdraw from.
      */
-    function withdrawSingleCapsule(uint256 _capsuleID) external {
+    function withdrawSingleCapsule(uint256 _capsuleID) external virtual {
         _withdrawSingleCapsule(_capsuleID);
     }
 
@@ -342,7 +352,10 @@ contract VestingVault {
      * vested to the owners of the capsules.
      * @param _capsuleIDs Array of capsule IDs to withdraw from.
      */
-    function withdrawMultiCapsule(uint256[] calldata _capsuleIDs) external {
+    function withdrawMultiCapsule(uint256[] calldata _capsuleIDs)
+        external
+        virtual
+    {
         _withdrawMultiCapsule(_capsuleIDs);
     }
 
@@ -350,7 +363,7 @@ contract VestingVault {
      * @dev Transfers the amount of tokens leftover owed caller.
      * @param _token ID of the Capsule to be claimed.
      */
-    function withdrawSingleTokenLeftovers(address _token) external {
+    function withdrawSingleTokenLeftovers(address _token) external virtual {
         _withdrawSingleTokenLeftovers(_token);
     }
 
@@ -358,7 +371,10 @@ contract VestingVault {
      * @dev Withdraw leftovers of several tokens owed to caller.
      * @param _tokens Array of token address to withdraw from leftover reserves.
      */
-    function withdrawMultiTokenLeftovers(address[] calldata _tokens) external {
+    function withdrawMultiTokenLeftovers(address[] calldata _tokens)
+        external
+        virtual
+    {
         _withdrawMultiTokenLeftovers(_tokens);
     }
 
