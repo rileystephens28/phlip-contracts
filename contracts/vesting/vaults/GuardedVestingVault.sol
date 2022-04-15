@@ -23,19 +23,6 @@ contract GuardedVestingVault is AccessControl, VestingVault {
     }
 
     /***********************************|
-    |          View Functions           |
-    |__________________________________*/
-
-    /**
-     * @dev Accessor function for checking if specified schedule is registered.
-     * @param _scheduleID The ID of the VestingSchedule to be queried.
-     * @return True if the schedule is registered, false otherwise.
-     */
-    function scheduleExists(uint256 _scheduleID) public view returns (bool) {
-        return _scheduleExists(_scheduleID);
-    }
-
-    /***********************************|
     |       Treasurer Functions         |
     |__________________________________*/
 
