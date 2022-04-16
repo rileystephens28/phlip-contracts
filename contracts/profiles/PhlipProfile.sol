@@ -4,6 +4,7 @@ pragma solidity 0.8.11;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "../gameRecords/AdminGameRecord.sol";
+import "./IPhlipProfile.sol";
 
 /**
  * @title UserProfile
@@ -18,7 +19,7 @@ import "../gameRecords/AdminGameRecord.sol";
  * join too. Joining a team does not provide any direct game benefits to Players. However, teams that
  * frequently win can rise through the leaderboards and gain a lot of publicity (play-to-advertise model).
  */
-contract PhlipProfile is ERC721, AdminGameRecord {
+contract PhlipProfile is ERC721, AdminGameRecord, IPhlipProfile {
     using Counters for Counters.Counter;
 
     struct Team {
