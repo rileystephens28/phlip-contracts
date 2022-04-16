@@ -18,12 +18,6 @@ contract CardSettingsControl is AccessControl {
     uint256 public MIN_DAO_TOKENS_REQUIRED;
     address public DAO_TOKEN_ADDRESS;
 
-    constructor() {
-        // Grant roles to contract creator
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(SETTINGS_ADMIN_ROLE, msg.sender);
-    }
-
     /**
      * @dev Allows MINTER to set the base URI for all tokens created by this contract
      * @param _newURI New base URI
