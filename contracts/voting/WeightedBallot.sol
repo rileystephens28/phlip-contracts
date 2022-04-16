@@ -25,8 +25,6 @@ pragma solidity 0.8.11;
  *
  */
 contract WeightedBallot {
-    uint256 private PRECISION = 10000;
-
     /**
      * @dev A Voter describes and address by storing
      * the number of upand down votes they have cast
@@ -63,6 +61,9 @@ contract WeightedBallot {
 
     mapping(uint256 => Ballot) internal _ballots;
 
+    // Vote weight precision contant
+    uint256 internal PRECISION = 10000;
+
     /***********************************|
     |          View Functions           |
     |__________________________________*/
@@ -93,6 +94,34 @@ contract WeightedBallot {
         returns (uint256)
     {
         return _ballots[_ballotID].downVoteVal;
+    }
+
+    /**
+     * @dev Accessor function for up vote weight of address.
+     * @param _voter Address of voter to check
+     * @return The up vote weight of a voter.
+     */
+    function upVoteWeightOf(address _voter)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
+        return _voters[_voter].upWeight;
+    }
+
+    /**
+     * @dev Accessor function for down vote weight of address.
+     * @param _voter Address of voter to check
+     * @return The down vote weight of a voter.
+     */
+    function downVoteWeightOf(address _voter)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
+        return _voters[_voter].downWeight;
     }
 
     /***********************************|
