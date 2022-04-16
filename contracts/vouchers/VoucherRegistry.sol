@@ -30,7 +30,7 @@ contract VoucherRegistry {
      * @param _address The address to check.
      * @return Whether or not the address has >= 1 vouchers
      */
-    function hasVoucher(address _address) public view returns (bool) {
+    function hasVoucher(address _address) public view virtual returns (bool) {
         return _remainingVouchers[_address] > 0;
     }
 
@@ -42,6 +42,7 @@ contract VoucherRegistry {
     function voucherHolderOf(uint256 _reservedTokenID)
         public
         view
+        virtual
         returns (address)
     {
         return _voucherRegistry[_reservedTokenID];
