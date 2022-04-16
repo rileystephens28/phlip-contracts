@@ -28,6 +28,78 @@ Check if an address has a profile.
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
 |`Whether`| address | or not an address has a profile
+### getProfile
+```solidity
+  function getProfile(
+    uint256 _profileID
+  ) public returns (struct PhlipProfile.Profile)
+```
+
+Accessor method to get the details of a profile.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_profileID` | uint256 | ID of the profile to query.
+
+#### Return Values:
+| Name                           | Type          | Description                                                                  |
+| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
+|`The`| uint256 | profile struct data for the given profile ID.
+### getFriends
+```solidity
+  function getFriends(
+    uint256 _profileID
+  ) public returns (uint256[])
+```
+
+Accessor method to get the friends of a profile.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_profileID` | uint256 | ID of the profile to query.
+
+#### Return Values:
+| Name                           | Type          | Description                                                                  |
+| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
+|`An`| uint256 | array of profile IDs (friends) of the given profile.
+### getTeamInfo
+```solidity
+  function getTeamInfo(
+    uint256 _teamID
+  ) public returns (struct PhlipProfile.Team)
+```
+
+Accessor method to get the details of a team.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_teamID` | uint256 | ID of the team to query.
+
+#### Return Values:
+| Name                           | Type          | Description                                                                  |
+| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
+|`The`| uint256 | profile struct data for the given profile ID.
+### getTeamMembers
+```solidity
+  function getTeamMembers(
+    uint256 _teamID
+  ) public returns (uint256[])
+```
+
+Accessor method to get the array of addresses that belong to team.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_teamID` | uint256 | ID of the team to query.
+
+#### Return Values:
+| Name                           | Type          | Description                                                                  |
+| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
+|`The`| uint256 | address array of all team members
 ### createProfile
 ```solidity
   function createProfile(
@@ -70,7 +142,7 @@ Sets the currentTeam of an existing profile.
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | ID of the profile joining the team.
+|`_profileID` | uint256 | The ID of the profile joining a team.
 |`_teamID` | uint256 | ID of the team to join
 
 ### addFriend
@@ -86,7 +158,7 @@ Appends an address to the friends array of an existing profile.
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | The ID of the profile adding a friend.
+|`_profileID` | uint256 | The ID of the profile to add friend to.
 |`_friendID` | uint256 | The ID of the profile being adding as a friend.
 
 ### removeFriend
@@ -102,39 +174,8 @@ Remove an address from the friends array of an existing profile.
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | The ID of the profile removing a friend.
+|`_profileID` | uint256 | The ID of the profile to remove a friend from.
 |`_friendIndex` | uint256 | The index of the friend in the friends array.
-
-### recordWin
-```solidity
-  function recordWin(
-    uint256 _profileID,
-    uint256 _winnings
-  ) external
-```
-
-Incrememnts the gamesWon counter by 1 and adds the value (in ETH or DAO tokens?)
-to an existing profile's totalGameWinnings.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | The ID of the token to record.
-|`_winnings` | uint256 | The amount the owner of the token won from the game.
-
-### recordLoss
-```solidity
-  function recordLoss(
-    uint256 _profileID
-  ) external
-```
-
-Incrememnts the gamesLost counter by 1 for an existing profile.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | The ID of the token to record.
 
 ### supportsInterface
 ```solidity

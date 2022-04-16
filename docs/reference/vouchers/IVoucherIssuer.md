@@ -1,107 +1,117 @@
 
-Provides contract with the ability to create and manage a voting simple
-voting system. The system allows for a single up or down vote to be cast per
-address. In order to prevent spam voting, it is expected that this will be
-converted to a weighted system that reduces the impact of an address's votes
-if they up they cast a lot of votes in ether direction.
+The IVoucherIssuer interface is used to define the functions that a
+voucher issuing contract must implement. Inheriting contracts should practice
+access-control for managing the issuance and redemption of vouchers.
+
 
 ## Functions
-### ballotIsRegistered
+### hasVoucher
 ```solidity
-  function ballotIsRegistered(
-    uint256 _ballotID
-  ) public returns (bool)
+  function hasVoucher(
+    address _address
+  ) external returns (bool)
 ```
 
-Accessor function for checking if a ballot has been registered.
+Accessor function to see if an address has any vouchers.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_ballotID` | uint256 | The ID of a ballot to check.
+|`_address` | address | The address to check.
 
 #### Return Values:
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`True`| uint256 | if the ballot has been registered, false if not.
-### upVotesFor
+|`Whether`| address | or not the address has >= 1 vouchers
+### voucherHolderOf
 ```solidity
-  function upVotesFor(
-    uint256 _ballotID
-  ) public returns (uint256)
+  function voucherHolderOf(
+    uint256 _id
+  ) external returns (address)
 ```
 
-Accessor function for getting a ballot's upVoteCount.
+Accessor function for address of voucher holder
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_ballotID` | uint256 | The ID of a ballot
+|`_id` | uint256 | ID associated with voucher.
 
 #### Return Values:
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | number of up votes cast on a given ballot.
-### downVotesFor
+|`Address`| uint256 | of voucher holder.
+### remainingVouchers
 ```solidity
-  function downVotesFor(
-    uint256 _ballotID
-  ) public returns (uint256)
+  function remainingVouchers(
+    address _for
+  ) external returns (uint256)
 ```
 
-Accessor function for getting a ballot's downVoteCount.
+Helper to get vouchers of claims for an address.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_ballotID` | uint256 | The ID of a ballot
+|`_for` | address | Address of check for remaing vouchers.
 
 #### Return Values:
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | number of down votes cast on a given ballot.
-### _createBallot
+|`Number`| address | of vouchers for an address.
+### issueVoucher
 ```solidity
-  function _createBallot(
-    uint256 _newBallotID
-  ) internal
+  function issueVoucher(
+    address _to
+  ) external
 ```
 
-Sets the new ballot ID to true in the _registeredBallots
-mapping. The new ballot ID must be unique.
+Issue a voucher to an address.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_newBallotID` | uint256 | The ID of the ballot to create
+|`_to` | address | The address to check.
 
-### _castUpVote
+### issueVouchers
 ```solidity
-  function _castUpVote(
-    uint256 _ballotID
-  ) internal
+  function issueVouchers(
+    address _to
+  ) external
 ```
 
-Increments the upVoteCount for a given ballot. Requires
-that msg.sender has not already casted a vote on the ballot.
+Issue many vouchers to an address.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_ballotID` | uint256 | The ID of the ballot to up vote.
+|`_to` | address | The address to check.
 
-### _castDownVote
+### redeemVoucher
 ```solidity
-  function _castDownVote(
-    uint256 _ballotID
-  ) internal
+  function redeemVoucher(
+    uint256 _id
+  ) external
 ```
 
-Increments the downVoteCount for a given ballot. Requires
-that msg.sender has not already casted a vote on the ballot.
+Redeem a voucher.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_ballotID` | uint256 | The ID of the ballot to down vote.
+|`_id` | uint256 | ID associated with the voucher to redeem.
+
+### redeemVouchers
+```solidity
+  function redeemVouchers(
+    uint256[] _ids
+  ) external
+```
+
+Redeem many vouchers.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_ids` | uint256[] | Array of IDs associated with the vouchers to redeem.
 
