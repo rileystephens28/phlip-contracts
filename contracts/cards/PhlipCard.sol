@@ -6,8 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "../presets/BlockerPauser.sol";
-import "../extensions/UpDownVote.sol";
 import "../vesting/capsules/GuardedVestingCapsule.sol";
+import "../voting/WeightedBallot.sol";
+import "../vouchers/VoucherRegistry.sol";
 import "./CardSettingsControl.sol";
 
 /**
@@ -42,7 +43,8 @@ contract PhlipCard is
     GuardedVestingCapsule,
     CardSettingsControl,
     BlockerPauser,
-    UpDownVote
+    WeightedBallot,
+    VoucherRegistry
 {
     using Counters for Counters.Counter;
 
@@ -161,10 +163,8 @@ contract PhlipCard is
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
-    function updateCardURI(uint256 _cardID, string memory _uri)
-        external
-        tokenExists(_cardID)
-    {
+    function updateCardURI(uint256 _cardID, string memory _uri) external {
+        require(_exists(_cardID), "PhlipCard: Card does not exist.");
         require(
             msg.sender == ownerOf(_cardID),
             "PhlipCard: Address does not own this card."
@@ -195,11 +195,8 @@ contract PhlipCard is
      * is not the owner and has not voted on the card already
      * @param _cardID The ID of the token upvoted
      */
-    function upVote(uint256 _cardID)
-        external
-        noBlacklisters
-        tokenExists(_cardID)
-    {
+    function upVote(uint256 _cardID) external noBlacklisters {
+        require(_exists(_cardID), "PhlipCard: Card does not exist.");
         require(
             ownerOf(_cardID) != msg.sender,
             "PhlipCard: Cannot vote on your own card."
@@ -209,7 +206,7 @@ contract PhlipCard is
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow upvotes on unplayable cards?
-        _castUpVote(_cardID);
+        _castUpVote(_cardID, msg.sender);
     }
 
     /**
@@ -219,11 +216,8 @@ contract PhlipCard is
      * it should be marked unplayable.
      * @param _cardID The ID of the token upvoted
      */
-    function downVote(uint256 _cardID)
-        external
-        noBlacklisters
-        tokenExists(_cardID)
-    {
+    function downVote(uint256 _cardID) external noBlacklisters {
+        require(_exists(_cardID), "PhlipCard: Card does not exist.");
         require(
             ownerOf(_cardID) != msg.sender,
             "PhlipCard: Cannot vote on your own card."
@@ -233,10 +227,10 @@ contract PhlipCard is
             "PhlipCard: Must own PhlipDAO tokens to vote."
         );
         // NOTE - Should we allow downvotes on unplayable cards?
-        _castDownVote(_cardID);
+        _castDownVote(_cardID, msg.sender);
 
         // NOTE - Need to take into account the number of upvotes
-        if (downVotesFor(_cardID) >= MAX_DOWNVOTES) {
+        if (downVoteValueOf(_cardID) >= MAX_DOWNVOTES) {
             _cards[_cardID].playable = false;
             _playableInCirculation.decrement();
         }
@@ -305,9 +299,6 @@ contract PhlipCard is
         // Store the new card data then mint the token
         _cards[_cardID] = Card(_uri, 0, blank, !blank);
         _minters[_cardID] = _to;
-
-        // Create a ballot for the new card
-        _createBallot(_cardID);
 
         // Update card counters
         _totalInCirculation.increment();
