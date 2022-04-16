@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
-import "../extensions/Whitelistable.sol";
+import "../lists/Whitelistable.sol";
 
 contract WhitelistMock is Whitelistable {
     bool public didProtectedAction;
