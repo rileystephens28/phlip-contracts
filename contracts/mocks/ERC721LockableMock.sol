@@ -2,7 +2,7 @@
 pragma solidity 0.8.11;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../extensions/ERC721Lockable.sol";
+import "../lockable/ERC721Lockable.sol";
 
 contract ERC721LockableMock is ERC721Lockable, Ownable {
     using Counters for Counters.Counter;
