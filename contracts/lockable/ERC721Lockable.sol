@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./ILockOperator.sol";
 
 /**
  * @title ERC721Lockable
@@ -9,7 +10,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
  * to lock/unlock token for transfers. Intended to be in NFT contracts to
  * allow token holders to approve other addresses as lock operators as an added layer of security
  */
-abstract contract ERC721Lockable is ERC721 {
+abstract contract ERC721Lockable is ERC721, ILockOperator {
     // Mapping of whether a lock operator has locked a token
     mapping(uint256 => bool) private _lockedByOperator;
 
@@ -52,7 +53,7 @@ abstract contract ERC721Lockable is ERC721 {
      * @param _tokenID The ID of the token to check
      * @return Whether or not the token is locked
      */
-    function isLocked(uint256 _tokenID) public view returns (bool) {
+    function isLocked(uint256 _tokenID) external view returns (bool) {
         return _isLocked(_tokenID);
     }
 
@@ -62,7 +63,7 @@ abstract contract ERC721Lockable is ERC721 {
      * @param _tokenID The ID of the token to check
      * @return Whether or not token has an approved lock operator
      */
-    function hasLockOperator(uint256 _tokenID) public view returns (bool) {
+    function hasLockOperator(uint256 _tokenID) external view returns (bool) {
         return _hasValidOperator(_tokenID);
     }
 
