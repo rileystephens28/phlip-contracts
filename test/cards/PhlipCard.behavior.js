@@ -5,7 +5,6 @@ const {
     time,
 } = require("@openzeppelin/test-helpers");
 require("chai").should();
-const utils = require("../utils/token");
 
 const MINTER = web3.utils.soliditySha3("MINTER_ROLE");
 const PAUSER = web3.utils.soliditySha3("PAUSER_ROLE");

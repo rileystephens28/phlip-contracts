@@ -8,7 +8,7 @@ const {
 } = require("@openzeppelin/test-helpers");
 const {
     shouldBehaveLikeAdminGameRecord,
-} = require("../presets/AdminGameRecord.behavior");
+} = require("../gameRecords/AdminGameRecord.behavior");
 require("chai").should();
 
 contract("PhlipProfile", (accounts) => {

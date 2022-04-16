@@ -4,7 +4,7 @@ const { BN, snapshot } = require("@openzeppelin/test-helpers");
 const { shouldBehaveLikePhlipCard } = require("./PhlipCard.behavior");
 const {
     shouldBehaveLikeAdminGameRecord,
-} = require("../presets/AdminGameRecord.behavior");
+} = require("../gameRecords/AdminGameRecord.behavior");
 
 require("chai").should();
 

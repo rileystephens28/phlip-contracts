@@ -304,8 +304,23 @@ contract PhlipCard is
         address _from,
         address _to,
         uint256 _tokenId
-    ) internal override(ERC721) whenNotPaused {
+    ) internal override(ERC721, ERC721Lockable) whenNotPaused {
         super._beforeTokenTransfer(_from, _to, _tokenId);
+    }
+
+    /**
+     * @dev Function called after tokens are transferred.
+     * Override ERC721 and VestingCapsule
+     * @param _from The address tokens were transferred from
+     * @param _to The address tokens were transferred  to
+     * @param _tokenId The ID of the token transferred
+     */
+    function _afterTokenTransfer(
+        address _from,
+        address _to,
+        uint256 _tokenId
+    ) internal override(ERC721, VestingCapsule) {
+        super._afterTokenTransfer(_from, _to, _tokenId);
     }
 
     /**
@@ -323,7 +338,7 @@ contract PhlipCard is
         public
         view
         virtual
-        override(GuardedVestingCapsule, AccessControl)
+        override(ERC721, GuardedVestingCapsule, AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
