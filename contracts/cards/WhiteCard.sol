@@ -2,7 +2,7 @@
 pragma solidity 0.8.11;
 
 import "./PhlipCard.sol";
-import "../presets/AdminGameRecord.sol";
+import "../gameRecords/AdminGameRecord.sol";
 
 /**
  * @title WhiteCard
@@ -26,8 +26,9 @@ contract WhiteCard is PhlipCard, AdminGameRecord {
             _minDaoTokensRequired,
             _daoTokenAddress
         )
-        AdminGameRecord()
-    {}
+    {
+        _grantRole(RECORDER_ROLE, msg.sender);
+    }
 
     /**
      * @dev Overrides PhlipCard._mintCard() to include game recording functionality.

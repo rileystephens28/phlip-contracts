@@ -2,20 +2,15 @@
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "../extensions/GameRecord.sol";
+import "./GameRecord.sol";
 
 /**
  * @title AdminGameRecord
  * @author Riley Stephens
  * @dev Contract that provides default game recording functionality with role based access control.
  */
-contract AdminGameRecord is AccessControl, GameRecord {
+abstract contract AdminGameRecord is AccessControl, GameRecord {
     bytes32 public constant RECORDER_ROLE = keccak256("RECORDER_ROLE");
-
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(RECORDER_ROLE, msg.sender);
-    }
 
     /**
      * @dev Records a game win (NO REWARDS)
