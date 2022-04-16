@@ -516,120 +516,120 @@ function shouldBehaveLikePhlipCard(
         });
     });
 
-    describe("Creating Card Claims", () => {
-        // Failing cases
-        it("should fail when msg.sender != minter", async () => {
-            const revertReason = getRoleRevertReason(tokenHolder, MINTER);
-            await expectRevert(createClaim(tokenHolder), revertReason);
-        });
+    // describe("Creating Card Claims", () => {
+    //     // Failing cases
+    //     it("should fail when msg.sender != minter", async () => {
+    //         const revertReason = getRoleRevertReason(tokenHolder, MINTER);
+    //         await expectRevert(createClaim(tokenHolder), revertReason);
+    //     });
 
-        it("should fail when recipient is 0x0", async () => {
-            // BUG: This test fails because it uses all gas not because of zero address
-            await expectRevert(
-                createClaim(minter, constants.ZERO_ADDRESS),
-                "Claimable._createClaim: Beneficiary cannot be 0x0 address"
-            );
-        });
+    //     it("should fail when recipient is 0x0", async () => {
+    //         // BUG: This test fails because it uses all gas not because of zero address
+    //         await expectRevert(
+    //             createClaim(minter, constants.ZERO_ADDRESS),
+    //             "Claimable._createClaim: Beneficiary cannot be 0x0 address"
+    //         );
+    //     });
 
-        it("should fail when address has an existing claim", async () => {
-            await createClaim();
+    //     it("should fail when address has an existing claim", async () => {
+    //         await createClaim();
 
-            // Ensure account has a claim
-            await verifyAddressHasClaim(otherAccount);
+    //         // Ensure account has a claim
+    //         await verifyAddressHasClaim(otherAccount);
 
-            await expectRevert(
-                createClaim(),
-                "Claimable._createClaim: Claim has already been created for this address. Call _updateClaim() for existing beneficiaries."
-            );
-        });
+    //         await expectRevert(
+    //             createClaim(),
+    //             "Claimable._createClaim: Claim has already been created for this address. Call _updateClaim() for existing beneficiaries."
+    //         );
+    //     });
 
-        // Passing cases
-        it("should pass when msg.sender = minter and address has no claims", async () => {
-            await createClaim();
+    //     // Passing cases
+    //     it("should pass when msg.sender = minter and address has no claims", async () => {
+    //         await createClaim();
 
-            // Ensure account has a claim with correct balance
-            await verifyAddressHasClaim(otherAccount);
-            await verifyClaimBalance(otherAccount, 1);
-        });
-    });
+    //         // Ensure account has a claim with correct balance
+    //         await verifyAddressHasClaim(otherAccount);
+    //         await verifyClaimBalance(otherAccount, 1);
+    //     });
+    // });
 
-    describe("Increasing Card Claims", () => {
-        // Failing cases
-        it("should fail when msg.sender != minter", async () => {
-            const revertReason = getRoleRevertReason(otherAccount, MINTER);
-            await expectRevert(increaseClaim(otherAccount), revertReason);
-        });
+    // describe("Increasing Card Claims", () => {
+    //     // Failing cases
+    //     it("should fail when msg.sender != minter", async () => {
+    //         const revertReason = getRoleRevertReason(otherAccount, MINTER);
+    //         await expectRevert(increaseClaim(otherAccount), revertReason);
+    //     });
 
-        it("should fail when address does not have an existing claim", async () => {
-            await expectRevert(
-                increaseClaim(minter, otherAccount),
-                "Claimable: Claim does not exist."
-            );
-        });
+    //     it("should fail when address does not have an existing claim", async () => {
+    //         await expectRevert(
+    //             increaseClaim(minter, otherAccount),
+    //             "Claimable: Claim does not exist."
+    //         );
+    //     });
 
-        it("should fail when amount to increase = 0", async () => {
-            await expectRevert(
-                increaseClaim(minter, claimHolder, 0),
-                "PhlipCard: Can only increase claim by amount greater than 0."
-            );
-        });
+    //     it("should fail when amount to increase = 0", async () => {
+    //         await expectRevert(
+    //             increaseClaim(minter, claimHolder, 0),
+    //             "PhlipCard: Can only increase claim by amount greater than 0."
+    //         );
+    //     });
 
-        // Passing cases
-        it("should pass when msg.sender = minter and address has a claim", async () => {
-            // Increase claim of claimHolder by 2
-            await increaseClaim(minter, claimHolder, 2);
+    //     // Passing cases
+    //     it("should pass when msg.sender = minter and address has a claim", async () => {
+    //         // Increase claim of claimHolder by 2
+    //         await increaseClaim(minter, claimHolder, 2);
 
-            // Ensure claim was increased correctly
-            await verifyClaimBalance(claimHolder, 4);
-        });
-    });
+    //         // Ensure claim was increased correctly
+    //         await verifyClaimBalance(claimHolder, 4);
+    //     });
+    // });
 
-    describe("Redeeming Card Claims", () => {
-        // Failing cases
-        it("should fail when msg.sender does not have claim", async () => {
-            await verifyClaimBalance(otherAccount, 0);
+    // describe("Redeeming Card Claims", () => {
+    //     // Failing cases
+    //     it("should fail when msg.sender does not have claim", async () => {
+    //         await verifyClaimBalance(otherAccount, 0);
 
-            await expectRevert(
-                redeemCard(baseCid, otherAccount),
-                "Claimable: Address does not have a claim."
-            );
-        });
+    //         await expectRevert(
+    //             redeemCard(baseCid, otherAccount),
+    //             "Claimable: Address does not have a claim."
+    //         );
+    //     });
 
-        it("should fail when contract is paused", async () => {
-            // Pause the contract
-            await context.cardInstance.pause({ from: pauser });
+    //     it("should fail when contract is paused", async () => {
+    //         // Pause the contract
+    //         await context.cardInstance.pause({ from: pauser });
 
-            // Contract should be paused
-            await verifyPause(true);
+    //         // Contract should be paused
+    //         await verifyPause(true);
 
-            await expectRevert(redeemCard(), "Pausable: paused");
-        });
+    //         await expectRevert(redeemCard(), "Pausable: paused");
+    //     });
 
-        it("should fail when claim has been emptied", async () => {
-            // Redeem all cards owed to claimHolder
-            const claimBalance = await context.cardInstance.remainingClaims(
-                claimHolder
-            );
-            for (let i = 0; i < claimBalance; i++) {
-                await redeemCard();
-            }
-            // Should treat claimHolder account as if it has no claim
-            await expectRevert(
-                redeemCard(),
-                "Claimable: Address does not have a claim."
-            );
-        });
+    //     it("should fail when claim has been emptied", async () => {
+    //         // Redeem all cards owed to claimHolder
+    //         const claimBalance = await context.cardInstance.remainingClaims(
+    //             claimHolder
+    //         );
+    //         for (let i = 0; i < claimBalance; i++) {
+    //             await redeemCard();
+    //         }
+    //         // Should treat claimHolder account as if it has no claim
+    //         await expectRevert(
+    //             redeemCard(),
+    //             "Claimable: Address does not have a claim."
+    //         );
+    //     });
 
-        // Passing cases
-        it("should pass when msg.sender has a claim amount > 0", async () => {
-            // Claim one of the cards owed to claimHolder
-            await redeemCard();
+    //     // Passing cases
+    //     it("should pass when msg.sender has a claim amount > 0", async () => {
+    //         // Claim one of the cards owed to claimHolder
+    //         await redeemCard();
 
-            // claimHolder should now have 1 card and 1 claim left
-            await verifyCardBalance(claimHolder, 1);
-            await verifyClaimBalance(claimHolder, 1);
-        });
-    });
+    //         // claimHolder should now have 1 card and 1 claim left
+    //         await verifyCardBalance(claimHolder, 1);
+    //         await verifyClaimBalance(claimHolder, 1);
+    //     });
+    // });
 
     describe("Up Voting", () => {
         // Failing cases

@@ -5,8 +5,10 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../presets/BlockerPauser.sol";
-import "../vesting/capsules/GuardedVestingCapsule.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "../vesting/GuardedVestingCapsule.sol";
+import "../lockable/ERC721Lockable.sol";
+import "../lists/Blacklister.sol";
 import "../voting/WeightedBallot.sol";
 import "../vouchers/VoucherRegistry.sol";
 import "./CardSettingsControl.sol";
@@ -41,13 +43,16 @@ import "./CardSettingsControl.sol";
 contract PhlipCard is
     AccessControl,
     GuardedVestingCapsule,
+    ERC721Lockable,
     CardSettingsControl,
-    BlockerPauser,
     WeightedBallot,
-    VoucherRegistry
+    VoucherRegistry,
+    Blacklister,
+    Pausable
 {
     using Counters for Counters.Counter;
 
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     struct Card {
@@ -58,19 +63,9 @@ contract PhlipCard is
     }
 
     Counters.Counter private _cardIdCounter;
-    Counters.Counter private _totalInCirculation;
     Counters.Counter private _playableInCirculation;
     mapping(uint256 => Card) private _cards;
     mapping(uint256 => address) private _minters;
-
-    /**
-     * @dev Requires that token has been minted and reverts if not
-     * @param _cardID The ID of the token to check
-     */
-    modifier tokenExists(uint256 _cardID) {
-        require(_exists(_cardID), "PhlipCard: Token does not exist.");
-        _;
-    }
 
     constructor(
         string memory _name,
@@ -80,14 +75,12 @@ contract PhlipCard is
         uint256 _maxUriChanges,
         uint256 _minDaoTokensRequired,
         address _daoTokenAddress
-    )
-        GuardedVestingCapsule(_name, _symbol)
-        CardSettingsControl()
-        BlockerPauser()
-    {
+    ) GuardedVestingCapsule(_name, _symbol) {
         // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(SETTINGS_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(BLOCKER_ROLE, msg.sender);
 
         // Set constants
         setBaseURI(_baseUri);
@@ -125,14 +118,6 @@ contract PhlipCard is
     }
 
     /**
-     * @dev View function to see number of cards in circulation
-     * @return Number of cards minted - number of cards burned
-     */
-    function getCirculatingCardCount() public view returns (uint256) {
-        return _totalInCirculation.current();
-    }
-
-    /**
      * @dev View function to see number of cards in that are playable
      * @return Number of cards in circulation that are not blank and have been voted out
      */
@@ -165,6 +150,7 @@ contract PhlipCard is
      */
     function updateCardURI(uint256 _cardID, string memory _uri) external {
         require(_exists(_cardID), "PhlipCard: Card does not exist.");
+        require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty.");
         require(
             msg.sender == ownerOf(_cardID),
             "PhlipCard: Address does not own this card."
@@ -178,16 +164,12 @@ contract PhlipCard is
             card.uriChangeCount < MAX_URI_CHANGES,
             "PhlipCard: Maximum number of URI changes reached."
         );
-        card.uri = _uri;
 
-        if (card.blank) {
-            // If card is blank, mark as playable and not blank
-            card.blank = false;
-            _playableInCirculation.increment();
-        } else {
-            // If card is not blank, increment URI change count
+        if (bytes(card.uri).length > 0) {
+            // Card has set URI at least once, increment URI change count
             card.uriChangeCount += 1;
         }
+        card.uri = _uri;
     }
 
     /**
@@ -301,25 +283,7 @@ contract PhlipCard is
         _minters[_cardID] = _to;
 
         // Update card counters
-        _totalInCirculation.increment();
-        if (!blank) {
-            _playableInCirculation.increment();
-        }
-    }
-
-    /**
-     * @dev Override of ERC721._baseURI
-     */
-    function _burnCard(uint256 tokenId) internal virtual {
-        _burn(tokenId);
-
-        // Update card counters
-        _totalInCirculation.decrement();
-
-        // If card is  playable, decrement the playable count
-        if (_cards[tokenId].playable) {
-            _playableInCirculation.decrement();
-        }
+        _playableInCirculation.increment();
     }
 
     /**

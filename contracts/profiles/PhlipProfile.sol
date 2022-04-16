@@ -3,7 +3,7 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../presets/AdminGameRecord.sol";
+import "../gameRecords/AdminGameRecord.sol";
 
 /**
  * @title UserProfile
