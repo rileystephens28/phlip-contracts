@@ -35,7 +35,6 @@ contract GuardedVestingCapsule is VestingCapsule, AccessControl {
      */
     function fillReserves(uint256 _scheduleID, uint256 _fillAmount)
         external
-        override
         onlyRole(TREASURER_ROLE)
     {
         _fillReserves(_scheduleID, _fillAmount);
@@ -52,7 +51,7 @@ contract GuardedVestingCapsule is VestingCapsule, AccessControl {
         uint256 _cliffSeconds,
         uint256 _durationSeconds,
         uint256 _tokenRatePerSecond
-    ) external override onlyRole(TREASURER_ROLE) {
+    ) external onlyRole(TREASURER_ROLE) {
         _createSchedule(
             _token,
             _cliffSeconds,

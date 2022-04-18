@@ -33,7 +33,6 @@ contract GuardedVestingVault is AccessControl, VestingVault {
      */
     function fillReserves(uint256 _scheduleID, uint256 _fillAmount)
         external
-        override
         onlyRole(TREASURER_ROLE)
     {
         _fillReserves(_scheduleID, _fillAmount);
@@ -50,7 +49,7 @@ contract GuardedVestingVault is AccessControl, VestingVault {
         uint256 _cliffSeconds,
         uint256 _durationSeconds,
         uint256 _tokenRatePerSecond
-    ) external override onlyRole(TREASURER_ROLE) {
+    ) external onlyRole(TREASURER_ROLE) {
         _createSchedule(
             _token,
             _cliffSeconds,
@@ -69,7 +68,7 @@ contract GuardedVestingVault is AccessControl, VestingVault {
         address _owner,
         uint256 _scheduleID,
         uint256 _startTime
-    ) external override onlyRole(TREASURER_ROLE) returns (uint256) {
+    ) external onlyRole(TREASURER_ROLE) returns (uint256) {
         return _createSingleCapsule(_owner, _scheduleID, _startTime);
     }
 
@@ -83,7 +82,7 @@ contract GuardedVestingVault is AccessControl, VestingVault {
         address _owner,
         uint256[] calldata _scheduleIDs,
         uint256 _startTime
-    ) external override onlyRole(TREASURER_ROLE) returns (uint256[] memory) {
+    ) external onlyRole(TREASURER_ROLE) returns (uint256[] memory) {
         return _createMultiCapsule(_owner, _scheduleIDs, _startTime);
     }
 }
