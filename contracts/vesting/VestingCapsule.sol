@@ -15,7 +15,7 @@ import "./VestingVault.sol";
  */
 abstract contract VestingCapsule is ERC721, VestingVault {
     // Mapping from token ID to array of capsule IDs
-    mapping(uint256 => uint256[]) private _capsulesLookup;
+    mapping(uint256 => uint256[]) private _tokenCapsules;
 
     // The IDs of the schedules to be used during mint
     uint256[] private _currentScheduleIds;
@@ -37,7 +37,7 @@ abstract contract VestingCapsule is ERC721, VestingVault {
             _exists(_tokenID),
             "VestingCapsule: Querying vested balance of nonexistant token."
         );
-        return _getVestedBalances(_capsulesLookup[_tokenID]);
+        return _getVestedBalances(_tokenCapsules[_tokenID]);
     }
 
     /***********************************|
@@ -52,7 +52,7 @@ abstract contract VestingCapsule is ERC721, VestingVault {
         for (uint256 i = 0; i < _ids.length; i++) {
             require(
                 _scheduleExists(_ids[i]),
-                "VestingCapsule: Invalid schedule ID provided."
+                "VestingCapsule: Invalid schedule ID"
             );
         }
         _currentScheduleIds = _ids;
@@ -82,20 +82,20 @@ abstract contract VestingCapsule is ERC721, VestingVault {
         super._afterTokenTransfer(_from, _to, _tokenId);
         if (_from == address(0)) {
             // MINT - Batch create capsule and store reference
-            _capsulesLookup[_tokenId] = _createMultiCapsule(
+            _tokenCapsules[_tokenId] = _createMultiCapsule(
                 _to,
                 _currentScheduleIds,
                 block.timestamp
             );
         } else if (_to == address(0)) {
             // BURN - Batch destroy capsule and delete reference
-            for (uint256 i = 0; i < _capsulesLookup[_tokenId].length; i++) {
-                _destroyCapsule(_capsulesLookup[_tokenId][i]);
+            for (uint256 i = 0; i < _tokenCapsules[_tokenId].length; i++) {
+                _destroyCapsule(_tokenCapsules[_tokenId][i]);
             }
-            delete _capsulesLookup[_tokenId];
+            delete _tokenCapsules[_tokenId];
         } else if (_from != _to) {
             // TRANSFER - Batch transfer capsules
-            _transferMultiCapsule(_capsulesLookup[_tokenId], _to);
+            _transferMultiCapsule(_tokenCapsules[_tokenId], _to);
         }
     }
 }

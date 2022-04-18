@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.11;
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "../vesting/VestingCapsule.sol";
+
+contract VestingCapsuleMock is VestingCapsule {
+    using Counters for Counters.Counter;
+
+    Counters.Counter public tokenIds;
+
+    constructor() ERC721("VestingCapsuleMock", "VEST") {}
+
+    function fillReserves(uint256 _scheduleID, uint256 _fillAmount) external {
+        _fillReserves(_scheduleID, _fillAmount);
+    }
+
+    function createVestingSchedule(
+        address _token,
+        uint256 _cliffSeconds,
+        uint256 _durationSeconds,
+        uint256 _tokenRatePerSecond
+    ) external {
+        _createSchedule(
+            _token,
+            _cliffSeconds,
+            _durationSeconds,
+            _tokenRatePerSecond
+        );
+    }
+
+    function mint(address _to) external {
+        uint256 id = tokenIds.current();
+        tokenIds.increment();
+        _mint(_to, id);
+    }
+
+    function burn(uint256 _id) external {
+        _burn(_id);
+    }
+
+    function setVestingScheme(uint256[] calldata _ids) external {
+        _setVestingSchedule(_ids);
+    }
+}
