@@ -411,17 +411,14 @@ contract VestingVault {
         uint256 _scheduleID,
         uint256 _startTime
     ) internal virtual returns (uint256) {
-        require(
-            _owner != address(0),
-            "VestingVault: Beneficiary cannot be 0x0"
-        );
+        require(_owner != address(0), "VestingVault: Owner cannot be 0x0");
         require(
             _scheduleID < _scheduleIDCounter.current(),
             "VestingVault: Invalid schedule ID"
         );
         require(
             _startTime >= block.timestamp,
-            "VestingVault: Capsule startTime cannot be in the past."
+            "VestingVault: Start time cannot be in the past."
         );
         return _createCapsule(_owner, _scheduleID, _startTime);
     }
@@ -462,38 +459,6 @@ contract VestingVault {
     }
 
     /**
-     * @dev Creates a batch of new Capsules from array params.
-     * Note - May end up not using this function.
-     * @param _owners Array of beneficiaries of vesting capsules.
-     * @param _scheduleIDs Array of schedule IDs of the associated vesting schedule.
-     * @param _startTimes Array of times at which cliff periods begin.
-     */
-    function _batchCreateCapsules(
-        address[] calldata _owners,
-        uint256[] calldata _scheduleIDs,
-        uint256[] calldata _startTimes
-    ) internal virtual returns (uint256[] memory) {
-        require(_owners.length > 0, "VestingVault: No owners provided");
-        require(
-            _owners.length == _scheduleIDs.length,
-            "VestingVault: owners and schedule IDs must be the same length"
-        );
-        require(
-            _owners.length == _startTimes.length,
-            "VestingVault: owners and start times must be the same length"
-        );
-        uint256[] memory newCapsuleIds = new uint256[](_owners.length);
-        for (uint256 i = 0; i < _owners.length; i++) {
-            newCapsuleIds[i] = _createSingleCapsule(
-                _owners[i],
-                _scheduleIDs[i],
-                _startTimes[i]
-            );
-        }
-        return newCapsuleIds;
-    }
-
-    /**
      * @dev Most basic function for capsule creation, skips some parameter validation.
      * Creates a new capsule for the given address if the contract holdsenough tokens
      * to cover the amount of tokens required for the vesting schedule.
@@ -509,7 +474,7 @@ contract VestingVault {
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
         require(
             _availableScheduleReserves[_scheduleID] >= schedule.amount,
-            "VestingVault: Insufficient token reserves for new capsule."
+            "VestingVault: Insufficient token reserves"
         );
 
         // Decrease schedule's reserves value by one capsule amount
@@ -633,29 +598,6 @@ contract VestingVault {
         );
         for (uint256 i = 0; i < _capsuleIDs.length; i++) {
             _transferCapsule(_capsuleIDs[i], _to);
-        }
-    }
-
-    /**
-     * @dev Transfers a batch of Capsules owned by the caller to new addresses.
-     * Note - May not end up using this function.
-     * @param _capsuleIDs Array of capsule IDs to transfer.
-     * @param _recipients Array of addresses to receive capsules.
-     */
-    function _batchTransferCapsules(
-        uint256[] memory _capsuleIDs,
-        address[] memory _recipients
-    ) internal virtual {
-        require(
-            _capsuleIDs.length > 0,
-            "VestingVault: No capsule IDs provided"
-        );
-        require(
-            _capsuleIDs.length == _recipients.length,
-            "VestingVault: capsule IDs and _recipients must be the same length"
-        );
-        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
-            _transferSingleCapsule(_capsuleIDs[i], _recipients[i]);
         }
     }
 
