@@ -63,9 +63,6 @@ contract VestingVault {
     mapping(uint256 => uint256) internal _totalScheduleReserves;
     mapping(uint256 => uint256) internal _availableScheduleReserves;
 
-    // The amount of tokens this contract holds that are waiting for withdrawal
-    mapping(address => uint256) internal _leftoverReserves;
-
     // Maps addresses to their capsules
     mapping(uint256 => Capsule) internal _capsules;
     mapping(uint256 => bool) internal _activeCapsules;
@@ -142,15 +139,6 @@ contract VestingVault {
         return
             _totalScheduleReserves[_scheduleID] -
             _availableScheduleReserves[_scheduleID];
-    }
-
-    /**
-     * @dev Accessor function for leftover reserves of specified token.
-     * @param _token The address of the token to be queried.
-     * @return The amount of specified tokens waiting to be withdrawn (no longer in capsules)
-     */
-    function leftoverReservesOf(address _token) public view returns (uint256) {
-        return _leftoverReserves[_token];
     }
 
     /**
@@ -308,7 +296,7 @@ contract VestingVault {
         );
         require(
             _cliffSeconds < _durationSeconds,
-            "VestingVault: Cliff must be less than duration."
+            "VestingVault: Cliff must be less than duration"
         );
 
         // Get the next schedule ID and increment the counter
@@ -382,7 +370,7 @@ contract VestingVault {
         require(_owner != address(0), "VestingVault: Owner cannot be 0x0");
         require(
             _startTime >= block.timestamp,
-            "VestingVault: Start time cannot be in the past."
+            "VestingVault: Start time cannot be in the past"
         );
         return _createCapsule(_owner, _scheduleID, _startTime);
     }
@@ -401,7 +389,7 @@ contract VestingVault {
         require(_owner != address(0), "VestingVault: Owner cannot be 0x0");
         require(
             _startTime >= block.timestamp,
-            "VestingVault: Start time cannot be in the past."
+            "VestingVault: Start time cannot be in the past"
         );
         require(
             _scheduleIDs.length > 0,
@@ -478,7 +466,7 @@ contract VestingVault {
         );
         require(
             _capsuleOwners[_capsuleID] == msg.sender,
-            "VestingVault: Cannot destory capsule because msg.sender is not the owner."
+            "VestingVault: Cannot destory capsule because msg.sender is not the owner"
         );
 
         Capsule storage capsule = _capsules[_capsuleID];
@@ -526,11 +514,11 @@ contract VestingVault {
     {
         require(
             _to != address(0),
-            "VestingVault: Cannot transfer capsule to 0x0."
+            "VestingVault: Cannot transfer capsule to 0x0"
         );
         require(
             _to != msg.sender,
-            "VestingVault: Cannot transfer capsule to self."
+            "VestingVault: Cannot transfer capsule to self"
         );
         _transferCapsule(_capsuleID, _to);
     }
@@ -546,11 +534,11 @@ contract VestingVault {
     {
         require(
             _to != address(0),
-            "VestingVault: Cannot transfer capsule to 0x0."
+            "VestingVault: Cannot transfer capsule to 0x0"
         );
         require(
             _to != msg.sender,
-            "VestingVault: Cannot transfer capsule to self."
+            "VestingVault: Cannot transfer capsule to self"
         );
         for (uint256 i = 0; i < _capsuleIDs.length; i++) {
             _transferCapsule(_capsuleIDs[i], _to);
@@ -574,13 +562,13 @@ contract VestingVault {
         );
         require(
             _capsuleOwners[_capsuleID] == msg.sender,
-            "VestingVault: Cannot transfer capsule because msg.sender is not the owner."
+            "VestingVault: Caller is not capsule owner"
         );
 
         Capsule storage capsule = _capsules[_capsuleID];
         require(
             capsule.endTime > block.timestamp,
-            "VestingVault: Cannot transfer capsule because it has already been fully vested."
+            "VestingVault: Capsule is fully vested"
         );
 
         // Register _to address as new owner
@@ -603,7 +591,6 @@ contract VestingVault {
 
                 // Add unclaimed vested tokens to previous owners leftover balance
                 _leftoverBalance[msg.sender][schedule.token] += balance;
-                _leftoverReserves[schedule.token] += balance;
             }
         }
     }
@@ -624,12 +611,12 @@ contract VestingVault {
         );
         require(
             _capsuleOwners[_capsuleID] == msg.sender,
-            "VestingVault: Cannot claim capsule because msg.sender is not the owner."
+            "VestingVault: Cannot claim capsule because msg.sender is not the owner"
         );
         uint256 claimAmount = _getVestedBalance(_capsuleID);
         require(
             claimAmount > 0,
-            "VestingVault: Capsule has no tokens to claim."
+            "VestingVault: Capsule has no tokens to claim"
         );
 
         Capsule storage capsule = _capsules[_capsuleID];
@@ -685,10 +672,9 @@ contract VestingVault {
         uint256 leftoverBalance = _leftoverBalance[msg.sender][_token];
         require(
             leftoverBalance > 0,
-            "VestingVault: No leftover tokens to withdraw."
+            "VestingVault: No leftover tokens to withdraw"
         );
-        // Reduce the leftover reserves and delete balance of caller
-        _leftoverReserves[_token] -= leftoverBalance;
+        // Delete leftover balance of caller
         delete _leftoverBalance[msg.sender][_token];
 
         // Transfer tokens to capsule owner
