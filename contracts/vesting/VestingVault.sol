@@ -463,14 +463,14 @@ contract VestingVault {
      * @dev Allows capsule owner to delete their Capsule and release its funds back to reserves.
      * @param _capsuleID Capsule ID to delete.
      */
-    function _destroySingleCapsule(uint256 _capsuleID) internal virtual {
+    function _destroyCapsule(uint256 _capsuleID) internal virtual {
         require(
-            _capsuleID < _capsuleIdCounter.current(),
-            "VestingVault: Invalid capsule ID"
+            _activeCapsules[_capsuleID],
+            "VestingVault: Capsule is not active"
         );
         require(
             _capsuleOwners[_capsuleID] == msg.sender,
-            "VestingVault: Cannot destory capsule because msg.sender is not the owner"
+            "VestingVault: Caller is not capsule owner"
         );
 
         Capsule storage capsule = _capsules[_capsuleID];
@@ -487,19 +487,7 @@ contract VestingVault {
         // Delete capsule and owner reference
         delete _capsules[_capsuleID];
         delete _capsuleOwners[_capsuleID];
-    }
-
-    /**
-     * @dev Destroys a batch of Capsules owned by the caller.
-     * @param _capsuleIDs Array of capsule IDs to destoy.
-     */
-    function _destroyMultiCapsule(uint256[] memory _capsuleIDs)
-        internal
-        virtual
-    {
-        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
-            _destroySingleCapsule(_capsuleIDs[i]);
-        }
+        delete _activeCapsules[_capsuleID];
     }
 
     /***********************************|
@@ -608,7 +596,7 @@ contract VestingVault {
      * vested to the owner of the capsule.
      * @param _capsuleID ID of the capsule to withdraw from.
      */
-    function _withdrawSingleCapsule(uint256 _capsuleID) internal virtual {
+    function _withdrawCapsuleBalance(uint256 _capsuleID) internal virtual {
         require(
             _capsuleID < _capsuleIdCounter.current(),
             "VestingVault: Invalid capsule ID"
@@ -643,33 +631,15 @@ contract VestingVault {
         IERC20(schedule.token).safeTransfer(msg.sender, claimAmount);
     }
 
-    /**
-     * @dev Transfers the amount of tokens in several capsules that have
-     * vested to the owners of the capsules.
-     * @param _capsuleIDs Array of capsule IDs to withdraw from.
-     */
-    function _withdrawMultiCapsule(uint256[] memory _capsuleIDs)
-        internal
-        virtual
-    {
-        require(
-            _capsuleIDs.length > 0,
-            "VestingVault: No capsule IDs provided"
-        );
-        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
-            _withdrawSingleCapsule(_capsuleIDs[i]);
-        }
-    }
-
     /***********************************|
     |   Leftover Withdrawal Functions   |
     |__________________________________*/
 
     /**
-     * @dev Transfers the amount of tokens leftover owed caller.
-     * @param _token ID of the Capsule to be claimed.
+     * @dev Transfers the amount of tokens leftover owed to caller.
+     * @param _token Address of token to withdraw from.
      */
-    function _withdrawSingleTokenLeftovers(address _token) internal virtual {
+    function _withdrawTokenLeftovers(address _token) internal virtual {
         uint256 leftoverBalance = _leftoverBalance[msg.sender][_token];
         require(
             leftoverBalance > 0,
@@ -680,22 +650,5 @@ contract VestingVault {
 
         // Transfer tokens to capsule owner
         IERC20(_token).safeTransfer(msg.sender, leftoverBalance);
-    }
-
-    /**
-     * @dev Withdraw leftovers of several tokens owed to caller.
-     * @param _tokens Array of token address to withdraw from leftover reserves.
-     */
-    function _withdrawMultiTokenLeftovers(address[] memory _tokens)
-        internal
-        virtual
-    {
-        require(
-            _tokens.length > 0,
-            "VestingVault: No token addresses provided"
-        );
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            _withdrawSingleTokenLeftovers(_tokens[i]);
-        }
     }
 }

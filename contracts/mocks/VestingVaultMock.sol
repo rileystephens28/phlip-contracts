@@ -68,22 +68,6 @@ contract VestingVaultMock is VestingVault {
     }
 
     /**
-     * @dev Allows capsule owner to delete one of their capsules and release its funds back to reserves.
-     * @param _capsuleID Capsule ID to delete.
-     */
-    function destroySingleCapsule(uint256 _capsuleID) external {
-        _destroySingleCapsule(_capsuleID);
-    }
-
-    /**
-     * @dev Destroys a batch of Capsules owned by the caller.
-     * @param _capsuleIDs Array of capsule IDs to destoy.
-     */
-    function destroyMultiCapsule(uint256[] calldata _capsuleIDs) external {
-        _destroyMultiCapsule(_capsuleIDs);
-    }
-
-    /**
      * @dev Transfers capsule ownership to a new address.
      * @param _capsuleID ID of the Capsule to be transferred.
      * @param _to Address to transfer to.
@@ -104,36 +88,27 @@ contract VestingVaultMock is VestingVault {
     }
 
     /**
+     * @dev Allows capsule owner to delete one of their capsules and release its funds back to reserves.
+     * @param _capsuleID Capsule ID to delete.
+     */
+    function destroyCapsule(uint256 _capsuleID) external {
+        _destroyCapsule(_capsuleID);
+    }
+
+    /**
      * @dev Transfers the amount of tokens in one Capsule that have
      * vested to the owner of the capsule.
      * @param _capsuleID ID of the capsule to withdraw from.
      */
-    function withdrawSingleCapsule(uint256 _capsuleID) external {
-        _withdrawSingleCapsule(_capsuleID);
-    }
-
-    /**
-     * @dev Transfers the amount of tokens in several capsules that have
-     * vested to the owners of the capsules.
-     * @param _capsuleIDs Array of capsule IDs to withdraw from.
-     */
-    function withdrawMultiCapsule(uint256[] calldata _capsuleIDs) external {
-        _withdrawMultiCapsule(_capsuleIDs);
+    function withdrawCapsuleBalance(uint256 _capsuleID) external {
+        _withdrawCapsuleBalance(_capsuleID);
     }
 
     /**
      * @dev Transfers the amount of tokens leftover owed caller.
      * @param _token ID of the Capsule to be claimed.
      */
-    function withdrawSingleTokenLeftovers(address _token) external {
-        _withdrawSingleTokenLeftovers(_token);
-    }
-
-    /**
-     * @dev Withdraw leftovers of several tokens owed to caller.
-     * @param _tokens Array of token address to withdraw from leftover reserves.
-     */
-    function withdrawMultiTokenLeftovers(address[] calldata _tokens) external {
-        _withdrawMultiTokenLeftovers(_tokens);
+    function withdrawTokenLeftovers(address _token) external {
+        _withdrawTokenLeftovers(_token);
     }
 }

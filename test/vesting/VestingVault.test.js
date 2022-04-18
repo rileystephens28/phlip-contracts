@@ -109,21 +109,6 @@ contract("VestingVault", (accounts) => {
         );
     };
 
-    const destroySingleCapsule = async (capsuleId = 0, from = capsuleOwner) => {
-        return await vaultInstance.destroySingleCapsule(capsuleId, {
-            from: from,
-        });
-    };
-
-    const destroyMultiCapsule = async (
-        capsuleIds = [0, 1],
-        from = capsuleOwner
-    ) => {
-        return await vaultInstance.destroyMultiCapsule(capsuleIds, {
-            from: from,
-        });
-    };
-
     const transferSingleCapsule = async (
         capsuleId = 0,
         to = recipient,
@@ -144,43 +129,31 @@ contract("VestingVault", (accounts) => {
         });
     };
 
-    const withdrawSingleCapsule = async (
+    const destroyCapsule = async (capsuleId = 0, from = capsuleOwner) => {
+        return await vaultInstance.destroyCapsule(capsuleId, {
+            from: from,
+        });
+    };
+
+    const withdrawCapsuleBalance = async (
         capsuleId = 0,
         from = capsuleOwner
     ) => {
-        return await vaultInstance.withdrawSingleCapsule(capsuleId, {
+        return await vaultInstance.withdrawCapsuleBalance(capsuleId, {
             from: from,
         });
     };
 
-    const withdrawMultiCapsule = async (
-        capsuleIds = [0, 1],
-        from = capsuleOwner
-    ) => {
-        return await vaultInstance.withdrawMultiCapsule(capsuleIds, {
-            from: from,
-        });
-    };
-
-    const withdrawSingleTokenLeftovers = async (
+    const withdrawTokenLeftovers = async (
         capsuleId = 0,
         from = capsuleOwner
     ) => {
-        return await vaultInstance.withdrawSingleTokenLeftovers(capsuleId, {
+        return await vaultInstance.withdrawTokenLeftovers(capsuleId, {
             from: from,
         });
     };
 
-    const withdrawMultiTokenLeftovers = async (
-        capsuleIds = [0, 1],
-        from = capsuleOwner
-    ) => {
-        return await vaultInstance.withdrawMultiTokenLeftovers(capsuleIds, {
-            from: from,
-        });
-    };
-
-    const verifyCapsuleExists = async (capsuleId, bool) => {
+    const verifyScheduleExists = async (capsuleId, bool) => {
         const exists = await vaultInstance.scheduleExists(capsuleId);
         exists.should.be.equal(bool);
     };
@@ -720,7 +693,64 @@ contract("VestingVault", (accounts) => {
         });
     });
 
-    describe("Withdrawing Single Capsule Balance", async () => {
+    describe.only("Destroying Capsules", async () => {
+        beforeEach(async () => {
+            await createSingleCapsule();
+        });
+        // Failure cases
+        it("should fail when capsule ID is invalid", async () => {
+            await expectRevert(
+                destroyCapsule(2),
+                "VestingVault: Capsule is not active"
+            );
+        });
+        it("should fail when caller is not capsule owner", async () => {
+            await expectRevert(
+                destroyCapsule(0, otherAccount),
+                "VestingVault: Caller is not capsule owner"
+            );
+        });
+
+        // Passing cases
+        it("should pass when capsule has not reached cliff", async () => {
+            // Ensure that the capsule has not reached the cliff
+            await verifyCapsuleCliffNotReached(0);
+
+            // Should be active
+            await verifyCapsuleIsActive(0, true);
+
+            // Should have 0 tokens available (beforeEach created capsule)
+            await verifyAvailableReserves(0, 0);
+
+            await destroyCapsule();
+
+            // Should no longer be active
+            await verifyCapsuleIsActive(0, false);
+
+            // Should have 1000 tokens available
+            await verifyAvailableReserves(0, 1000);
+        });
+        it("should pass when capsule has partially vested an not been withdrawn from", async () => {
+            // Increase time so capsule is 20% vested
+            await time.increase(secondsUntil20PercVested);
+
+            // Should be active
+            await verifyCapsuleIsActive(0, true);
+
+            // Should have 0 tokens available (beforeEach created capsule)
+            await verifyAvailableReserves(0, 0);
+
+            await destroyCapsule();
+
+            // Should no longer be active
+            await verifyCapsuleIsActive(0, false);
+
+            // Should have 1000 tokens available
+            await verifyAvailableReserves(0, 1000);
+        });
+    });
+
+    describe("Withdrawing Capsule Balance", async () => {
         beforeEach(async () => {
             await createSingleCapsule();
         });
@@ -728,13 +758,13 @@ contract("VestingVault", (accounts) => {
         // Failure cases
         it("should fail when capsule ID is out of bounds", async () => {
             await expectRevert(
-                withdrawSingleCapsule(1),
+                withdrawCapsuleBalance(1),
                 "VestingVault: Invalid capsule ID"
             );
         });
         it("should fail when msg.sender is not capsule owner", async () => {
             await expectRevert(
-                withdrawSingleCapsule(0, otherAccount),
+                withdrawCapsuleBalance(0, otherAccount),
                 "VestingVault: Caller is not capsule owner"
             );
         });
@@ -743,7 +773,7 @@ contract("VestingVault", (accounts) => {
             await verifyCapsuleCliffNotReached(0);
 
             await expectRevert(
-                withdrawSingleCapsule(),
+                withdrawCapsuleBalance(),
                 "VestingVault: No tokens to withdraw"
             );
         });
@@ -753,11 +783,11 @@ contract("VestingVault", (accounts) => {
 
             // Get balance of capsule before claiming
             const vestedBalance = await vaultInstance.vestedBalanceOf(0);
-            await withdrawSingleCapsule();
+            await withdrawCapsuleBalance();
 
             // Capsule should have been emptied and then deleted, so the capsuleOwner is no longer the owner
             await expectRevert(
-                withdrawSingleCapsule(),
+                withdrawCapsuleBalance(),
                 "VestingVault: Caller is not capsule owner"
             );
 
@@ -777,7 +807,7 @@ contract("VestingVault", (accounts) => {
             // Get balance of capsule before claiming
             const vestedBalance = await vaultInstance.vestedBalanceOf(0);
 
-            await withdrawSingleCapsule(0);
+            await withdrawCapsuleBalance(0);
 
             // Capsule should have no claimable balance
             await verifyVestedBalance(0, 0);
@@ -795,7 +825,7 @@ contract("VestingVault", (accounts) => {
 
             // Get balance of capsule before claiming
             const vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            await withdrawSingleCapsule(0);
+            await withdrawCapsuleBalance(0);
 
             // Capsule should have no claimable balance
             await verifyVestedBalance(0, 0);
@@ -812,7 +842,7 @@ contract("VestingVault", (accounts) => {
 
             const vestedBalance2 = await vaultInstance.vestedBalanceOf(0);
 
-            await withdrawSingleCapsule(0);
+            await withdrawCapsuleBalance(0);
 
             // Capsule should have no claimable balance
             await verifyVestedBalance(0, 0);
@@ -829,7 +859,7 @@ contract("VestingVault", (accounts) => {
             // Increase time so capsule is fully vested
             await time.increase(secondsUntilFullyVested);
             const balance = await vaultInstance.vestedBalanceOf(0);
-            await withdrawSingleCapsule(0);
+            await withdrawCapsuleBalance(0);
 
             // Capsule should have no claimable balance
             await verifyVestedBalance(0, 0);
@@ -847,7 +877,7 @@ contract("VestingVault", (accounts) => {
 
             // Get balance of capsule before claiming
             const vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            await withdrawSingleCapsule(0);
+            await withdrawCapsuleBalance(0);
 
             // Capsule should have no claimable balance
             await verifyVestedBalance(0, 0);
@@ -864,7 +894,7 @@ contract("VestingVault", (accounts) => {
 
             // Get balance of capsule before claiming again
             const vestedBalance2 = await vaultInstance.vestedBalanceOf(0);
-            await withdrawSingleCapsule(0);
+            await withdrawCapsuleBalance(0);
 
             // Capsule should have no claimable balance
             await verifyVestedBalance(0, 0);
@@ -880,244 +910,6 @@ contract("VestingVault", (accounts) => {
                 capsuleOwner,
                 totalClaimAmount
             );
-        });
-    });
-
-    describe("Withdrawing Multi Capsule Balance", async () => {
-        beforeEach(async () => {
-            await createMultiCapsule();
-        });
-
-        // Failure cases
-        it("should fail when capsule ID is out of bounds", async () => {
-            await expectRevert(
-                withdrawMultiCapsule([2, 3]),
-                "VestingVault: Invalid capsule ID"
-            );
-        });
-        it("should fail when msg.sender is not capsule owner", async () => {
-            await expectRevert(
-                withdrawMultiCapsule([0, 1], otherAccount),
-                "VestingVault: Caller is not capsule owner"
-            );
-        });
-        it("should fail when cliff has not been reached", async () => {
-            // Ensure capsule cliff has not been reached
-            await verifyCapsuleCliffNotReached(0);
-            await verifyCapsuleCliffNotReached(1);
-
-            await expectRevert(
-                withdrawMultiCapsule(),
-                "VestingVault: No tokens to withdraw"
-            );
-        });
-        it("should fail when 100% of fully vested capsule tokens have been claimed", async () => {
-            // Increase time so capsule is fully vested
-            await time.increase(secondsUntilFullyVested);
-
-            // Get balance of capsule before claiming
-            const vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            const vestedBalance2 = await vaultInstance.vestedBalanceOf(1);
-            await withdrawMultiCapsule();
-
-            // Capsule should have been emptied and then deleted, so the capsuleOwner is no longer the owner
-            await expectRevert(
-                withdrawMultiCapsule(),
-                "VestingVault: Caller is not capsule owner"
-            );
-
-            // Check that capsule owner has been credited with the correct amount of tokens
-            await verifyTokenBalance(
-                tokenInstance1,
-                capsuleOwner,
-                vestedBalance1
-            );
-            await verifyTokenBalance(
-                tokenInstance2,
-                capsuleOwner,
-                vestedBalance2
-            );
-        });
-
-        // Passing cases
-        it("should pass when 0% of partially vested capsule tokens have been claimed", async () => {
-            // Increase time so capsule is 20% vested
-            await time.increase(secondsUntil20PercVested);
-
-            // Get balance of capsule before claiming
-            const vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            const vestedBalance2 = await vaultInstance.vestedBalanceOf(1);
-            await withdrawMultiCapsule();
-
-            // Capsules should have no claimable balance
-            await verifyVestedBalance(0, 0);
-            await verifyVestedBalance(1, 0);
-
-            // Check that capsule owner has been credited with the correct amount of tokens
-            await verifyTokenBalance(
-                tokenInstance1,
-                capsuleOwner,
-                vestedBalance1
-            );
-            await verifyTokenBalance(
-                tokenInstance2,
-                capsuleOwner,
-                vestedBalance2
-            );
-        });
-        it("should pass when 50% of partially vested capsule tokens have been claimed", async () => {
-            // Increase time so capsule is 20% vested
-            await time.increase(secondsUntil20PercVested);
-
-            // Get balance of capsule before claiming
-            let vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            let vestedBalance2 = await vaultInstance.vestedBalanceOf(1);
-
-            let totalWithdrawn1 = vestedBalance1;
-            let totalWithdrawn2 = vestedBalance2;
-
-            await withdrawMultiCapsule();
-
-            // Capsules should have no claimable balance
-            await verifyVestedBalance(0, 0);
-            await verifyVestedBalance(1, 0);
-
-            // Check that capsule owner has been credited with the correct amount of tokens
-            await verifyTokenBalance(
-                tokenInstance1,
-                capsuleOwner,
-                vestedBalance1
-            );
-            await verifyTokenBalance(
-                tokenInstance2,
-                capsuleOwner,
-                vestedBalance2
-            );
-
-            // Increase time 20% again so capsule is half of vested tokens have been claimed
-            await time.increase(secondsUntil20PercVested);
-
-            vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            vestedBalance2 = await vaultInstance.vestedBalanceOf(1);
-
-            // Update total token balance withdrawn
-            totalWithdrawn1 = totalWithdrawn1.add(vestedBalance1);
-            totalWithdrawn2 = totalWithdrawn2.add(vestedBalance2);
-
-            await withdrawMultiCapsule();
-
-            // Capsules should have no claimable balance
-            await verifyVestedBalance(0, 0);
-            await verifyVestedBalance(1, 0);
-
-            // Check that capsule owner has been credited with the correct amount of tokens
-            await verifyTokenBalance(
-                tokenInstance1,
-                capsuleOwner,
-                totalWithdrawn1
-            );
-            await verifyTokenBalance(
-                tokenInstance2,
-                capsuleOwner,
-                totalWithdrawn2
-            );
-        });
-        it("should pass when 0% of fully vested capsule tokens have been claimed", async () => {
-            // Increase time so capsule is fully vested
-            await time.increase(secondsUntilFullyVested);
-
-            // Get balance of capsule before claiming
-            let vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            let vestedBalance2 = await vaultInstance.vestedBalanceOf(1);
-
-            await withdrawMultiCapsule();
-
-            // Capsules should have no claimable balance
-            await verifyVestedBalance(0, 0);
-            await verifyVestedBalance(1, 0);
-
-            // Check that capsule owner has been credited with the correct amount of tokens
-            await verifyTokenBalance(
-                tokenInstance1,
-                capsuleOwner,
-                vestedBalance1
-            );
-            await verifyTokenBalance(
-                tokenInstance2,
-                capsuleOwner,
-                vestedBalance2
-            );
-
-            // Schedule amounts should equal vested balances
-            const schedule1 = await vaultInstance.getSchedule(0);
-            vestedBalance1.should.be.bignumber.equal(schedule1["amount"]);
-
-            const schedule2 = await vaultInstance.getSchedule(1);
-            vestedBalance2.should.be.bignumber.equal(schedule2["amount"]);
-        });
-        it.only("should pass when 50% of fully vested capsule tokens have been claimed", async () => {
-            // Increase time so capsule is 50% vested
-            await time.increase(secondsUntil50PercVested);
-
-            // Get balance of capsule before claiming
-            let vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            let vestedBalance2 = await vaultInstance.vestedBalanceOf(1);
-
-            let totalWithdrawn1 = vestedBalance1;
-            let totalWithdrawn2 = vestedBalance2;
-
-            await withdrawMultiCapsule();
-
-            // Capsules should have no claimable balance
-            await verifyVestedBalance(0, 0);
-            await verifyVestedBalance(1, 0);
-
-            // Check that capsule owner has been credited with the correct amount of tokens
-            await verifyTokenBalance(
-                tokenInstance1,
-                capsuleOwner,
-                vestedBalance1
-            );
-            await verifyTokenBalance(
-                tokenInstance2,
-                capsuleOwner,
-                vestedBalance2
-            );
-
-            // Increase time 50% again so capsule is fully vested and half claimed
-            await time.increase(secondsUntil50PercVested);
-
-            vestedBalance1 = await vaultInstance.vestedBalanceOf(0);
-            vestedBalance2 = await vaultInstance.vestedBalanceOf(1);
-
-            // Update total token balance withdrawn
-            totalWithdrawn1 = totalWithdrawn1.add(vestedBalance1);
-            totalWithdrawn2 = totalWithdrawn2.add(vestedBalance2);
-
-            await withdrawMultiCapsule();
-
-            // Capsules should have no claimable balance
-            await verifyVestedBalance(0, 0);
-            await verifyVestedBalance(1, 0);
-
-            // Check that capsule owner has been credited with the correct amount of tokens
-            await verifyTokenBalance(
-                tokenInstance1,
-                capsuleOwner,
-                totalWithdrawn1
-            );
-            await verifyTokenBalance(
-                tokenInstance2,
-                capsuleOwner,
-                totalWithdrawn2
-            );
-
-            // Schedule amounts should equal vested balances
-            const schedule1 = await vaultInstance.getSchedule(0);
-            totalWithdrawn1.should.be.bignumber.equal(schedule1["amount"]);
-
-            const schedule2 = await vaultInstance.getSchedule(1);
-            totalWithdrawn2.should.be.bignumber.equal(schedule2["amount"]);
         });
     });
 });
