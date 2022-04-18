@@ -46,14 +46,13 @@ contract VestingVault {
      * @param scheduleId The ID of the VestingSchedule associated with this capsule
      * @param startTime Time at which cliff period begins
      * @param endTime Time at which capsule is fully vested
-     * @param lastClaimedTimestamp Time at which last claim was made
+     * @param  Time at which last claim was made
      * @param claimedAmount The total amount of tokens that have been claimed (by current and previous owners)
      */
     struct Capsule {
         uint256 scheduleId;
         uint256 startTime;
         uint256 endTime;
-        uint256 lastClaimedTimestamp;
         uint256 claimedAmount;
     }
 
@@ -196,19 +195,6 @@ contract VestingVault {
     }
 
     /**
-     * @dev Accessor function for amount of tokens that have vested for several capsules.
-     * @param _capsuleIDs Array of IDs of capsules to be queried
-     * @return (array of token addresses, array of vested balances for respective tokens)
-     */
-    function vestedBalancesOf(uint256[] calldata _capsuleIDs)
-        public
-        view
-        returns (address[] memory, uint256[] memory)
-    {
-        return _getVestedBalances(_capsuleIDs);
-    }
-
-    /**
      * @dev Accessor function for previous capsule owners leftover balance of given token.
      * @param _prevOwner The address of previous owner whose balance to query
      * @param _token The address of a token to query
@@ -220,24 +206,6 @@ contract VestingVault {
         returns (uint256)
     {
         return _leftoverBalance[_prevOwner][_token];
-    }
-
-    /**
-     * @dev Accessor function for previous capsule owners leftover balance of several tokens.
-     * @param _prevOwner The address of account whose balance to query
-     * @param _tokens Array of token addresses to query
-     * @return The amount of specified tokens leftover after capsule transfer
-     */
-    function leftoverBalancesOf(address _prevOwner, address[] calldata _tokens)
-        public
-        view
-        returns (uint256[] memory)
-    {
-        uint256[] memory balances = new uint256[](_tokens.length);
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            balances[i] = _leftoverBalance[_prevOwner][_tokens[i]];
-        }
-        return balances;
     }
 
     /***********************************|
@@ -413,10 +381,6 @@ contract VestingVault {
     ) internal virtual returns (uint256) {
         require(_owner != address(0), "VestingVault: Owner cannot be 0x0");
         require(
-            _scheduleID < _scheduleIDCounter.current(),
-            "VestingVault: Invalid schedule ID"
-        );
-        require(
             _startTime >= block.timestamp,
             "VestingVault: Start time cannot be in the past."
         );
@@ -434,13 +398,10 @@ contract VestingVault {
         uint256[] memory _scheduleIDs,
         uint256 _startTime
     ) internal virtual returns (uint256[] memory) {
-        require(
-            _owner != address(0),
-            "VestingVault: Beneficiary cannot be 0x0"
-        );
+        require(_owner != address(0), "VestingVault: Owner cannot be 0x0");
         require(
             _startTime >= block.timestamp,
-            "VestingVault: Capsule startTime cannot be in the past."
+            "VestingVault: Start time cannot be in the past."
         );
         require(
             _scheduleIDs.length > 0,
@@ -471,6 +432,10 @@ contract VestingVault {
         uint256 _scheduleID,
         uint256 _startTime
     ) internal virtual returns (uint256) {
+        require(
+            _scheduleID < _scheduleIDCounter.current(),
+            "VestingVault: Invalid schedule ID"
+        );
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
         require(
             _availableScheduleReserves[_scheduleID] >= schedule.amount,
@@ -493,7 +458,6 @@ contract VestingVault {
             _scheduleID,
             _startTime,
             _startTime + schedule.duration,
-            _startTime,
             0
         );
         return currentId;
@@ -541,10 +505,6 @@ contract VestingVault {
         internal
         virtual
     {
-        require(
-            _capsuleIDs.length > 0,
-            "VestingVault: No capsule IDs provided"
-        );
         for (uint256 i = 0; i < _capsuleIDs.length; i++) {
             _destroySingleCapsule(_capsuleIDs[i]);
         }
@@ -584,10 +544,6 @@ contract VestingVault {
         internal
         virtual
     {
-        require(
-            _capsuleIDs.length > 0,
-            "VestingVault: No capsule IDs provided"
-        );
         require(
             _to != address(0),
             "VestingVault: Cannot transfer capsule to 0x0."
@@ -641,7 +597,6 @@ contract VestingVault {
             if (balance > 0) {
                 // Update capsule values to reflect that they have been "claimed"
                 capsule.claimedAmount += balance;
-                capsule.lastClaimedTimestamp = block.timestamp;
 
                 // Reduce the total schedule reserves by leftover balance
                 _totalScheduleReserves[capsule.scheduleId] -= balance;
@@ -694,7 +649,6 @@ contract VestingVault {
         } else {
             // Not Fully Vested -> claim values
             capsule.claimedAmount += claimAmount;
-            capsule.lastClaimedTimestamp = block.timestamp;
         }
 
         // Transfer tokens to capsule owner
