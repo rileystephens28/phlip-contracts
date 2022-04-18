@@ -225,6 +225,10 @@ contract VestingVault {
         virtual
         returns (uint256)
     {
+        // If capsule is inactive (or does not exist), return 0
+        if (!_activeCapsules[_capsuleID]) {
+            return 0;
+        }
         Capsule storage capsule = _capsules[_capsuleID];
         VestingSchedule storage schedule = _vestingSchedules[
             capsule.scheduleId
@@ -611,13 +615,10 @@ contract VestingVault {
         );
         require(
             _capsuleOwners[_capsuleID] == msg.sender,
-            "VestingVault: Cannot claim capsule because msg.sender is not the owner"
+            "VestingVault: Caller is not capsule owner"
         );
         uint256 claimAmount = _getVestedBalance(_capsuleID);
-        require(
-            claimAmount > 0,
-            "VestingVault: Capsule has no tokens to claim"
-        );
+        require(claimAmount > 0, "VestingVault: No tokens to withdraw");
 
         Capsule storage capsule = _capsules[_capsuleID];
         VestingSchedule storage schedule = _vestingSchedules[
@@ -625,7 +626,7 @@ contract VestingVault {
         ];
 
         // Reduce the total reserves by amount claimed by owner
-        // Note - Have to do think before (possibly) deleting the capsule
+        // Note - Have to update reserves before (possibly) deleting the capsule
         _totalScheduleReserves[capsule.scheduleId] -= claimAmount;
 
         if (block.timestamp > capsule.endTime) {
