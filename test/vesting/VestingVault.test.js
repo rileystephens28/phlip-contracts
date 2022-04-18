@@ -145,10 +145,10 @@ contract("VestingVault", (accounts) => {
     };
 
     const withdrawTokenLeftovers = async (
-        capsuleId = 0,
+        tokenAddress = tokenInstance1.address,
         from = capsuleOwner
     ) => {
-        return await vaultInstance.withdrawTokenLeftovers(capsuleId, {
+        return await vaultInstance.withdrawTokenLeftovers(tokenAddress, {
             from: from,
         });
     };
@@ -693,7 +693,7 @@ contract("VestingVault", (accounts) => {
         });
     });
 
-    describe.only("Destroying Capsules", async () => {
+    describe("Destroying Capsules", async () => {
         beforeEach(async () => {
             await createSingleCapsule();
         });
@@ -701,6 +701,13 @@ contract("VestingVault", (accounts) => {
         it("should fail when capsule ID is invalid", async () => {
             await expectRevert(
                 destroyCapsule(2),
+                "VestingVault: Capsule is not active"
+            );
+        });
+        it("should fail when capsule has already been destroyed", async () => {
+            await destroyCapsule();
+            await expectRevert(
+                destroyCapsule(),
                 "VestingVault: Capsule is not active"
             );
         });
@@ -712,10 +719,7 @@ contract("VestingVault", (accounts) => {
         });
 
         // Passing cases
-        it("should pass when capsule has not reached cliff", async () => {
-            // Ensure that the capsule has not reached the cliff
-            await verifyCapsuleCliffNotReached(0);
-
+        it("should pass when capsule has never been withdrawn from", async () => {
             // Should be active
             await verifyCapsuleIsActive(0, true);
 
@@ -730,7 +734,7 @@ contract("VestingVault", (accounts) => {
             // Should have 1000 tokens available
             await verifyAvailableReserves(0, 1000);
         });
-        it("should pass when capsule has partially vested an not been withdrawn from", async () => {
+        it("should pass when capsule has been withdrawn from before", async () => {
             // Increase time so capsule is 20% vested
             await time.increase(secondsUntil20PercVested);
 
@@ -740,13 +744,19 @@ contract("VestingVault", (accounts) => {
             // Should have 0 tokens available (beforeEach created capsule)
             await verifyAvailableReserves(0, 0);
 
+            const vestedBalance = await vaultInstance.vestedBalanceOf(0);
+
+            // Should withdraw ~20% of total tokens
+            await withdrawCapsuleBalance(0);
+
+            // Destroy and release remaining tokens
             await destroyCapsule();
 
             // Should no longer be active
             await verifyCapsuleIsActive(0, false);
 
             // Should have 1000 tokens available
-            await verifyAvailableReserves(0, 1000);
+            await verifyAvailableReserves(0, new BN(1000).sub(vestedBalance));
         });
     });
 
@@ -910,6 +920,95 @@ contract("VestingVault", (accounts) => {
                 capsuleOwner,
                 totalClaimAmount
             );
+        });
+    });
+
+    describe("Withdrawing Leftover Token Balance", async () => {
+        beforeEach(async () => {
+            await createSingleCapsule();
+        });
+        // Failure cases
+        it("should fail when token address does not match any schedules", async () => {
+            const newToken = await ERC20Mock.new({ from: deployer });
+            await expectRevert(
+                withdrawTokenLeftovers(newToken.address),
+                "VestingVault: No leftover tokens to withdraw"
+            );
+        });
+        it("should fail when caller has never owned/transfered a capsule", async () => {
+            await expectRevert(
+                withdrawTokenLeftovers(tokenInstance1.address, otherAccount),
+                "VestingVault: No leftover tokens to withdraw"
+            );
+        });
+        it("should fail when caller has already withdrawn tokens", async () => {
+            // Increase time to 50% vested then transfer
+            await time.increase(secondsUntil50PercVested);
+            await transferSingleCapsule();
+
+            // Withdraw tokens
+            await withdrawTokenLeftovers();
+            await expectRevert(
+                withdrawTokenLeftovers(),
+                "VestingVault: No leftover tokens to withdraw"
+            );
+        });
+
+        // Passing cases
+        it("should pass when caller has leftover token balance", async () => {
+            // Increase time so capsule is 50% vested
+            await time.increase(secondsUntil50PercVested);
+
+            const vestedBalance = await vaultInstance.vestedBalanceOf(0);
+            await transferSingleCapsule();
+
+            // Should have leftover balance = vested balance
+            await verifyLeftoverBalance(
+                capsuleOwner,
+                tokenInstance1.address,
+                vestedBalance
+            );
+
+            // Withdraw tokens
+            await withdrawTokenLeftovers();
+
+            // Should now have leftover balance = 0
+            await verifyLeftoverBalance(
+                capsuleOwner,
+                tokenInstance1.address,
+                0
+            );
+
+            // Should now have token balance = vested balance
+            await verifyTokenBalance(
+                tokenInstance1,
+                capsuleOwner,
+                vestedBalance
+            );
+        });
+        it("should pass when capsule has been withdrawn from before", async () => {
+            // Increase time so capsule is 20% vested
+            await time.increase(secondsUntil20PercVested);
+
+            // Should be active
+            await verifyCapsuleIsActive(0, true);
+
+            // Should have 0 tokens available (beforeEach created capsule)
+            await verifyAvailableReserves(0, 0);
+
+            const vestedBalance = await vaultInstance.vestedBalanceOf(0);
+
+            // Should withdraw ~20% of total tokens
+            await withdrawCapsuleBalance(0);
+
+            // Destroy and release remaining tokens
+            await destroyCapsule();
+
+            // Should no longer be active
+            await verifyCapsuleIsActive(0, false);
+
+            // Should have 1000 tokens available
+            await verifyAvailableReserves(0, new BN(1000).sub(vestedBalance));
         });
     });
 });

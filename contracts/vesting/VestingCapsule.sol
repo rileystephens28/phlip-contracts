@@ -81,18 +81,20 @@ abstract contract VestingCapsule is ERC721, VestingVault {
     ) internal virtual override {
         super._afterTokenTransfer(_from, _to, _tokenId);
         if (_from == address(0)) {
-            // MINT - Call manager to batch create capsule and store reference
+            // MINT - Batch create capsule and store reference
             _capsulesLookup[_tokenId] = _createMultiCapsule(
                 _to,
                 _currentScheduleIds,
                 block.timestamp
             );
         } else if (_to == address(0)) {
-            // BURN - Call manager to batch destroy capsule and delete reference
-            _destroyMultiCapsule(_capsulesLookup[_tokenId]);
+            // BURN - Batch destroy capsule and delete reference
+            for (uint256 i = 0; i < _capsulesLookup[_tokenId].length; i++) {
+                _destroyCapsule(_capsulesLookup[_tokenId][i]);
+            }
             delete _capsulesLookup[_tokenId];
         } else if (_from != _to) {
-            // TRANSFER - Call manager to batch transfer capsules
+            // TRANSFER - Batch transfer capsules
             _transferMultiCapsule(_capsulesLookup[_tokenId], _to);
         }
     }
