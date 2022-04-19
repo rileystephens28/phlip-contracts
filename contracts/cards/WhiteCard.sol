@@ -6,11 +6,9 @@ import "./PhlipCard.sol";
 /**
  * @title WhiteCard
  * @author Riley Stephens
- * @dev Implementation of a PhlipCard with with no additional functionality.
+ * @dev Implementation of a PhlipCard that supports text and blank cards.
  */
 contract WhiteCard is PhlipCard {
-    using Counters for Counters.Counter;
-
     // Possible data types of a card
     enum CardType {
         TEXT,
