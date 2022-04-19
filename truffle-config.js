@@ -12,6 +12,13 @@ module.exports = {
         polygonscan: process.env.POLYGONSCAN_API_KEY,
         bscscan: process.env.BSCSCAN_API_KEY,
     },
+    mocha: {
+        reporter: "eth-gas-reporter",
+        reporterOptions: {
+            coinmarketcap: "d7e5fdac-7c5d-4c95-a0b2-dd494bf2db93",
+            currency: "USD",
+        },
+    },
     networks: {
         develop: {
             host: "127.0.0.1",
