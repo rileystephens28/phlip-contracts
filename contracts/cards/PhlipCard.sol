@@ -62,16 +62,21 @@ contract PhlipCard is
         string memory _symbol,
         string memory _baseUri,
         uint256 _maxUriChanges
-    ) GuardedVestingCapsule(_name, _symbol) {
+    ) ERC721(_name, _symbol) {
         // Grant roles to contract creator
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SETTINGS_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(TREASURER_ROLE, msg.sender);
 
         // Set constants
         setBaseURI(_baseUri);
         setMaxUriChanges(_maxUriChanges);
     }
+
+    /***********************************|
+    |          View Functions           |
+    |__________________________________*/
 
     /**
      * @dev Accessor function to get address of card minter
@@ -80,73 +85,6 @@ contract PhlipCard is
      */
     function minterOf(uint256 _cardID) public view returns (address) {
         return _minters[_cardID];
-    }
-
-    /**
-     * @dev Allow address with MINTER role to mint tokens to a given address.
-     * @param _to The address to mint tokens to.
-     * @param _uri The IPFS CID referencing the new tokens metadata.
-     */
-    function mintCard(address _to, string memory _uri)
-        external
-        onlyRole(MINTER_ROLE)
-    {
-        // Get the next token ID then increment the counter
-        uint256 tokenId = _tokenIds.current();
-        _tokenIds.increment();
-        _mintCard(tokenId, _to, _uri);
-    }
-
-    /**
-     * @dev Allows owner of a card to update the URI of their card. Requires
-     * that the owner is also the minter of the card and has not already updated
-     * the card's metadata before. If the URI was not set during mint, this function
-     * allows the owner to set it without it counting towards the number of URI changes.
-     * @param _cardID The ID of the card to update
-     * @param _uri The IPFS CID referencing the updated metadata
-     */
-    function updateCardURI(uint256 _cardID, string memory _uri) external {
-        require(_exists(_cardID), "PhlipCard: Card does not exist");
-        require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty");
-        require(msg.sender == ownerOf(_cardID), "PhlipCard: Must be owner");
-        require(msg.sender == _minters[_cardID], "PhlipCard: Must be minter");
-        require(
-            _metadataChangeCounts[_cardID] < MAX_URI_CHANGES,
-            "PhlipCard: Exceeded max URI changes"
-        );
-
-        if (bytes(_tokenURIs[_cardID]).length > 0) {
-            // Card has set URI at least once, increment URI change count
-            _metadataChangeCounts[_cardID] += 1;
-        }
-        _tokenURIs[_cardID] = _uri;
-    }
-
-    /**
-     * @dev Allows MINTER to set the base URI for all tokens created by this contract
-     * @param _newURI New base URI
-     */
-    function setBaseURI(string memory _newURI) public onlyRole(SETTINGS_ROLE) {
-        BASE_URI = _newURI;
-    }
-
-    /**
-     * @dev Allows Settings Admin to set max number of times minter can change the URI of a card.
-     * @param _newMax New max changes allowed
-     */
-    function setMaxUriChanges(uint256 _newMax) public onlyRole(SETTINGS_ROLE) {
-        MAX_URI_CHANGES = _newMax;
-    }
-
-    /**
-     * @dev Allows MINTER to set the address of the PhlipDAO token contract
-     * @param _ids New contract address
-     */
-    function setVestingScheme(uint256[] calldata _ids)
-        public
-        onlyRole(SETTINGS_ROLE)
-    {
-        _setVestingSchedule(_ids);
     }
 
     /**
@@ -177,6 +115,89 @@ contract PhlipCard is
 
         return super.tokenURI(_tokenId);
     }
+
+    /***********************************|
+    |     Settings Admin Functions      |
+    |__________________________________*/
+
+    /**
+     * @dev Allows MINTER to set the base URI for all tokens created by this contract
+     * @param _newURI New base URI
+     */
+    function setBaseURI(string memory _newURI) public onlyRole(SETTINGS_ROLE) {
+        BASE_URI = _newURI;
+    }
+
+    /**
+     * @dev Allows Settings Admin to set max number of times minter can change the URI of a card.
+     * @param _newMax New max changes allowed
+     */
+    function setMaxUriChanges(uint256 _newMax) public onlyRole(SETTINGS_ROLE) {
+        MAX_URI_CHANGES = _newMax;
+    }
+
+    /**
+     * @dev Allows MINTER to set the address of the PhlipDAO token contract
+     * @param _ids New contract address
+     */
+    function setVestingScheme(uint256[] calldata _ids)
+        public
+        onlyRole(SETTINGS_ROLE)
+    {
+        _setVestingSchedule(_ids);
+    }
+
+    /***********************************|
+    |      Minter Admin Functions       |
+    |__________________________________*/
+
+    /**
+     * @dev Allow address with MINTER role to mint tokens to a given address.
+     * @param _to The address to mint tokens to.
+     * @param _uri The IPFS CID referencing the new tokens metadata.
+     */
+    function mintCard(address _to, string memory _uri)
+        external
+        onlyRole(MINTER_ROLE)
+    {
+        // Get the next token ID then increment the counter
+        uint256 tokenId = _tokenIds.current();
+        _tokenIds.increment();
+        _mintCard(tokenId, _to, _uri);
+    }
+
+    /***********************************|
+    |        External Functions         |
+    |__________________________________*/
+
+    /**
+     * @dev Allows owner of a card to update the URI of their card. Requires
+     * that the owner is also the minter of the card and has not already updated
+     * the card's metadata before. If the URI was not set during mint, this function
+     * allows the owner to set it without it counting towards the number of URI changes.
+     * @param _cardID The ID of the card to update
+     * @param _uri The IPFS CID referencing the updated metadata
+     */
+    function updateCardURI(uint256 _cardID, string memory _uri) external {
+        require(_exists(_cardID), "PhlipCard: Card does not exist");
+        require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty");
+        require(msg.sender == ownerOf(_cardID), "PhlipCard: Must be owner");
+        require(msg.sender == _minters[_cardID], "PhlipCard: Must be minter");
+        require(
+            _metadataChangeCounts[_cardID] < MAX_URI_CHANGES,
+            "PhlipCard: Exceeded max URI changes"
+        );
+
+        if (bytes(_tokenURIs[_cardID]).length > 0) {
+            // Card has set URI at least once, increment URI change count
+            _metadataChangeCounts[_cardID] += 1;
+        }
+        _tokenURIs[_cardID] = _uri;
+    }
+
+    /***********************************|
+    |         Private Functions         |
+    |__________________________________*/
 
     /**
      * @dev Mints card to the given address and initilizes a ballot for it.
