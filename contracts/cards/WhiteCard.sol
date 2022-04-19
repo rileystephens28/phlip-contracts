@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
+import "@openzeppelin/contracts/utils/Counters.sol";
 import "./PhlipCard.sol";
 
 /**
@@ -9,6 +10,8 @@ import "./PhlipCard.sol";
  * @dev Implementation of a PhlipCard that supports text and blank cards.
  */
 contract WhiteCard is PhlipCard {
+    using Counters for Counters.Counter;
+
     // Possible data types of a card
     enum CardType {
         TEXT,
