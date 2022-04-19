@@ -152,9 +152,9 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Allow address with MINTER role to mint tokens to a given address.
-     * @param _to The address to mint tokens to.
-     * @param _uri The IPFS CID referencing the new tokens metadata.
+     * @dev Allow minter to mint a card to a given address.
+     * @param _to The address to mint to.
+     * @param _uri The IPFS CID referencing the new cards metadata.
      */
     function mintCard(address _to, string memory _uri)
         external
@@ -163,7 +163,39 @@ contract PhlipCard is
         // Get the next token ID then increment the counter
         uint256 tokenId = _tokenIds.current();
         _tokenIds.increment();
+
+        // Mint card for _to address
         _mintCard(tokenId, _to, _uri);
+    }
+
+    /**
+     * @dev Allow minter to issue voucher to a given address.
+     * @param _to The address to issue voucher to.
+     */
+    function issueVoucher(address _to) external onlyRole(MINTER_ROLE) {
+        // Get the next token ID then increment the counter
+        uint256 reservedTokenId = _tokenIds.current();
+        _tokenIds.increment();
+
+        // Issue voucher for reserved token ID
+        _issueVoucher(_to, reservedTokenId);
+    }
+
+    /**
+     * @dev Allow minter to issue many vouchers to a given address.
+     * @param _to The address to mint tokens to.
+     * @param _amount The number of card vouchers to issue.
+     */
+    function batchIssueVouchers(address _to, uint256 _amount)
+        external
+        onlyRole(MINTER_ROLE)
+    {
+        for (uint256 i = 0; i < _amount; i++) {
+            // Get the next token ID then increment the counter
+            uint256 reservedTokenId = _tokenIds.current();
+            _tokenIds.increment();
+            _issueVoucher(_to, reservedTokenId);
+        }
     }
 
     /***********************************|
@@ -178,7 +210,7 @@ contract PhlipCard is
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
-    function updateCardURI(uint256 _cardID, string memory _uri) external {
+    function updateMetadata(uint256 _cardID, string memory _uri) external {
         require(_exists(_cardID), "PhlipCard: Card does not exist");
         require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty");
         require(msg.sender == ownerOf(_cardID), "PhlipCard: Must be owner");
@@ -193,6 +225,24 @@ contract PhlipCard is
             _metadataChangeCounts[_cardID] += 1;
         }
         _tokenURIs[_cardID] = _uri;
+    }
+
+    /**
+     * @dev Mint card with ID that has been reserved by the callers voucher
+     * Requires that caller has >=1 remaining card vouchers.
+     * @param _uri The IPFS CID referencing the new tokens metadata
+     */
+    function redeemVoucher(uint256 _reservedID, string memory _uri)
+        external
+        whenNotPaused
+        onlyVoucherHolders
+    {
+        // Checks that caller holds voucher for reserved ID
+        // Deletes voucher record from the registry
+        _redeemVoucher(msg.sender, _reservedID);
+
+        // Mints card with reserved ID to caller
+        _mintCard(_reservedID, msg.sender, _uri);
     }
 
     /***********************************|
