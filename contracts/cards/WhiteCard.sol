@@ -3,13 +3,14 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./PhlipCard.sol";
+import "./IBlankCard.sol";
 
 /**
  * @title WhiteCard
  * @author Riley Stephens
  * @dev Implementation of a PhlipCard that supports text and blank cards.
  */
-contract WhiteCard is PhlipCard {
+contract WhiteCard is PhlipCard, IBlankCard {
     using Counters for Counters.Counter;
 
     // Possible data types of a card
@@ -93,6 +94,21 @@ contract WhiteCard is PhlipCard {
     |__________________________________*/
 
     /**
+     * @dev Override PhlipCard.updateMetadata to prevent blank
+     * cards from setting their URI.
+     * @param _cardID The ID of the card to update
+     * @param _uri The IPFS CID referencing the updated metadata
+     */
+    function updateMetadata(uint256 _cardID, string memory _uri)
+        public
+        virtual
+        override
+    {
+        require(_cardTypes[_cardID] == CardType.TEXT, "Cant update blank card");
+        super.updateMetadata(_cardID, _uri);
+    }
+
+    /**
      * @dev Mint card with ID that has been reserved by the callers voucher
      * Requires that caller has >=1 remaining card vouchers.
      * @param _reservedID ID reserved by the callers voucher
@@ -100,6 +116,7 @@ contract WhiteCard is PhlipCard {
      */
     function redeemVoucher(uint256 _reservedID, string memory _uri)
         public
+        virtual
         override
     {
         // Passes empty uri

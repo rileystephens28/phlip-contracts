@@ -3,13 +3,14 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./PhlipCard.sol";
+import "./IImageCard.sol";
 
 /**
  * @title PinkCard
  * @author Riley Stephens
  * @dev Implementation of a PhlipCard that supports text and image cards.
  */
-contract PinkCard is PhlipCard {
+contract PinkCard is PhlipCard, IImageCard {
     using Counters for Counters.Counter;
 
     // Possible data types of a card

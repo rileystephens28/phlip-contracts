@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "../vesting/GuardedVestingCapsule.sol";
 import "../lockable/ERC721Lockable.sol";
 import "../vouchers/VoucherRegistry.sol";
+import "./IBaseCard.sol";
+import "./ITextCard.sol";
 
 /**
  * @title PhlipCard
@@ -35,7 +37,9 @@ contract PhlipCard is
     GuardedVestingCapsule,
     ERC721Lockable,
     VoucherRegistry,
-    Pausable
+    Pausable,
+    IBaseCard,
+    ITextCard
 {
     using Counters for Counters.Counter;
 
