@@ -46,16 +46,16 @@ contract PhlipCard is
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant SETTINGS_ROLE = keccak256("SETTINGS_ROLE");
 
-    Counters.Counter private _tokenIds;
+    Counters.Counter internal _tokenIds;
 
     // Token ID => URI string
-    mapping(uint256 => string) private _tokenURIs;
+    mapping(uint256 => string) internal _tokenURIs;
 
     // Token ID => Number of times URI has been updated
-    mapping(uint256 => uint256) private _metadataChangeCounts;
+    mapping(uint256 => uint256) internal _metadataChangeCounts;
 
     // Token ID => Address of token minter
-    mapping(uint256 => address) private _minters;
+    mapping(uint256 => address) internal _minters;
 
     constructor(
         string memory _name,
@@ -155,11 +155,11 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Allow minter to mint a card to a given address.
+     * @dev Allow minter to mint a text card to a given address.
      * @param _to The address to mint to.
-     * @param _uri The IPFS CID referencing the new cards metadata.
+     * @param _uri The IPFS CID referencing the new cards text metadata.
      */
-    function mintCard(address _to, string memory _uri)
+    function mintTextCard(address _to, string memory _uri)
         external
         onlyRole(MINTER_ROLE)
     {
@@ -172,10 +172,10 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Allow minter to issue voucher to a given address.
+     * @dev Allow minter to issue a text card voucher to a given address.
      * @param _to The address to issue voucher to.
      */
-    function issueVoucher(address _to) external onlyRole(MINTER_ROLE) {
+    function issueTextCardVoucher(address _to) external onlyRole(MINTER_ROLE) {
         // Get the next token ID then increment the counter
         uint256 reservedTokenId = _tokenIds.current();
         _tokenIds.increment();
@@ -185,11 +185,11 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Allow minter to issue many vouchers to a given address.
+     * @dev Allow minter to issue many text card vouchers to a given address.
      * @param _to The address to mint tokens to.
      * @param _amount The number of card vouchers to issue.
      */
-    function batchIssueVouchers(address _to, uint256 _amount)
+    function batchIssueTextCardVouchers(address _to, uint256 _amount)
         external
         onlyRole(MINTER_ROLE)
     {
@@ -235,7 +235,7 @@ contract PhlipCard is
      * Requires that caller has >=1 remaining card vouchers.
      * @param _uri The IPFS CID referencing the new tokens metadata
      */
-    function redeemVoucher(uint256 _reservedID, string memory _uri)
+    function redeemTextCardVoucher(uint256 _reservedID, string memory _uri)
         external
         whenNotPaused
         onlyVoucherHolders
