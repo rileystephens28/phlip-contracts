@@ -161,6 +161,7 @@ contract PhlipCard is
      */
     function mintTextCard(address _to, string memory _uri)
         external
+        virtual
         onlyRole(MINTER_ROLE)
     {
         // Get the next token ID then increment the counter
@@ -175,7 +176,11 @@ contract PhlipCard is
      * @dev Allow minter to issue a text card voucher to a given address.
      * @param _to The address to issue voucher to.
      */
-    function issueTextCardVoucher(address _to) external onlyRole(MINTER_ROLE) {
+    function issueTextCardVoucher(address _to)
+        external
+        virtual
+        onlyRole(MINTER_ROLE)
+    {
         // Get the next token ID then increment the counter
         uint256 reservedTokenId = _tokenIds.current();
         _tokenIds.increment();
@@ -191,6 +196,7 @@ contract PhlipCard is
      */
     function batchIssueTextCardVouchers(address _to, uint256 _amount)
         external
+        virtual
         onlyRole(MINTER_ROLE)
     {
         for (uint256 i = 0; i < _amount; i++) {
@@ -202,7 +208,7 @@ contract PhlipCard is
     }
 
     /***********************************|
-    |        External Functions         |
+    |     Public/External Functions     |
     |__________________________________*/
 
     /**
@@ -213,7 +219,10 @@ contract PhlipCard is
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
-    function updateMetadata(uint256 _cardID, string memory _uri) external {
+    function updateMetadata(uint256 _cardID, string memory _uri)
+        public
+        virtual
+    {
         require(_exists(_cardID), "PhlipCard: Card does not exist");
         require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty");
         require(msg.sender == ownerOf(_cardID), "PhlipCard: Must be owner");
@@ -233,10 +242,12 @@ contract PhlipCard is
     /**
      * @dev Mint card with ID that has been reserved by the callers voucher
      * Requires that caller has >=1 remaining card vouchers.
+     * @param _reservedID ID reserved by the callers voucher
      * @param _uri The IPFS CID referencing the new tokens metadata
      */
-    function redeemTextCardVoucher(uint256 _reservedID, string memory _uri)
-        external
+    function redeemVoucher(uint256 _reservedID, string memory _uri)
+        public
+        virtual
         whenNotPaused
         onlyVoucherHolders
     {
@@ -273,11 +284,11 @@ contract PhlipCard is
         address _to,
         string memory _uri
     ) internal virtual {
-        _safeMint(_to, _cardID, "");
-
-        // Set card's URI and minters address
+        // Set card URI and minters address
         _tokenURIs[_cardID] = _uri;
         _minters[_cardID] = _to;
+
+        _safeMint(_to, _cardID, "");
     }
 
     /**
