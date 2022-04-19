@@ -63,13 +63,16 @@ contract PhlipCard is
         string memory _baseUri,
         uint256 _maxUriChanges
     ) ERC721(_name, _symbol) {
-        // Grant roles to contract creator
+        // Grant roles for this contract
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(SETTINGS_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(SETTINGS_ROLE, msg.sender);
+
+        // Grant role for GuardedVestingCapsule
         _grantRole(TREASURER_ROLE, msg.sender);
 
-        // Set constants
+        // Set globals
         setBaseURI(_baseUri);
         setMaxUriChanges(_maxUriChanges);
     }
@@ -243,6 +246,16 @@ contract PhlipCard is
 
         // Mints card with reserved ID to caller
         _mintCard(_reservedID, msg.sender, _uri);
+    }
+
+    /**
+     * @dev Transfer creatorship of a card to a new address.
+     * @param _to The address to transfer creatorship to.
+     * @param _cardID ID of the card whose creatorship to transfer
+     */
+    function transferCreatorship(address _to, uint256 _cardID) external {
+        require(msg.sender == _minters[_cardID], "PhlipCard: Must be minter");
+        _minters[_cardID] = _to;
     }
 
     /***********************************|
