@@ -220,7 +220,7 @@ contract VestingVault {
      * @return True if the schedule is registered, false otherwise.
      */
     function _expired(uint256 _capsuleID) internal view virtual returns (bool) {
-        return _capsules[_capsuleID].endTime > block.timestamp;
+        return _capsules[_capsuleID].endTime < block.timestamp;
     }
 
     /**

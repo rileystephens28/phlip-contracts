@@ -38,7 +38,7 @@ contract VestingCapsuleMock is VestingCapsule {
         _burn(_id);
     }
 
-    function setVestingScheme(uint256[] calldata _ids) external {
-        _setVestingSchedule(_ids);
+    function setVestingScheme(uint256 _id) external {
+        _setVestingScheme(_id);
     }
 }
