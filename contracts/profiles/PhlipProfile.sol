@@ -3,7 +3,6 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../gameRecords/AdminGameRecord.sol";
 import "./IPhlipProfile.sol";
 
 /**
@@ -19,7 +18,7 @@ import "./IPhlipProfile.sol";
  * join too. Joining a team does not provide any direct game benefits to Players. However, teams that
  * frequently win can rise through the leaderboards and gain a lot of publicity (play-to-advertise model).
  */
-contract PhlipProfile is ERC721, AdminGameRecord, IPhlipProfile {
+contract PhlipProfile is ERC721, IPhlipProfile {
     using Counters for Counters.Counter;
 
     struct Team {
@@ -54,7 +53,7 @@ contract PhlipProfile is ERC721, AdminGameRecord, IPhlipProfile {
         _;
     }
 
-    constructor() ERC721("PhlipProfile", "USER") AdminGameRecord() {
+    constructor() ERC721("PhlipProfile", "USER") {
         // team ID counter should start at 1 because 0 is reserved for the default no team
         _teamIdCounter.increment();
     }
@@ -133,22 +132,18 @@ contract PhlipProfile is ERC721, AdminGameRecord, IPhlipProfile {
     function createProfile(string memory _uri) external {
         require(bytes(_uri).length > 0, "PhlipProfile: URI cannot be blank.");
         require(
-            !hasProfile(msg.sender),
+            balanceOf(msg.sender) == 0,
             "PhlipProfile: Address already has a profile."
         );
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
 
         // create profile
-        Profile memory newProfile;
+        Profile storage newProfile = _profiles[tokenId];
         newProfile.uri = _uri;
-        _profiles[tokenId] = newProfile;
 
         // Mint token to sender
         _safeMint(msg.sender, tokenId);
-
-        // Create a game record for the new card
-        _createGameRecord(tokenId);
     }
 
     /**
@@ -162,7 +157,7 @@ contract PhlipProfile is ERC721, AdminGameRecord, IPhlipProfile {
             "PhlipProfile: Team name cannot be blank."
         );
         require(
-            hasProfile(msg.sender),
+            balanceOf(msg.sender) > 0,
             "PhlipProfile: Address does not have a profile."
         );
         uint256 teamId = _teamIdCounter.current();
@@ -170,7 +165,9 @@ contract PhlipProfile is ERC721, AdminGameRecord, IPhlipProfile {
 
         // Register and save team
         _registeredTeams[teamId] = true;
-        _teams[teamId] = Team(_name, msg.sender, 0);
+        Team storage newTeam = _teams[teamId];
+        newTeam.name = _name;
+        newTeam.founder = msg.sender;
     }
 
     /**
@@ -252,7 +249,7 @@ contract PhlipProfile is ERC721, AdminGameRecord, IPhlipProfile {
         public
         view
         virtual
-        override(ERC721, AccessControl)
+        override
         returns (bool)
     {
         return super.supportsInterface(interfaceId);

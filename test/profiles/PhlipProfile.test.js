@@ -6,9 +6,6 @@ const {
     expectRevert, // Assertions for transactions that should fail
     snapshot,
 } = require("@openzeppelin/test-helpers");
-const {
-    shouldBehaveLikeAdminGameRecord,
-} = require("../gameRecords/AdminGameRecord.behavior");
 require("chai").should();
 
 contract("PhlipProfile", (accounts) => {
@@ -114,11 +111,4 @@ contract("PhlipProfile", (accounts) => {
         // Passing cases
         it("should pass when msg.sender has a profile and friend index is valid", async () => {});
     });
-
-    shouldBehaveLikeAdminGameRecord(
-        context,
-        "profileInstance",
-        "tokenInstance",
-        ...accounts
-    );
 });
