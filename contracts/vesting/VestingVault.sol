@@ -215,6 +215,15 @@ contract VestingVault {
     }
 
     /**
+     * @dev Accessor function for checking if specified schedule is registered.
+     * @param _capsuleID The ID of of the capsule to check.
+     * @return True if the schedule is registered, false otherwise.
+     */
+    function _expired(uint256 _capsuleID) internal view virtual returns (bool) {
+        return _capsules[_capsuleID].endTime > block.timestamp;
+    }
+
+    /**
      * @dev Calculates the amount of tokens that have vested for a given capsule.
      * @param _capsuleID The ID of the capsule to be queried
      * @return The amount of claimable tokens in a capsule
@@ -246,28 +255,6 @@ contract VestingVault {
         }
         // Cliff period has not ended so nothing to claim
         return 0;
-    }
-
-    /**
-     * @dev Calculates the amount of tokens that have vested for several capsules.
-     * @param _capsuleIDs Array of IDs of capsules to be queried
-     * @return (array of token addresses, array of vested balances for respective tokens)
-     */
-    function _getVestedBalances(uint256[] memory _capsuleIDs)
-        internal
-        view
-        virtual
-        returns (address[] memory, uint256[] memory)
-    {
-        address[] memory tokens = new address[](_capsuleIDs.length);
-        uint256[] memory balances = new uint256[](_capsuleIDs.length);
-
-        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
-            balances[i] = _getVestedBalance(_capsuleIDs[i]);
-            tokens[i] = _vestingSchedules[_capsules[_capsuleIDs[i]].scheduleId]
-                .token;
-        }
-        return (tokens, balances);
     }
 
     /***********************************|
@@ -360,13 +347,12 @@ contract VestingVault {
     |__________________________________*/
 
     /**
-     * @dev Creates one new Capsule for the given address if the contract holds
-     * enough tokens to cover the amount of tokens required for the vesting schedule.
-     * @param _scheduleID The ID of the schedule to be used for the capsule.
-     * @param _startTime The amount of claimable tokens in the capsule.
-     * @param _owner Address able to claim the tokens in the capsule.
+     * @dev Performs additional validation checks on capsule params before creation.
+     * @param _owner Address of new capsule owner.
+     * @param _scheduleID The ID of the associated vesting schedule.
+     * @param _startTime Time at which cliff periods begin.
      */
-    function _createSingleCapsule(
+    function _safeCreateCapsule(
         address _owner,
         uint256 _scheduleID,
         uint256 _startTime
@@ -380,41 +366,11 @@ contract VestingVault {
     }
 
     /**
-     * @dev Creates multiple new Capsules, all with same owner and start time.
-     * @param _owner Single beneficiary of new vesting capsules.
-     * @param _scheduleIDs Array of schedule IDs of the associated vesting schedule.
-     * @param _startTime Time at which cliff periods begin.
-     */
-    function _createMultiCapsule(
-        address _owner,
-        uint256[] memory _scheduleIDs,
-        uint256 _startTime
-    ) internal virtual returns (uint256[] memory) {
-        require(_owner != address(0), "VestingVault: Owner cannot be 0x0");
-        require(
-            _startTime >= block.timestamp,
-            "VestingVault: Start time cannot be in the past"
-        );
-        require(
-            _scheduleIDs.length > 0,
-            "VestingVault: No vesting schedule IDs provided"
-        );
-
-        uint256[] memory newCapsuleIds = new uint256[](_scheduleIDs.length);
-        for (uint256 i = 0; i < _scheduleIDs.length; i++) {
-            newCapsuleIds[i] = _createCapsule(
-                _owner,
-                _scheduleIDs[i],
-                _startTime
-            );
-        }
-        return newCapsuleIds;
-    }
-
-    /**
      * @dev Most basic function for capsule creation, skips some parameter validation.
      * Creates a new capsule for the given address if the contract holdsenough tokens
-     * to cover the amount of tokens required for the vesting schedule.
+     * to cover the amount of tokens required for the vesting schedule. This function
+     * skips validation checks on _owner and _startTime to give inherited contracts
+     * the ability to create more efficient batch operations
      * @param _scheduleID The ID of the schedule to be used for the capsule.
      * @param _startTime The amount of claimable tokens in the capsule.
      * @param _owner Address able to claim the tokens in the capsule.
@@ -495,12 +451,13 @@ contract VestingVault {
     |__________________________________*/
 
     /**
-     * @dev Allow Capsule owner to transfer ownership of one capsule to another address.
-     * The amount of unclaimed vested tokens are stored in leftover reseverves for prior owner.
+     * @dev Allow Capsule owner to transfer ownership of one capsule
+     * to another address. Validates the recipients address and that
+     * the capsule has not expired before transfer.
      * @param _capsuleID ID of the Capsule to be transferred.
      * @param _to Address to receive one capsule
      */
-    function _transferSingleCapsule(uint256 _capsuleID, address _to)
+    function _safeTransferCapsule(uint256 _capsuleID, address _to)
         internal
         virtual
     {
@@ -512,35 +469,16 @@ contract VestingVault {
             _to != msg.sender,
             "VestingVault: Cannot transfer capsule to self"
         );
+        require(!_expired(_capsuleID), "VestingVault: Capsule is fully vested");
         _transferCapsule(_capsuleID, _to);
-    }
-
-    /**
-     * @dev Transfers a batch of Capsules owned by the caller to a single address.
-     * @param _capsuleIDs Array of capsule IDs to transfer.
-     * @param _to Address to receive all capsules.
-     */
-    function _transferMultiCapsule(uint256[] memory _capsuleIDs, address _to)
-        internal
-        virtual
-    {
-        require(
-            _to != address(0),
-            "VestingVault: Cannot transfer capsule to 0x0"
-        );
-        require(
-            _to != msg.sender,
-            "VestingVault: Cannot transfer capsule to self"
-        );
-        for (uint256 i = 0; i < _capsuleIDs.length; i++) {
-            _transferCapsule(_capsuleIDs[i], _to);
-        }
     }
 
     /**
      * @dev Most basic function for capsule transfer, skips some parameter
      * validation. Allows capsule owner to transfer ownership to another address.
      * Unclaimed vested tokens are stored in leftover reserves for prior owner.
+     * This function skips validation checks on recipient address and capsule expiration
+     * so inherited contracts have the ability to create more efficient batch operations
      * @param _capsuleID ID of the Capsule to be transferred.
      * @param _to Address to the list of token beneficiaries.
      */
@@ -557,14 +495,10 @@ contract VestingVault {
             "VestingVault: Caller is not capsule owner"
         );
 
-        Capsule storage capsule = _capsules[_capsuleID];
-        require(
-            capsule.endTime > block.timestamp,
-            "VestingVault: Capsule is fully vested"
-        );
-
         // Register _to address as new owner
         _capsuleOwners[_capsuleID] = _to;
+
+        Capsule storage capsule = _capsules[_capsuleID];
 
         VestingSchedule storage schedule = _vestingSchedules[
             capsule.scheduleId
