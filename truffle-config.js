@@ -24,7 +24,7 @@ module.exports = {
             host: "127.0.0.1",
             port: 7545,
             chainId: 1337,
-            network_id: 1337,
+            network_id: 5777,
         },
         ropsten: {
             provider: () =>
@@ -182,6 +182,7 @@ module.exports = {
     compilers: {
         solc: {
             version: "0.8.11",
+            docker: true,
             settings: {
                 optimizer: {
                     enabled: true,
