@@ -28,7 +28,7 @@ abstract contract GuardedVestingCapsule is VestingCapsule, AccessControl {
         external
         onlyRole(TREASURER_ROLE)
     {
-        _fillReserves(_scheduleID, _fillAmount);
+        _fillReserves(msg.sender, _scheduleID, _fillAmount);
     }
 
     /**

@@ -210,19 +210,28 @@ abstract contract VestingCapsule is ERC721, VestingVault {
 
     /**
      * @dev Transfers a batch of Capsules owned by the caller to a single address.
-     * @param _tokenID ID of token to transfer.
+     * Capsules must be marked as active and cannot have expired.
+     * @param _from Address sending all capsules.
      * @param _to Address to receive all capsules.
+     * @param _tokenID ID of token to transfer.
      */
-    function _transferTokenCapsules(uint256 _tokenID, address _to)
-        internal
-        virtual
-    {
+    function _transferTokenCapsules(
+        address _from,
+        address _to,
+        uint256 _tokenID
+    ) internal virtual {
         CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
-        if (!_expired(capsuleBox.capsule1)) {
-            _transferCapsule(capsuleBox.capsule1, _to);
+        if (
+            _activeCapsules[capsuleBox.capsule1] &&
+            !_expired(capsuleBox.capsule1)
+        ) {
+            _transferCapsule(_from, _to, capsuleBox.capsule1);
         }
-        if (!_expired(capsuleBox.capsule2)) {
-            _transferCapsule(capsuleBox.capsule2, _to);
+        if (
+            _activeCapsules[capsuleBox.capsule2] &&
+            !_expired(capsuleBox.capsule2)
+        ) {
+            _transferCapsule(_from, _to, capsuleBox.capsule2);
         }
     }
 
@@ -233,11 +242,12 @@ abstract contract VestingCapsule is ERC721, VestingVault {
     function _destroyTokenCapsules(uint256 _tokenID) internal virtual {
         CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
         if (_activeCapsules[capsuleBox.capsule1]) {
-            _destroyCapsule(capsuleBox.capsule1);
+            _destroyCapsule(capsuleBox.capsule1, msg.sender);
         }
         if (_activeCapsules[capsuleBox.capsule2]) {
-            _destroyCapsule(capsuleBox.capsule2);
+            _destroyCapsule(capsuleBox.capsule2, msg.sender);
         }
+        delete _capsuleBoxes[_tokenID];
     }
 
     /**
@@ -284,10 +294,9 @@ abstract contract VestingCapsule is ERC721, VestingVault {
         } else if (_to == address(0)) {
             // BURN - Batch destroy capsule and delete reference
             _destroyTokenCapsules(_tokenID);
-            delete _capsuleBoxes[_tokenID];
         } else if (_from != _to) {
             // TRANSFER - Batch transfer capsules
-            _transferTokenCapsules(_tokenID, _to);
+            _transferTokenCapsules(_from, _to, _tokenID);
         }
     }
 }
