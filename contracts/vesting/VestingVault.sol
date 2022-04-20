@@ -572,7 +572,7 @@ contract VestingVault {
             // Note - Have to update reserves before (possibly) deleting the capsule
             _totalScheduleReserves[capsule.scheduleId] -= claimAmount;
 
-            if (block.timestamp > capsule.endTime) {
+            if (block.timestamp >= capsule.endTime) {
                 // Emptying Expired Capsule -> mark as inactive & delete
                 delete _capsules[_capsuleID];
                 delete _capsuleOwners[_capsuleID];
