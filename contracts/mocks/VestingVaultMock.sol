@@ -11,7 +11,7 @@ contract VestingVaultMock is VestingVault {
     }
 
     function fillReserves(uint256 _scheduleID, uint256 _fillAmount) external {
-        _fillReserves(_scheduleID, _fillAmount);
+        _fillReserves(msg.sender, _scheduleID, _fillAmount);
     }
 
     function createVestingSchedule(
@@ -45,19 +45,19 @@ contract VestingVaultMock is VestingVault {
     }
 
     function safeTransferCapsule(uint256 _capsuleID, address _to) external {
-        _safeTransferCapsule(_capsuleID, _to);
+        _safeTransferCapsule(msg.sender, _to, _capsuleID);
     }
 
     function transferCapsule(uint256 _capsuleID, address _to) external {
-        _transferCapsule(_capsuleID, _to);
+        _transferCapsule(msg.sender, _to, _capsuleID);
     }
 
     function safeDestroyCapsule(uint256 _capsuleID) external {
-        _safeDestroyCapsule(_capsuleID);
+        _safeDestroyCapsule(_capsuleID, msg.sender);
     }
 
     function destroyCapsule(uint256 _capsuleID) external {
-        _destroyCapsule(_capsuleID);
+        _destroyCapsule(_capsuleID, msg.sender);
     }
 
     function withdrawCapsuleBalance(uint256 _capsuleID) external {

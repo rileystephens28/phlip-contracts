@@ -250,7 +250,7 @@ contract VestingVault {
         } else if (block.timestamp > cliffTime) {
             // Capsule's cliff period has ended
             return
-                ((block.timestamp - cliffTime) * schedule.rate) -
+                ((block.timestamp - capsule.startTime) * schedule.rate) -
                 capsule.claimedAmount;
         }
         // Cliff period has not ended so nothing to claim
@@ -315,10 +315,11 @@ contract VestingVault {
      * @param _scheduleID The ID of the schedule to fill.
      * @param _fillAmount Amount of tokens transfered from sender to contract.
      */
-    function _fillReserves(uint256 _scheduleID, uint256 _fillAmount)
-        internal
-        virtual
-    {
+    function _fillReserves(
+        address _filler,
+        uint256 _scheduleID,
+        uint256 _fillAmount
+    ) internal virtual {
         require(
             _scheduleID < _scheduleIDCounter.current(),
             "VestingVault: Schedule does not exist"
@@ -336,7 +337,7 @@ contract VestingVault {
         // approved this contract to spend at least _fillAmount of their ERC20 tokens.
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
         IERC20(schedule.token).safeTransferFrom(
-            msg.sender,
+            _filler,
             address(this),
             _fillAmount
         );
@@ -419,12 +420,15 @@ contract VestingVault {
      * @dev Checks that capsule is active before destroying it.
      * @param _capsuleID Capsule ID to delete.
      */
-    function _safeDestroyCapsule(uint256 _capsuleID) internal virtual {
+    function _safeDestroyCapsule(uint256 _capsuleID, address _owner)
+        internal
+        virtual
+    {
         require(
             _activeCapsules[_capsuleID],
             "VestingVault: Capsule is not active"
         );
-        _destroyCapsule(_capsuleID);
+        _destroyCapsule(_capsuleID, _owner);
     }
 
     /**
@@ -433,9 +437,12 @@ contract VestingVault {
      * more efficient batch operations.
      * @param _capsuleID Capsule ID to delete.
      */
-    function _destroyCapsule(uint256 _capsuleID) internal virtual {
+    function _destroyCapsule(uint256 _capsuleID, address _owner)
+        internal
+        virtual
+    {
         require(
-            _capsuleOwners[_capsuleID] == msg.sender,
+            _capsuleOwners[_capsuleID] == _owner,
             "VestingVault: Caller is not capsule owner"
         );
 
@@ -464,23 +471,22 @@ contract VestingVault {
      * @dev Allow Capsule owner to transfer ownership of one capsule
      * to another address. Validates the recipients address and that
      * the capsule has not expired before transfer.
-     * @param _capsuleID ID of the Capsule to be transferred.
-     * @param _to Address to receive one capsule
+     * @param _from Address sending capsule.
+     * @param _to Address to receive capsule.
+     * @param _capsuleID ID of capsule to transfer.
      */
-    function _safeTransferCapsule(uint256 _capsuleID, address _to)
-        internal
-        virtual
-    {
+    function _safeTransferCapsule(
+        address _from,
+        address _to,
+        uint256 _capsuleID
+    ) internal virtual {
         require(
             _to != address(0),
             "VestingVault: Cannot transfer capsule to 0x0"
         );
-        require(
-            _to != msg.sender,
-            "VestingVault: Cannot transfer capsule to self"
-        );
+        require(_from != _to, "VestingVault: Cannot transfer capsule to self");
         require(!_expired(_capsuleID), "VestingVault: Capsule is fully vested");
-        _transferCapsule(_capsuleID, _to);
+        _transferCapsule(_from, _to, _capsuleID);
     }
 
     /**
@@ -489,19 +495,21 @@ contract VestingVault {
      * Unclaimed vested tokens are stored in leftover reserves for prior owner.
      * This function skips validation checks on recipient address and capsule expiration
      * so inherited contracts have the ability to create more efficient batch operations
-     * @param _capsuleID ID of the Capsule to be transferred.
-     * @param _to Address to the list of token beneficiaries.
+     * @param _from Address sending capsule.
+     * @param _to Address to receive capsule.
+     * @param _capsuleID ID of capsule to transfer.
      */
-    function _transferCapsule(uint256 _capsuleID, address _to)
-        internal
-        virtual
-    {
+    function _transferCapsule(
+        address _from,
+        address _to,
+        uint256 _capsuleID
+    ) internal virtual {
         require(
             _capsuleID < _capsuleIdCounter.current(),
             "VestingVault: Invalid capsule ID"
         );
         require(
-            _capsuleOwners[_capsuleID] == msg.sender,
+            _capsuleOwners[_capsuleID] == _from,
             "VestingVault: Caller is not capsule owner"
         );
 
@@ -526,7 +534,7 @@ contract VestingVault {
                 _totalScheduleReserves[capsule.scheduleId] -= balance;
 
                 // Add unclaimed vested tokens to previous owners leftover balance
-                _leftoverBalance[msg.sender][schedule.token] += balance;
+                _leftoverBalance[_from][schedule.token] += balance;
             }
         }
     }
@@ -566,9 +574,9 @@ contract VestingVault {
 
             if (block.timestamp > capsule.endTime) {
                 // Emptying Expired Capsule -> mark as inactive & delete
-                _activeCapsules[_capsuleID] = false;
                 delete _capsules[_capsuleID];
                 delete _capsuleOwners[_capsuleID];
+                delete _activeCapsules[_capsuleID];
             } else {
                 // Not Fully Vested -> claim values
                 capsule.claimedAmount += claimAmount;
