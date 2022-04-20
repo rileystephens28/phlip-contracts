@@ -61,10 +61,10 @@ contract VestingVaultMock is VestingVault {
     }
 
     function withdrawCapsuleBalance(uint256 _capsuleID) external {
-        _withdrawCapsuleBalance(_capsuleID);
+        _withdrawCapsuleBalance(_capsuleID, msg.sender);
     }
 
     function withdrawTokenLeftovers(address _token) external {
-        _withdrawTokenLeftovers(_token);
+        _withdrawTokenLeftovers(_token, msg.sender);
     }
 }

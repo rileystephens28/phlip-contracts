@@ -38,6 +38,10 @@ contract VestingCapsuleMock is VestingCapsule {
         _burn(_id);
     }
 
+    function addVestingScheme(uint256 _scheme1, uint256 _scheme2) external {
+        _addVestingScheme(_scheme1, _scheme2);
+    }
+
     function setVestingScheme(uint256 _id) external {
         _setVestingScheme(_id);
     }

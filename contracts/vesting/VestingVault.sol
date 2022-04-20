@@ -540,7 +540,7 @@ contract VestingVault {
      * vested to the owner of the capsule.
      * @param _capsuleID ID of the capsule to withdraw from.
      */
-    function _withdrawCapsuleBalance(uint256 _capsuleID)
+    function _withdrawCapsuleBalance(uint256 _capsuleID, address _owner)
         internal
         virtual
         returns (bool)
@@ -550,7 +550,7 @@ contract VestingVault {
             "VestingVault: Invalid capsule ID"
         );
         require(
-            _capsuleOwners[_capsuleID] == msg.sender,
+            _capsuleOwners[_capsuleID] == _owner,
             "VestingVault: Caller is not capsule owner"
         );
         uint256 claimAmount = _getVestedBalance(_capsuleID);
@@ -575,7 +575,7 @@ contract VestingVault {
             }
 
             // Transfer tokens to capsule owner
-            IERC20(schedule.token).safeTransfer(msg.sender, claimAmount);
+            IERC20(schedule.token).safeTransfer(_owner, claimAmount);
             return true;
         }
         return false;
@@ -588,21 +588,21 @@ contract VestingVault {
     /**
      * @dev Transfers the amount of tokens leftover owed to caller.
      * @param _token Address of token to withdraw from.
+     * @param _prevOwner Address of previous owner of token.
      */
-    function _withdrawTokenLeftovers(address _token)
+    function _withdrawTokenLeftovers(address _token, address _prevOwner)
         internal
         virtual
-        returns (bool)
     {
-        uint256 leftoverBalance = _leftoverBalance[msg.sender][_token];
-        if (leftoverBalance > 0) {
-            // Delete leftover balance of caller
-            delete _leftoverBalance[msg.sender][_token];
+        uint256 leftoverBalance = _leftoverBalance[_prevOwner][_token];
+        require(
+            leftoverBalance > 0,
+            "VestingVault: No leftover tokens to withdraw"
+        );
+        // Delete leftover balance of caller
+        delete _leftoverBalance[_prevOwner][_token];
 
-            // Transfer tokens to capsule owner
-            IERC20(_token).safeTransfer(msg.sender, leftoverBalance);
-            return true;
-        }
-        return false;
+        // Transfer tokens to capsule owner
+        IERC20(_token).safeTransfer(_prevOwner, leftoverBalance);
     }
 }
