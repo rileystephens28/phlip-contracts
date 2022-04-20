@@ -540,7 +540,11 @@ contract VestingVault {
      * vested to the owner of the capsule.
      * @param _capsuleID ID of the capsule to withdraw from.
      */
-    function _withdrawCapsuleBalance(uint256 _capsuleID) internal virtual {
+    function _withdrawCapsuleBalance(uint256 _capsuleID)
+        internal
+        virtual
+        returns (bool)
+    {
         require(
             _capsuleID < _capsuleIdCounter.current(),
             "VestingVault: Invalid capsule ID"
@@ -550,29 +554,31 @@ contract VestingVault {
             "VestingVault: Caller is not capsule owner"
         );
         uint256 claimAmount = _getVestedBalance(_capsuleID);
-        require(claimAmount > 0, "VestingVault: No tokens to withdraw");
+        if (claimAmount > 0) {
+            Capsule storage capsule = _capsules[_capsuleID];
+            VestingSchedule storage schedule = _vestingSchedules[
+                capsule.scheduleId
+            ];
 
-        Capsule storage capsule = _capsules[_capsuleID];
-        VestingSchedule storage schedule = _vestingSchedules[
-            capsule.scheduleId
-        ];
+            // Reduce the total reserves by amount claimed by owner
+            // Note - Have to update reserves before (possibly) deleting the capsule
+            _totalScheduleReserves[capsule.scheduleId] -= claimAmount;
 
-        // Reduce the total reserves by amount claimed by owner
-        // Note - Have to update reserves before (possibly) deleting the capsule
-        _totalScheduleReserves[capsule.scheduleId] -= claimAmount;
+            if (block.timestamp > capsule.endTime) {
+                // Emptying Expired Capsule -> mark as inactive & delete
+                _activeCapsules[_capsuleID] = false;
+                delete _capsules[_capsuleID];
+                delete _capsuleOwners[_capsuleID];
+            } else {
+                // Not Fully Vested -> claim values
+                capsule.claimedAmount += claimAmount;
+            }
 
-        if (block.timestamp > capsule.endTime) {
-            // Emptying Expired Capsule -> mark as inactive & delete
-            _activeCapsules[_capsuleID] = false;
-            delete _capsules[_capsuleID];
-            delete _capsuleOwners[_capsuleID];
-        } else {
-            // Not Fully Vested -> claim values
-            capsule.claimedAmount += claimAmount;
+            // Transfer tokens to capsule owner
+            IERC20(schedule.token).safeTransfer(msg.sender, claimAmount);
+            return true;
         }
-
-        // Transfer tokens to capsule owner
-        IERC20(schedule.token).safeTransfer(msg.sender, claimAmount);
+        return false;
     }
 
     /***********************************|
@@ -583,16 +589,20 @@ contract VestingVault {
      * @dev Transfers the amount of tokens leftover owed to caller.
      * @param _token Address of token to withdraw from.
      */
-    function _withdrawTokenLeftovers(address _token) internal virtual {
+    function _withdrawTokenLeftovers(address _token)
+        internal
+        virtual
+        returns (bool)
+    {
         uint256 leftoverBalance = _leftoverBalance[msg.sender][_token];
-        require(
-            leftoverBalance > 0,
-            "VestingVault: No leftover tokens to withdraw"
-        );
-        // Delete leftover balance of caller
-        delete _leftoverBalance[msg.sender][_token];
+        if (leftoverBalance > 0) {
+            // Delete leftover balance of caller
+            delete _leftoverBalance[msg.sender][_token];
 
-        // Transfer tokens to capsule owner
-        IERC20(_token).safeTransfer(msg.sender, leftoverBalance);
+            // Transfer tokens to capsule owner
+            IERC20(_token).safeTransfer(msg.sender, leftoverBalance);
+            return true;
+        }
+        return false;
     }
 }
