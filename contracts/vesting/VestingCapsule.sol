@@ -31,7 +31,7 @@ abstract contract VestingCapsule is ERC721, VestingVault {
     mapping(uint256 => VestingScheme) private _vestingSchemes;
 
     // Stores IDs of the schedules to be used during mint
-    VestingScheme private _currentScheme;
+    uint256 private _currentSchemeID;
 
     /***********************************|
     |          View Functions           |
@@ -67,11 +67,11 @@ abstract contract VestingCapsule is ERC721, VestingVault {
     |__________________________________*/
 
     /**
-     * @dev Setter for the ID of the schedule to be used during mint.
+     * @dev Create a new vesting scheme with 2 schedules.
      * @param _schedule1 ID of 1st schedule to use
      * @param _schedule2 ID of 2nd schedule to use
      */
-    function _setVestingScheme(uint256 _schedule1, uint256 _schedule2)
+    function _addVestingScheme(uint256 _schedule1, uint256 _schedule2)
         internal
         virtual
     {
@@ -83,10 +83,22 @@ abstract contract VestingCapsule is ERC721, VestingVault {
         uint256 currentSchemeID = _schemeIDCounter.current();
         _schemeIDCounter.increment();
 
-        VestingScheme memory newScheme = VestingScheme(_schedule1, _schedule2);
+        _vestingSchemes[currentSchemeID] = VestingScheme(
+            _schedule1,
+            _schedule2
+        );
+    }
 
-        _vestingSchemes[currentSchemeID] = newScheme;
-        _currentScheme = newScheme;
+    /**
+     * @dev Setter for the ID of the scheme to be used during mint.
+     * @param _schemeID ID of scheme to set
+     */
+    function _setVestingScheme(uint256 _schemeID) internal virtual {
+        require(
+            _schemeID < _schemeIDCounter.current(),
+            "VestingCapsule: Invalid scheme ID"
+        );
+        _currentSchemeID = _schemeID;
     }
 
     /**
@@ -103,20 +115,21 @@ abstract contract VestingCapsule is ERC721, VestingVault {
             _startTime >= block.timestamp,
             "VestingVault: Start time cannot be in the past"
         );
+        VestingScheme storage currentScheme = _vestingSchemes[_currentSchemeID];
         CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
 
         // Set vesting scheme ID to the last created scheme ID
-        capsuleBox.scheme = _schemeIDCounter.current() - 1;
+        capsuleBox.scheme = _currentSchemeID;
 
         // Create new capsules
         capsuleBox.capsule1 = _createCapsule(
             _owner,
-            _currentScheme.schedule1,
+            currentScheme.schedule1,
             _startTime
         );
         capsuleBox.capsule2 = _createCapsule(
             _owner,
-            _currentScheme.schedule2,
+            currentScheme.schedule2,
             _startTime
         );
     }
@@ -148,6 +161,20 @@ abstract contract VestingCapsule is ERC721, VestingVault {
     }
 
     /**
+     * @dev Destroys capsules in capsule box that are still active.
+     * @param _tokenID ID of token to destroy.
+     */
+    function _destroyTokenCapsules(uint256 _tokenID) internal virtual {
+        CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
+        if (!_activeCapsules[capsuleBox.capsule1]) {
+            _destroyCapsule(capsuleBox.capsule1);
+        }
+        if (!_activeCapsules[capsuleBox.capsule2]) {
+            _destroyCapsule(capsuleBox.capsule2);
+        }
+    }
+
+    /**
      * @dev Hook that is called after tokens are transferred. This function
      * handles interaction with capsule manager.
      *
@@ -174,8 +201,7 @@ abstract contract VestingCapsule is ERC721, VestingVault {
             _createTokenCapsules(_tokenID, _to, block.timestamp);
         } else if (_to == address(0)) {
             // BURN - Batch destroy capsule and delete reference
-            _destroyCapsule(_capsuleBoxes[_tokenID].capsule1);
-            _destroyCapsule(_capsuleBoxes[_tokenID].capsule2);
+            _destroyTokenCapsules(_tokenID);
             delete _capsuleBoxes[_tokenID];
         } else if (_from != _to) {
             // TRANSFER - Batch transfer capsules

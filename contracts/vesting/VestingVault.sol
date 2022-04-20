@@ -416,14 +416,24 @@ contract VestingVault {
     |__________________________________*/
 
     /**
-     * @dev Allows capsule owner to delete their Capsule and release its funds back to reserves.
+     * @dev Checks that capsule is active before destroying it.
      * @param _capsuleID Capsule ID to delete.
      */
-    function _destroyCapsule(uint256 _capsuleID) internal virtual {
+    function _safeDestroyCapsule(uint256 _capsuleID) internal virtual {
         require(
             _activeCapsules[_capsuleID],
             "VestingVault: Capsule is not active"
         );
+        _destroyCapsule(_capsuleID);
+    }
+
+    /**
+     * @dev Allows capsule owner to delete their Capsule and release its funds back to reserves.
+     * This function skips validation checks on _capsuleID to give inherited contracts to make
+     * more efficient batch operations.
+     * @param _capsuleID Capsule ID to delete.
+     */
+    function _destroyCapsule(uint256 _capsuleID) internal virtual {
         require(
             _capsuleOwners[_capsuleID] == msg.sender,
             "VestingVault: Caller is not capsule owner"
