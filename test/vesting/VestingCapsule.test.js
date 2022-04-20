@@ -71,11 +71,17 @@ contract("VestingCapsule", (accounts) => {
     const transfer = async (
         from = capsuleOwner,
         to = recipient,
-        tokeneId = 0,
-        caller = capsuleOwner
+        tokeneId = 0
     ) => {
+        const estimatedGas = await capsuleInstance.transferFrom.estimateGas(
+            from,
+            to,
+            tokeneId,
+            { from: from }
+        );
         return await capsuleInstance.transferFrom(from, to, tokeneId, {
-            from: caller,
+            from: from,
+            gas: estimatedGas,
         });
     };
 
@@ -155,6 +161,14 @@ contract("VestingCapsule", (accounts) => {
     const verifyTokenBalance = async (token, address, amount) => {
         const tokenBalance = await token.balanceOf(address);
         tokenBalance.should.be.bignumber.equal(new BN(amount));
+    };
+
+    const verifyTokenBalanceInRange = async (token, address, amount, range) => {
+        const tokenBalance = await token.balanceOf(address);
+        const min = new BN(amount).sub(new BN(range));
+        const max = new BN(amount).add(new BN(range));
+        tokenBalance.should.be.bignumber.gte(min);
+        tokenBalance.should.be.bignumber.lte(max);
     };
 
     before(async () => {
@@ -300,7 +314,7 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleIsActive(1, true);
 
             // Increase time so both capsules are fully vested
-            await time.increase(baseDuration);
+            await time.increase(baseDuration.add(new BN(100)));
 
             // This withdraw all tokens from both capsules
             await withdrawFromCapsules();
@@ -463,6 +477,102 @@ contract("VestingCapsule", (accounts) => {
             // Verify recipient got capsule 1 and that 2 has no owner
             await verifyCapsuleOwner(0, recipient);
             await verifyCapsuleOwner(1, constants.ZERO_ADDRESS);
+        });
+    });
+
+    describe("Withdrawing Token Capsules", async () => {
+        // Passing cases
+        it("should pass when both capsules are active", async () => {
+            // Scheme 0 - equal schedule durations
+            await addVestingScheme();
+            await setVestingScheme();
+            await mint();
+
+            // Increase time so both capsules are half vested
+            await time.increase(baseDuration.div(new BN(2)));
+
+            // Withdraw tokens from both capsules
+            await withdrawFromCapsules();
+
+            // Owner should have balance of 500 (+-0) of tokens 1 & 2
+            await verifyTokenBalanceInRange(
+                tokenInstance1,
+                capsuleOwner,
+                500,
+                1
+            );
+            await verifyTokenBalanceInRange(
+                tokenInstance2,
+                capsuleOwner,
+                500,
+                1
+            );
+
+            // Verifiy capsules are active
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, true);
+        });
+        it("should pass when both capsules are not active", async () => {
+            // Set vesting scheme and mint token
+            await addVestingScheme();
+            await setVestingScheme();
+            await mint();
+
+            // Verifiy new created capsules are active
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, true);
+
+            // Increase time so both capsules are fully vested
+            await time.increase(baseDuration.add(new BN(100)));
+
+            // This withdraw all tokens from both capsules
+            await withdrawFromCapsules();
+
+            // Capsules should be inactive
+            await verifyCapsuleIsActive(0, false);
+            await verifyCapsuleIsActive(1, false);
+
+            // Owner should have balance of 1000 for tokens 1 & 2
+            await verifyTokenBalance(tokenInstance1, capsuleOwner, 1000);
+            await verifyTokenBalance(tokenInstance2, capsuleOwner, 1000);
+        });
+        it("should pass when one capsule is active and one is not", async () => {
+            // Create schedule and fill reserves
+            await createSchedule(
+                tokenInstance2.address,
+                baseCliff,
+                baseDuration.sub(new BN(500))
+            );
+            await fillReserves(2, 5000, tokenInstance2);
+
+            // Set vesting scheme and mint token
+            await addVestingScheme([0, 2]);
+            await setVestingScheme();
+            await mint();
+
+            // Verifiy new created capsules are active
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, true);
+
+            // Increase time so seconds capsule is fully vested
+            await time.increase(new BN(501));
+
+            // This should withdraw all tokens from the
+            // second capsule and about half from the first
+            await withdrawFromCapsules();
+
+            // Capsule should be inactive owner should have token balance of 500
+            await verifyTokenBalanceInRange(
+                tokenInstance1,
+                capsuleOwner,
+                501,
+                1
+            );
+            await verifyTokenBalance(tokenInstance2, capsuleOwner, 500);
+
+            // Capsule 1 should be active & capsule 2 should be inactive
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, false);
         });
     });
 });
