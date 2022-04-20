@@ -30,8 +30,11 @@ abstract contract VestingCapsule is ERC721, VestingVault {
     mapping(uint256 => CapsuleBox) private _capsuleBoxes;
     mapping(uint256 => VestingScheme) private _vestingSchemes;
 
-    // Stores IDs of the schedules to be used during mint
+    // Stores ID of the scheme to be used during mint
     uint256 private _currentSchemeID;
+
+    // Determines if scheme has been set
+    bool private _schemeSet;
 
     /***********************************|
     |          View Functions           |
@@ -60,6 +63,80 @@ abstract contract VestingCapsule is ERC721, VestingVault {
             _getVestedBalance(capsuleBox.capsule2)
         ];
         return (tokens, balances);
+    }
+
+    /**
+     * @dev Accessor to get the ID of the current vesting scheme.
+     */
+    function getCurrentVestingScheme() public view returns (uint256) {
+        return _currentSchemeID;
+    }
+
+    /**
+     * @dev Accessor function for specified VestingScheme details.
+     * @param _schemeID The ID of the VestingScheme to be queried.
+     * @return The struct values of the vesting scheme
+     */
+    function getScheme(uint256 _schemeID)
+        public
+        view
+        returns (VestingScheme memory)
+    {
+        return _vestingSchemes[_schemeID];
+    }
+
+    /**
+     * @dev Accessor function for specified CapsuleBox details.
+     * @param _boxID The ID of the CapsuleBox to be queried.
+     * @return The struct values of the capsule box
+     */
+    function getCapsuleBox(uint256 _boxID)
+        public
+        view
+        returns (CapsuleBox memory)
+    {
+        return _capsuleBoxes[_boxID];
+    }
+
+    /**
+     * @dev Accessor function for is scheme has been set
+     * @return True if a scheme has been set, false if not
+     */
+    function schemeIsSet() public view returns (bool) {
+        return _schemeSet;
+    }
+
+    /***********************************|
+    |        External Functions         |
+    |__________________________________*/
+
+    /**
+     * @dev Transfers vested ERC20 tokens from specified tokens
+     * capsule box. If capsules are no longer active, this function
+     * will complete without reversion.
+     * @param _tokenID The ID of the token whose capsules will be withdrawn
+     */
+    function withdrawFromCapsules(uint256 _tokenID) external {
+        require(_exists(_tokenID), "VestingCapsule: Token does not exist");
+        require(
+            ownerOf(_tokenID) == msg.sender,
+            "VestingCapsule: Caller not token owner"
+        );
+        CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
+        if (_activeCapsules[capsuleBox.capsule1]) {
+            _withdrawCapsuleBalance(capsuleBox.capsule1, msg.sender);
+        }
+        if (_activeCapsules[capsuleBox.capsule2]) {
+            _withdrawCapsuleBalance(capsuleBox.capsule2, msg.sender);
+        }
+    }
+
+    /**
+     * @dev Transfers ERC20 tokens leftover after vesting capsule transfer to previous owner
+     * @param _tokenAddress The ID of the token whose capsules will be withdrawn
+     */
+    function withdrawTokenLeftovers(address _tokenAddress) external {
+        _withdrawTokenLeftovers(_tokenAddress, msg.sender);
     }
 
     /***********************************|
@@ -99,6 +176,7 @@ abstract contract VestingCapsule is ERC721, VestingVault {
             "VestingCapsule: Invalid scheme ID"
         );
         _currentSchemeID = _schemeID;
+        _schemeSet = true;
     }
 
     /**
@@ -111,10 +189,6 @@ abstract contract VestingCapsule is ERC721, VestingVault {
         address _owner,
         uint256 _startTime
     ) internal virtual {
-        require(
-            _startTime >= block.timestamp,
-            "VestingVault: Start time cannot be in the past"
-        );
         VestingScheme storage currentScheme = _vestingSchemes[_currentSchemeID];
         CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
 
@@ -143,14 +217,6 @@ abstract contract VestingCapsule is ERC721, VestingVault {
         internal
         virtual
     {
-        require(
-            _to != address(0),
-            "VestingVault: Cannot transfer capsule to 0x0"
-        );
-        require(
-            _to != msg.sender,
-            "VestingVault: Cannot transfer capsule to self"
-        );
         CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
         if (!_expired(capsuleBox.capsule1)) {
             _transferCapsule(capsuleBox.capsule1, _to);
@@ -166,12 +232,28 @@ abstract contract VestingCapsule is ERC721, VestingVault {
      */
     function _destroyTokenCapsules(uint256 _tokenID) internal virtual {
         CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
-        if (!_activeCapsules[capsuleBox.capsule1]) {
+        if (_activeCapsules[capsuleBox.capsule1]) {
             _destroyCapsule(capsuleBox.capsule1);
         }
-        if (!_activeCapsules[capsuleBox.capsule2]) {
+        if (_activeCapsules[capsuleBox.capsule2]) {
             _destroyCapsule(capsuleBox.capsule2);
         }
+    }
+
+    /**
+     * @dev Function called before tokens are transferred. Override to
+     * make sure vesting scheme has been set
+     * @param _from The address tokens will be transferred from
+     * @param _to The address tokens will be transferred  to
+     * @param _tokenID The ID of the token to transfer
+     */
+    function _beforeTokenTransfer(
+        address _from,
+        address _to,
+        uint256 _tokenID
+    ) internal virtual override {
+        require(_schemeSet, "VestingCapsule: Vesting scheme not set");
+        super._beforeTokenTransfer(_from, _to, _tokenID);
     }
 
     /**
