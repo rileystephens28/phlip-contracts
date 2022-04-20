@@ -2,23 +2,36 @@
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 import "./VestingVault.sol";
 
 /**
  * @title VestingCapsule
  * @author Riley Stephens
  * @dev The VestingCapsule is an implementation of a VestingVault that supports
- * multiple vesting schemes per token. The vesting scheme group can be updated but each token only supports
+ * 2 vesting schemes per token. The vesting scheme group can be updated but each token only supports
  * the vesting scheme that was set when the token was minted.
  *
  * NOTE - This contract is intended to hold ERC20 tokens on behalf of capsule owners.
  */
 abstract contract VestingCapsule is ERC721, VestingVault {
-    // Mapping from token ID to array of capsule IDs
-    mapping(uint256 => uint256[]) private _tokenCapsules;
+    using Counters for Counters.Counter;
+    Counters.Counter internal _schemeIDCounter;
+    struct VestingScheme {
+        uint256 schedule1;
+        uint256 schedule2;
+    }
+    struct CapsuleBox {
+        uint256 scheme;
+        uint256 capsule1;
+        uint256 capsule2;
+    }
+    // Mapping from token IDs to boxes containing capsule IDs
+    mapping(uint256 => CapsuleBox) private _capsuleBoxes;
+    mapping(uint256 => VestingScheme) private _vestingSchemes;
 
-    // The IDs of the schedules to be used during mint
-    uint256[] private _currentScheduleIds;
+    // Stores IDs of the schedules to be used during mint
+    VestingScheme private _currentScheme;
 
     /***********************************|
     |          View Functions           |
@@ -31,13 +44,22 @@ abstract contract VestingCapsule is ERC721, VestingVault {
     function totalVestedBalanceOf(uint256 _tokenID)
         public
         view
-        returns (address[] memory, uint256[] memory)
+        returns (address[2] memory, uint256[2] memory)
     {
-        require(
-            _exists(_tokenID),
-            "VestingCapsule: Querying vested balance of nonexistant token."
-        );
-        return _getVestedBalances(_tokenCapsules[_tokenID]);
+        CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
+        VestingScheme storage _vestingScheme = _vestingSchemes[
+            capsuleBox.scheme
+        ];
+
+        address[2] memory tokens = [
+            _vestingSchedules[_vestingScheme.schedule1].token,
+            _vestingSchedules[_vestingScheme.schedule2].token
+        ];
+        uint256[2] memory balances = [
+            _getVestedBalance(capsuleBox.capsule1),
+            _getVestedBalance(capsuleBox.capsule2)
+        ];
+        return (tokens, balances);
     }
 
     /***********************************|
@@ -46,16 +68,83 @@ abstract contract VestingCapsule is ERC721, VestingVault {
 
     /**
      * @dev Setter for the ID of the schedule to be used during mint.
-     * @param _ids Array of vesting schedule IDs
+     * @param _schedule1 ID of 1st schedule to use
+     * @param _schedule2 ID of 2nd schedule to use
      */
-    function _setVestingSchedule(uint256[] memory _ids) internal virtual {
-        for (uint256 i = 0; i < _ids.length; i++) {
-            require(
-                _scheduleExists(_ids[i]),
-                "VestingCapsule: Invalid schedule ID"
-            );
+    function _setVestingScheme(uint256 _schedule1, uint256 _schedule2)
+        internal
+        virtual
+    {
+        require(
+            _scheduleExists(_schedule1) && _scheduleExists(_schedule2),
+            "VestingCapsule: Invalid schedule ID"
+        );
+
+        uint256 currentSchemeID = _schemeIDCounter.current();
+        _schemeIDCounter.increment();
+
+        VestingScheme memory newScheme = VestingScheme(_schedule1, _schedule2);
+
+        _vestingSchemes[currentSchemeID] = newScheme;
+        _currentScheme = newScheme;
+    }
+
+    /**
+     * @dev Creates multiple new Capsules, all with same owner and start time.
+     * @param _owner Single beneficiary of new vesting capsules.
+     * @param _startTime Time at which cliff periods begin.
+     */
+    function _createTokenCapsules(
+        uint256 _tokenID,
+        address _owner,
+        uint256 _startTime
+    ) internal virtual {
+        require(
+            _startTime >= block.timestamp,
+            "VestingVault: Start time cannot be in the past"
+        );
+        CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
+
+        // Set vesting scheme ID to the last created scheme ID
+        capsuleBox.scheme = _schemeIDCounter.current() - 1;
+
+        // Create new capsules
+        capsuleBox.capsule1 = _createCapsule(
+            _owner,
+            _currentScheme.schedule1,
+            _startTime
+        );
+        capsuleBox.capsule2 = _createCapsule(
+            _owner,
+            _currentScheme.schedule2,
+            _startTime
+        );
+    }
+
+    /**
+     * @dev Transfers a batch of Capsules owned by the caller to a single address.
+     * @param _tokenID ID of token to transfer.
+     * @param _to Address to receive all capsules.
+     */
+    function _transferTokenCapsules(uint256 _tokenID, address _to)
+        internal
+        virtual
+    {
+        require(
+            _to != address(0),
+            "VestingVault: Cannot transfer capsule to 0x0"
+        );
+        require(
+            _to != msg.sender,
+            "VestingVault: Cannot transfer capsule to self"
+        );
+        CapsuleBox storage capsuleBox = _capsuleBoxes[_tokenID];
+        if (!_expired(capsuleBox.capsule1)) {
+            _transferCapsule(capsuleBox.capsule1, _to);
         }
-        _currentScheduleIds = _ids;
+        if (!_expired(capsuleBox.capsule2)) {
+            _transferCapsule(capsuleBox.capsule2, _to);
+        }
     }
 
     /**
@@ -72,30 +161,25 @@ abstract contract VestingCapsule is ERC721, VestingVault {
      *
      * @param _from The address tokens will be transferred from
      * @param _to The address tokens will be transferred  to
-     * @param _tokenId The ID of the token to transfer
+     * @param _tokenID The ID of the token to transfer
      */
     function _afterTokenTransfer(
         address _from,
         address _to,
-        uint256 _tokenId
+        uint256 _tokenID
     ) internal virtual override {
-        super._afterTokenTransfer(_from, _to, _tokenId);
+        super._afterTokenTransfer(_from, _to, _tokenID);
         if (_from == address(0)) {
             // MINT - Batch create capsule and store reference
-            _tokenCapsules[_tokenId] = _createMultiCapsule(
-                _to,
-                _currentScheduleIds,
-                block.timestamp
-            );
+            _createTokenCapsules(_tokenID, _to, block.timestamp);
         } else if (_to == address(0)) {
             // BURN - Batch destroy capsule and delete reference
-            for (uint256 i = 0; i < _tokenCapsules[_tokenId].length; i++) {
-                _destroyCapsule(_tokenCapsules[_tokenId][i]);
-            }
-            delete _tokenCapsules[_tokenId];
+            _destroyCapsule(_capsuleBoxes[_tokenID].capsule1);
+            _destroyCapsule(_capsuleBoxes[_tokenID].capsule2);
+            delete _capsuleBoxes[_tokenID];
         } else if (_from != _to) {
             // TRANSFER - Batch transfer capsules
-            _transferMultiCapsule(_tokenCapsules[_tokenId], _to);
+            _transferTokenCapsules(_tokenID, _to);
         }
     }
 }
