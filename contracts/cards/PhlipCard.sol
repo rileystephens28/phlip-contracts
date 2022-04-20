@@ -128,7 +128,8 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Allows MINTER to set the base URI for all tokens created by this contract
+     * @dev Allows MINTER to set the base URI for
+     * all tokens created by this contract
      * @param _newURI New base URI
      */
     function setBaseURI(string memory _newURI) public onlyRole(SETTINGS_ROLE) {
@@ -136,7 +137,8 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Allows Settings Admin to set max number of times minter can change the URI of a card.
+     * @dev Allows Settings Admin to set max number
+     * of times minter can change the URI of a card.
      * @param _newMax New max changes allowed
      */
     function setMaxUriChanges(uint256 _newMax) public onlyRole(SETTINGS_ROLE) {
@@ -144,14 +146,12 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Allows MINTER to set the address of the PhlipDAO token contract
-     * @param _ids New contract address
+     * @dev Allows Settings Admin to set the vesting
+     * scheme ID for future card capsules to use
+     * @param _id ID of vesting scheme to set
      */
-    function setVestingScheme(uint256[] calldata _ids)
-        public
-        onlyRole(SETTINGS_ROLE)
-    {
-        _setVestingSchedule(_ids);
+    function setVestingScheme(uint256 _id) public onlyRole(SETTINGS_ROLE) {
+        _setVestingScheme(_id);
     }
 
     /***********************************|
