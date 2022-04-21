@@ -150,8 +150,39 @@ contract PhlipCard is
      * scheme ID for future card capsules to use
      * @param _id ID of vesting scheme to set
      */
-    function setVestingScheme(uint256 _id) public onlyRole(SETTINGS_ROLE) {
+    function setVestingScheme(uint256 _id) external onlyRole(SETTINGS_ROLE) {
         _setVestingScheme(_id);
+    }
+
+    /**
+     * @dev Allows Settings Admin to create a new vesting
+     * scheme with 2 vesting schedule IDs
+     * @param _scheme1 ID of first schedule in vesting scheme
+     * @param _scheme2 ID of second schedule in vesting scheme
+     */
+    function addVestingScheme(uint256 _scheme1, uint256 _scheme2)
+        external
+        onlyRole(SETTINGS_ROLE)
+    {
+        _addVestingScheme(_scheme1, _scheme2);
+    }
+
+    /***********************************|
+    |      Pauser Admin Functions       |
+    |__________________________________*/
+
+    /**
+     * @dev Allow address with PAUSER role to pause card transfers
+     */
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    /**
+     * @dev Allow address with PAUSER role to unpause card transfers
+     */
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
     }
 
     /***********************************|
@@ -306,7 +337,7 @@ contract PhlipCard is
         address _from,
         address _to,
         uint256 _tokenId
-    ) internal override(ERC721, ERC721Lockable) whenNotPaused {
+    ) internal override(VestingCapsule, ERC721Lockable) whenNotPaused {
         super._beforeTokenTransfer(_from, _to, _tokenId);
     }
 
