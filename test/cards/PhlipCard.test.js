@@ -98,7 +98,7 @@ contract("PhlipCard", (accounts) => {
 
     const batchIssueTextCardVouchers = async (
         to = voucherHolder,
-        amount = 1,
+        amount = 2,
         from = admin
     ) => {
         return await cardInstance.batchIssueTextCardVouchers(
@@ -183,15 +183,20 @@ contract("PhlipCard", (accounts) => {
         cardBalance.should.be.bignumber.equal(new BN(amount));
     };
 
-    // const verifyClaimBalance = async (address, amount) => {
-    //     const claimBalance = await cardInstance.remainingClaims(address);
-    //     claimBalance.should.be.bignumber.equal(new BN(amount));
-    // };
+    const verifyVoucherHolder = async (id, address) => {
+        const hasVoucher = await cardInstance.voucherHolderOf(id);
+        hasVoucher.should.be.equal(address);
+    };
 
-    // const verifyAddressHasClaim = async (address, bool = true) => {
-    //     const hasClaim = await cardInstance.hasClaim(address);
-    //     hasClaim.should.be.equal(bool);
-    // };
+    const verifyRemainingVouchers = async (address, amount) => {
+        const remaining = await cardInstance.remainingVouchers(address);
+        remaining.should.be.bignumber.equal(new BN(amount));
+    };
+
+    const verifyAddressHasVoucher = async (address, bool) => {
+        const hasVoucher = await cardInstance.hasVoucher(address);
+        hasVoucher.should.be.equal(bool);
+    };
 
     const getRoleRevertReason = (address, role) => {
         return (
@@ -490,118 +495,142 @@ contract("PhlipCard", (accounts) => {
         });
     });
 
-    // describe("Creating Card Claims", () => {
-    //     // Failing cases
-    //     it("should fail when msg.sender != minter", async () => {
-    //         const revertReason = getRoleRevertReason(tokenHolder, MINTER);
-    //         await expectRevert(createClaim(tokenHolder), revertReason);
-    //     });
+    describe("Issuing Text Card Vouchers", () => {
+        // Failing cases
+        it("should fail when caller is not card minter admin", async () => {
+            const revertReason = getRoleRevertReason(otherAccount, MINTER);
+            await expectRevert(
+                issueTextCardVoucher(voucherHolder, otherAccount),
+                revertReason
+            );
+        });
+        it("should fail when recipient is 0x0", async () => {
+            // BUG: This test fails because it uses all gas not because of zero address
+            await expectRevert(
+                issueTextCardVoucher(constants.ZERO_ADDRESS),
+                "VoucherRegistry: Cannot issue voucher to 0x0"
+            );
+        });
 
-    //     it("should fail when recipient is 0x0", async () => {
-    //         // BUG: This test fails because it uses all gas not because of zero address
-    //         await expectRevert(
-    //             createClaim(admin, constants.ZERO_ADDRESS),
-    //             "Claimable._createClaim: Beneficiary cannot be 0x0 address"
-    //         );
-    //     });
+        // Passing cases
+        it("should pass when caller is minter admin and address is valid", async () => {
+            await issueTextCardVoucher();
 
-    //     it("should fail when address has an existing claim", async () => {
-    //         await createClaim();
+            // Ensure voucher was properly issued to voucherHolder
+            await verifyAddressHasVoucher(voucherHolder, true);
+            await verifyRemainingVouchers(voucherHolder, 1);
+            await verifyVoucherHolder(0, voucherHolder);
+        });
+    });
 
-    //         // Ensure account has a claim
-    //         await verifyAddressHasClaim(otherAccount);
+    describe("Batch Issuing Text Card Vouchers", () => {
+        // Failing cases
+        it("should fail when caller is not card minter admin", async () => {
+            const revertReason = getRoleRevertReason(otherAccount, MINTER);
+            await expectRevert(
+                batchIssueTextCardVouchers(voucherHolder, 2, otherAccount),
+                revertReason
+            );
+        });
+        it("should fail when recipient is 0x0", async () => {
+            // BUG: This test fails because it uses all gas not because of zero address
+            await expectRevert(
+                batchIssueTextCardVouchers(constants.ZERO_ADDRESS),
+                "VoucherRegistry: Cannot issue voucher to 0x0"
+            );
+        });
 
-    //         await expectRevert(
-    //             createClaim(),
-    //             "Claimable._createClaim: Claim has already been created for this address. Call _updateClaim() for existing beneficiaries."
-    //         );
-    //     });
+        // Passing cases
+        it("should pass when caller is minter admin and address is valid", async () => {
+            await batchIssueTextCardVouchers();
 
-    //     // Passing cases
-    //     it("should pass when msg.sender = minter and address has no claims", async () => {
-    //         await createClaim();
+            // Ensure voucher was properly issued to voucherHolder
+            await verifyAddressHasVoucher(voucherHolder, true);
+            await verifyRemainingVouchers(voucherHolder, 2);
+            await verifyVoucherHolder(0, voucherHolder);
+            await verifyVoucherHolder(1, voucherHolder);
+        });
+    });
 
-    //         // Ensure account has a claim with correct balance
-    //         await verifyAddressHasClaim(otherAccount);
-    //         await verifyClaimBalance(otherAccount, 1);
-    //     });
-    // });
+    describe("Redeeming Card Vouchers", () => {
+        beforeEach(async () => {
+            await batchIssueTextCardVouchers();
+        });
+        // Failing cases
+        it("should fail when caller has no vouchers", async () => {
+            await expectRevert(
+                redeemVoucher(0, baseCid, otherAccount),
+                "VoucherRegistry: Not voucher holder"
+            );
+        });
 
-    // describe("Increasing Card Claims", () => {
-    //     // Failing cases
-    //     it("should fail when msg.sender != minter", async () => {
-    //         const revertReason = getRoleRevertReason(otherAccount, MINTER);
-    //         await expectRevert(increaseClaim(otherAccount), revertReason);
-    //     });
+        it("should fail when contract is paused", async () => {
+            // Pause the contract
+            await cardInstance.pause({ from: admin });
 
-    //     it("should fail when address does not have an existing claim", async () => {
-    //         await expectRevert(
-    //             increaseClaim(admin, otherAccount),
-    //             "Claimable: Claim does not exist."
-    //         );
-    //     });
+            // Contract should be paused
+            await verifyPause(true);
 
-    //     it("should fail when amount to increase = 0", async () => {
-    //         await expectRevert(
-    //             increaseClaim(admin, claimHolder, 0),
-    //             "PhlipCard: Can only increase claim by amount greater than 0."
-    //         );
-    //     });
+            await expectRevert(redeemVoucher(), "Pausable: paused");
+        });
 
-    //     // Passing cases
-    //     it("should pass when msg.sender = minter and address has a claim", async () => {
-    //         // Increase claim of claimHolder by 2
-    //         await increaseClaim(admin, claimHolder, 2);
+        it("should fail when caller has already redeemed voucher", async () => {
+            // Redeem all cards owed to claimHolder
+            const remainingVouchers = await cardInstance.remainingVouchers(
+                voucherHolder
+            );
+            for (let i = 0; i < remainingVouchers; i++) {
+                await redeemVoucher(i);
+            }
 
-    //         // Ensure claim was increased correctly
-    //         await verifyClaimBalance(claimHolder, 4);
-    //     });
-    // });
+            // voucherHolder should no longer have any vouchers
+            await verifyAddressHasVoucher(voucherHolder, false);
 
-    // describe("Redeeming Card Claims", () => {
-    //     // Failing cases
-    //     it("should fail when msg.sender does not have claim", async () => {
-    //         await verifyClaimBalance(otherAccount, 0);
+            // Should treat voucherHolder as if they have no vouchers
+            await expectRevert(
+                redeemVoucher(),
+                "VoucherRegistry: Not voucher holder"
+            );
+        });
 
-    //         await expectRevert(
-    //             redeemCard(baseCid, otherAccount),
-    //             "Claimable: Address does not have a claim."
-    //         );
-    //     });
+        // Passing cases
+        it("should pass when caller redeems one of many vouchers", async () => {
+            // Claim one of the cards owed to claimHolder
+            await redeemVoucher();
 
-    //     it("should fail when contract is paused", async () => {
-    //         // Pause the contract
-    //         await cardInstance.pause({ from: admin });
+            // Should still have one voucher
+            await verifyAddressHasVoucher(voucherHolder, true);
 
-    //         // Contract should be paused
-    //         await verifyPause(true);
+            // Should act as if zero address holds redeemed voucher
+            await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
 
-    //         await expectRevert(redeemCard(), "Pausable: paused");
-    //     });
+            // voucherHolder should still hold voucher 1
+            await verifyVoucherHolder(1, voucherHolder);
 
-    //     it("should fail when claim has been emptied", async () => {
-    //         // Redeem all cards owed to claimHolder
-    //         const claimBalance = await cardInstance.remainingClaims(
-    //             claimHolder
-    //         );
-    //         for (let i = 0; i < claimBalance; i++) {
-    //             await redeemCard();
-    //         }
-    //         // Should treat claimHolder account as if it has no claim
-    //         await expectRevert(
-    //             redeemCard(),
-    //             "Claimable: Address does not have a claim."
-    //         );
-    //     });
+            // claimHolder should now have 1 card and 1 voucher left
+            await verifyCardBalance(voucherHolder, 1);
+            await verifyRemainingVouchers(voucherHolder, 1);
+        });
+        it("should pass when caller redeems all vouchers", async () => {
+            const remainingVouchers = await cardInstance.remainingVouchers(
+                voucherHolder
+            );
 
-    //     // Passing cases
-    //     it("should pass when msg.sender has a claim amount > 0", async () => {
-    //         // Claim one of the cards owed to claimHolder
-    //         await redeemCard();
+            // Redeem all cards owed to voucherHolder
+            for (let i = 0; i < remainingVouchers; i++) {
+                await redeemVoucher(i);
+            }
 
-    //         // claimHolder should now have 1 card and 1 claim left
-    //         await verifyCardBalance(claimHolder, 1);
-    //         await verifyClaimBalance(claimHolder, 1);
-    //     });
-    // });
+            // Should no longer have any vouchers
+            await verifyAddressHasVoucher(voucherHolder, false);
+
+            // Should act as if zero address holds both vouchers
+            await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
+            await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
+
+            // claimHolder should now have 2 cards and 0 vouchers left
+            await verifyCardBalance(voucherHolder, 2);
+            await verifyRemainingVouchers(voucherHolder, 0);
+        });
+    });
 });

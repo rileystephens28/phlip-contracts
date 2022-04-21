@@ -284,7 +284,6 @@ contract PhlipCard is
         public
         virtual
         whenNotPaused
-        onlyVoucherHolders
     {
         // Checks that caller holds voucher for reserved ID
         // Deletes voucher record from the registry
