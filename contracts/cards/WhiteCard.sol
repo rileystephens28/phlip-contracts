@@ -39,6 +39,26 @@ contract WhiteCard is PhlipCard, IBlankCard {
         return uint256(_cardTypes[_cardID]);
     }
 
+    /**
+     * @dev Accessor function for getting card's URI from ID
+     * Override to return empty string if card is blank
+     * @param _tokenId ID of the card to get URI of
+     * @return URI of the card
+     */
+    function tokenURI(uint256 _tokenId)
+        public
+        view
+        virtual
+        override
+        returns (string memory)
+    {
+        if (_cardTypes[_tokenId] == CardType.BLANK) {
+            return "";
+        }
+
+        return super.tokenURI(_tokenId);
+    }
+
     /***********************************|
     |      Minter Admin Functions       |
     |__________________________________*/
