@@ -1,120 +1,198 @@
 const PinkCard = artifacts.require("PinkCard");
 const ERC20Mock = artifacts.require("ERC20Mock");
-const { BN, snapshot } = require("@openzeppelin/test-helpers");
+const {
+    BN,
+    snapshot,
+    expectRevert,
+    constants,
+} = require("@openzeppelin/test-helpers");
 require("chai").should();
-const { shouldBehaveLikePhlipCard } = require("./PhlipCard.behavior");
+
+const MINTER = web3.utils.soliditySha3("MINTER_ROLE");
 
 contract("PinkCard", (accounts) => {
-    const cardAttributes = {
-        name: "Phlip Pink Card",
-        symbol: "PPC",
-        baseUri: "https.ipfs.moralis.io/ipfs/",
-        maxDownVotes: new BN(2),
-        maxUriChanges: new BN(1),
-        minDaoTokensRequired: new BN(100),
+    let cardInstance, tokenInstance1, tokenInstance2;
+    const [admin, cardOwner, voucherHolder, recipient, account, otherAccount] =
+        accounts;
+
+    // 100 second cliff
+    const baseCliff = new BN(100);
+
+    // 1000 second vesting duration
+    const baseDuration = new BN(1000);
+
+    // 1 token unit per second
+    const baseRate = new BN(1);
+
+    const baseUri = "https.ipfs.moralis.io/ipfs/";
+    const baseMaxUriChanges = new BN(1);
+    const baseCid = "base123";
+    const testCid = "test123";
+
+    const IMAGE_CARD = new BN(1);
+
+    const fillReserves = async (
+        scheduleId = 0,
+        amount = new BN(1000),
+        token = tokenInstance1,
+        from = admin,
+        preApprove = true
+    ) => {
+        if (preApprove) {
+            await token.approve(cardInstance.address, new BN(amount), {
+                from: from,
+            });
+        }
+        return await cardInstance.fillReserves(scheduleId, new BN(amount), {
+            from: from,
+        });
     };
 
-    const context = {};
+    const createSchedule = async (
+        token = tokenInstance1.address,
+        cliff = baseCliff,
+        duration = baseDuration,
+        rate = baseRate,
+        from = admin
+    ) => {
+        return await cardInstance.createVestingSchedule(
+            token,
+            new BN(cliff),
+            new BN(duration),
+            new BN(rate),
+            { from: from }
+        );
+    };
+
+    const addVestingScheme = async (scheduleIds = [0, 1], from = admin) => {
+        return await cardInstance.addVestingScheme(
+            scheduleIds[0],
+            scheduleIds[1],
+            {
+                from: from,
+            }
+        );
+    };
+
+    const setVestingScheme = async (scheduleId = 0, from = admin) => {
+        return await cardInstance.setVestingScheme(scheduleId, {
+            from: from,
+        });
+    };
+
+    const mintImageCard = async (
+        to = cardOwner,
+        cid = baseCid,
+        from = admin
+    ) => {
+        return await cardInstance.mintImageCard(to, cid, {
+            from: from,
+        });
+    };
+
+    const issueImageCardVoucher = async (to = voucherHolder, from = admin) => {
+        return await cardInstance.issueImageCardVoucher(to, {
+            from: from,
+        });
+    };
+
+    const batchIssueImageCardVouchers = async (
+        to = voucherHolder,
+        amount = 2,
+        from = admin
+    ) => {
+        return await cardInstance.batchIssueImageCardVouchers(
+            to,
+            new BN(amount),
+            {
+                from: from,
+            }
+        );
+    };
+
+    const redeemVoucher = async (
+        reservedID = 0,
+        uri = testCid,
+        from = voucherHolder
+    ) => {
+        return await cardInstance.redeemVoucher(reservedID, uri, {
+            from: from,
+        });
+    };
+
+    const verifyCardType = async (cardId, val) => {
+        const type = await cardInstance.typeOf(cardId);
+        type.should.be.bignumber.equal(new BN(val));
+    };
+
+    const verifyCardURI = async (cardId, uri) => {
+        const cardURI = await cardInstance.tokenURI(new BN(cardId));
+        cardURI.should.be.equal(uri);
+    };
+
+    const verifyCardMinter = async (cardId, address) => {
+        const cardMinter = await cardInstance.minterOf(new BN(cardId));
+        cardMinter.should.be.equal(address);
+    };
+
+    const verifyCardOwner = async (cardId, address) => {
+        const cardOwner = await cardInstance.ownerOf(new BN(cardId));
+        cardOwner.should.be.equal(address);
+    };
+
+    const verifyCardBalance = async (address, amount) => {
+        const cardBalance = await cardInstance.balanceOf(address);
+        cardBalance.should.be.bignumber.equal(new BN(amount));
+    };
+
+    const verifyVoucherHolder = async (id, address) => {
+        const hasVoucher = await cardInstance.voucherHolderOf(id);
+        hasVoucher.should.be.equal(address);
+    };
+
+    const verifyRemainingVouchers = async (address, amount) => {
+        const remaining = await cardInstance.remainingVouchers(address);
+        remaining.should.be.bignumber.equal(new BN(amount));
+    };
+
+    const verifyAddressHasVoucher = async (address, bool) => {
+        const hasVoucher = await cardInstance.hasVoucher(address);
+        hasVoucher.should.be.equal(bool);
+    };
+
+    const getRoleRevertReason = (address, role) => {
+        return (
+            "AccessControl: account " +
+            address.toLowerCase() +
+            " is missing role " +
+            role +
+            "."
+        );
+    };
 
     before(async () => {
-        // Initialize contract state so tests have default cards, claims, etc
-        // to interact with throughout the test suite.
-
-        const baseSchedule = {
-            cliff: new BN(100),
-            duration: new BN(1000),
-            rate: new BN(1),
-        };
-        let receipt;
-        context.tokenInstance = await ERC20Mock.new({ from: accounts[0] });
-        context.tokenInstance2 = await ERC20Mock.new({ from: accounts[0] });
-
-        // Create a new contract instance of erc20 and card contracts
-
-        context.cardInstance = await PinkCard.new(
-            cardAttributes.baseUri,
-            cardAttributes.maxDownVotes,
-            cardAttributes.maxUriChanges,
-            cardAttributes.minDaoTokensRequired,
-            context.tokenInstance.address,
-            { from: accounts[0] }
-        );
-
-        receipt = await context.cardInstance.createVestingSchedule(
-            context.tokenInstance.address,
-            baseSchedule.cliff,
-            baseSchedule.duration,
-            baseSchedule.rate,
-            {
-                from: accounts[0],
-            }
-        );
-        console.log(`Create Vesting Schedule: ${receipt.receipt.gasUsed}`);
-        await context.cardInstance.createVestingSchedule(
-            context.tokenInstance2.address,
-            baseSchedule.cliff,
-            baseSchedule.duration,
-            baseSchedule.rate,
-            {
-                from: accounts[0],
-            }
-        );
-
-        receipt = await context.cardInstance.setVestingSchedule([0, 1]);
-        console.log(`Set Vesting Schedule: ${receipt.receipt.gasUsed}`);
-
-        // fund the deployer account with 10,000 tokens
-        receipt = await context.tokenInstance.mint(accounts[0], 10000, {
-            from: accounts[0],
-        });
-        console.log(`Mint ERC20: ${receipt.receipt.gasUsed}`);
-
-        receipt = await context.tokenInstance2.mint(accounts[0], 10000, {
-            from: accounts[0],
+        // Initialize contract state
+        cardInstance = await PinkCard.new(baseUri, baseMaxUriChanges, {
+            from: admin,
         });
 
-        receipt = await context.tokenInstance.approve(
-            context.cardInstance.address,
-            new BN(1000),
-            { from: accounts[0] }
-        );
-        console.log(`Approve ERC20: ${receipt.receipt.gasUsed}`);
+        tokenInstance1 = await ERC20Mock.new({ from: admin });
+        tokenInstance2 = await ERC20Mock.new({ from: admin });
 
-        receipt = await context.tokenInstance2.approve(
-            context.cardInstance.address,
-            new BN(1000),
-            { from: accounts[0] }
-        );
+        // fund the deployer account with 10,000 of tokens 1 & 2
+        await tokenInstance1.mint(admin, 10000, { from: admin });
+        await tokenInstance2.mint(admin, 10000, { from: admin });
 
-        receipt = await context.cardInstance.fillReserves(0, new BN(1000), {
-            from: accounts[0],
-        });
-        console.log(`Fill Schedule Reserves: ${receipt.receipt.gasUsed}`);
+        // Create vesting schedules
+        await createSchedule(tokenInstance1.address);
+        await createSchedule(tokenInstance2.address);
 
-        receipt = await context.cardInstance.fillReserves(1, new BN(1000), {
-            from: accounts[0],
-        });
+        // Fill schedule reserves with tokens 1 & 2
+        await fillReserves(0, 5000, tokenInstance1);
+        await fillReserves(1, 5000, tokenInstance2);
 
-        // Send some tokens to token holder account
-        receipt = await context.tokenInstance.transfer(
-            accounts[1],
-            new BN(200),
-            {
-                from: accounts[0],
-            }
-        );
-
-        console.log(`Transfer ERC20: ${receipt.receipt.gasUsed}`);
-        // Mint 1 card to card holder
-        receipt = await context.cardInstance.mintCard(accounts[2], "base123", {
-            from: accounts[0],
-            gas: 9000000,
-        });
-        console.log(`Mint Card: ${receipt.receipt.gasUsed}`);
-
-        // await context.cardInstance.createClaim(accounts[3], new BN(2), {
-        //     from: accounts[0],
-        // });
+        await addVestingScheme([0, 1]);
+        await setVestingScheme(0);
     });
 
     beforeEach(async () => {
@@ -125,5 +203,170 @@ contract("PinkCard", (accounts) => {
         await this.snapshot.restore();
     });
 
-    shouldBehaveLikePhlipCard(context, cardAttributes, ...accounts);
+    describe("Minting Image Cards", () => {
+        // Failing cases
+        it("should fail when caller is not minter admin", async () => {
+            const revertReason = getRoleRevertReason(otherAccount, MINTER);
+            await expectRevert(
+                mintImageCard(recipient, baseCid, otherAccount),
+                revertReason
+            );
+        });
+
+        it("should fail when recipient is 0x0", async () => {
+            // BUG: This test fails because it uses all gas not because of zero address
+            await expectRevert(
+                mintImageCard(constants.ZERO_ADDRESS),
+                "ERC721: mint to the zero address"
+            );
+        });
+
+        // Passing cases
+        it("should pass when caller is minter admin", async () => {
+            // Mints new card with ID = 3. (IDs 0, 1, 2 are used in before() function)
+            await mintImageCard();
+
+            // account should have 1 card
+            await verifyCardBalance(cardOwner, 1);
+
+            // Verify card minter and URI are correct
+            await verifyCardMinter(0, cardOwner);
+            await verifyCardURI(0, baseUri + baseCid);
+            await verifyCardType(0, IMAGE_CARD);
+        });
+    });
+
+    describe("Issuing Image Card Vouchers", () => {
+        // Failing cases
+        it("should fail when caller is not card minter admin", async () => {
+            const revertReason = getRoleRevertReason(otherAccount, MINTER);
+            await expectRevert(
+                issueImageCardVoucher(voucherHolder, otherAccount),
+                revertReason
+            );
+        });
+        it("should fail when recipient is 0x0", async () => {
+            // BUG: This test fails because it uses all gas not because of zero address
+            await expectRevert(
+                issueImageCardVoucher(constants.ZERO_ADDRESS),
+                "VoucherRegistry: Cannot issue voucher to 0x0"
+            );
+        });
+
+        // Passing cases
+        it("should pass when caller is minter admin and address is valid", async () => {
+            await issueImageCardVoucher();
+
+            // Ensure voucher was properly issued to voucherHolder
+            await verifyAddressHasVoucher(voucherHolder, true);
+            await verifyRemainingVouchers(voucherHolder, 1);
+            await verifyVoucherHolder(0, voucherHolder);
+        });
+    });
+
+    describe("Batch Issuing Image Card Vouchers", () => {
+        // Failing cases
+        it("should fail when caller is not card minter admin", async () => {
+            const revertReason = getRoleRevertReason(otherAccount, MINTER);
+            await expectRevert(
+                batchIssueImageCardVouchers(voucherHolder, 2, otherAccount),
+                revertReason
+            );
+        });
+        it("should fail when recipient is 0x0", async () => {
+            // BUG: This test fails because it uses all gas not because of zero address
+            await expectRevert(
+                batchIssueImageCardVouchers(constants.ZERO_ADDRESS),
+                "VoucherRegistry: Cannot issue voucher to 0x0"
+            );
+        });
+
+        // Passing cases
+        it("should pass when caller is minter admin and address is valid", async () => {
+            await batchIssueImageCardVouchers();
+
+            // Ensure voucher was properly issued to voucherHolder
+            await verifyAddressHasVoucher(voucherHolder, true);
+            await verifyRemainingVouchers(voucherHolder, 2);
+            await verifyVoucherHolder(0, voucherHolder);
+            await verifyVoucherHolder(1, voucherHolder);
+        });
+    });
+
+    describe("Redeeming Card Vouchers", () => {
+        beforeEach(async () => {
+            await batchIssueImageCardVouchers();
+        });
+        // Failing cases
+        it("should fail when caller has no vouchers", async () => {
+            await expectRevert(
+                redeemVoucher(0, baseCid, otherAccount),
+                "VoucherRegistry: Not voucher holder"
+            );
+        });
+
+        it("should fail when caller has already redeemed voucher", async () => {
+            // Redeem all cards owed to claimHolder
+            const remainingVouchers = await cardInstance.remainingVouchers(
+                voucherHolder
+            );
+            for (let i = 0; i < remainingVouchers; i++) {
+                await redeemVoucher(i);
+            }
+
+            // voucherHolder should no longer have any vouchers
+            await verifyAddressHasVoucher(voucherHolder, false);
+
+            // Should treat voucherHolder as if they have no vouchers
+            await expectRevert(
+                redeemVoucher(),
+                "VoucherRegistry: Not voucher holder"
+            );
+        });
+
+        // Passing cases
+        it("should pass when caller redeems one of many vouchers", async () => {
+            // Claim one of the cards owed to voucherHolder
+            await redeemVoucher();
+
+            // Should still have one voucher
+            await verifyAddressHasVoucher(voucherHolder, true);
+
+            // Should act as if zero address holds redeemed voucher
+            await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
+
+            // voucherHolder should still hold voucher 1 and own card 0
+            await verifyVoucherHolder(1, voucherHolder);
+            await verifyCardOwner(0, voucherHolder);
+
+            // voucherHolder should now have 1 card and 1 voucher left
+            await verifyCardBalance(voucherHolder, 1);
+            await verifyRemainingVouchers(voucherHolder, 1);
+        });
+        it("should pass when caller redeems all vouchers", async () => {
+            const remainingVouchers = await cardInstance.remainingVouchers(
+                voucherHolder
+            );
+
+            // Redeem all cards owed to voucherHolder
+            for (let i = 0; i < remainingVouchers; i++) {
+                await redeemVoucher(i);
+            }
+
+            // Should no longer have any vouchers
+            await verifyAddressHasVoucher(voucherHolder, false);
+
+            // Should act as if zero address holds both vouchers
+            await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
+            await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
+
+            // voucherHolder should now own card 0 and 1
+            await verifyCardOwner(0, voucherHolder);
+            await verifyCardOwner(1, voucherHolder);
+
+            // voucherHolder should now have 2 cards and 0 vouchers left
+            await verifyCardBalance(voucherHolder, 2);
+            await verifyRemainingVouchers(voucherHolder, 0);
+        });
+    });
 });
