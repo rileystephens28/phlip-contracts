@@ -9,8 +9,7 @@
         "ganache-core": "^2.13.2",
         "ganache-time-traveler": "^1.0.16",
         "solc": "^0.8.11",
-        "solidity-docgen": "^0.5.16",
-        "truffle": "^5.5.10"
+        "solidity-docgen": "^0.5.16"
     },
     "devDependencies": {
         "@truffle/hdwallet-provider": "^2.0.3",
