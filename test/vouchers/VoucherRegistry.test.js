@@ -100,7 +100,7 @@ contract("VoucherRegistry", (accounts) => {
             // Attempt to redeem voucher for other account
             await expectRevert(
                 redeemVoucher(0, otherAccount),
-                "VoucherRegistry: Not voucher holder."
+                "VoucherRegistry: Not voucher holder"
             );
 
             // Should still have 1 voucher
@@ -129,7 +129,7 @@ contract("VoucherRegistry", (accounts) => {
         it("should fail when caller has no vouchers", async () => {
             await expectRevert(
                 registryInstance.protectedAction({ from: otherAccount }),
-                "VoucherRegistry: Caller has no vouchers."
+                "VoucherRegistry: No vouchers"
             );
             const didAction = await registryInstance.didProtectedAction();
             didAction.should.be.equal(false);

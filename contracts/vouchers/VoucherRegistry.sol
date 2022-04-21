@@ -20,7 +20,7 @@ contract VoucherRegistry {
     modifier onlyVoucherHolders() {
         require(
             _remainingVouchers[msg.sender] > 0,
-            "VoucherRegistry: Caller has no vouchers"
+            "VoucherRegistry: No vouchers"
         );
         _;
     }
