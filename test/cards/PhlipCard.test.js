@@ -575,7 +575,7 @@ contract("PhlipCard", (accounts) => {
         });
 
         it("should fail when caller has already redeemed voucher", async () => {
-            // Redeem all cards owed to claimHolder
+            // Redeem all cards owed to voucherHolder
             const remainingVouchers = await cardInstance.remainingVouchers(
                 voucherHolder
             );
@@ -595,7 +595,7 @@ contract("PhlipCard", (accounts) => {
 
         // Passing cases
         it("should pass when caller redeems one of many vouchers", async () => {
-            // Claim one of the cards owed to claimHolder
+            // Claim one of the cards owed to voucherHolder
             await redeemVoucher();
 
             // Should still have one voucher
@@ -604,10 +604,11 @@ contract("PhlipCard", (accounts) => {
             // Should act as if zero address holds redeemed voucher
             await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
 
-            // voucherHolder should still hold voucher 1
+            // voucherHolder should still hold voucher 1 and own card 0
             await verifyVoucherHolder(1, voucherHolder);
+            await verifyCardOwner(0, voucherHolder);
 
-            // claimHolder should now have 1 card and 1 voucher left
+            // voucherHolder should now have 1 card and 1 voucher left
             await verifyCardBalance(voucherHolder, 1);
             await verifyRemainingVouchers(voucherHolder, 1);
         });
@@ -628,7 +629,11 @@ contract("PhlipCard", (accounts) => {
             await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
             await verifyVoucherHolder(0, constants.ZERO_ADDRESS);
 
-            // claimHolder should now have 2 cards and 0 vouchers left
+            // voucherHolder should now own card 0 and 1
+            await verifyCardOwner(0, voucherHolder);
+            await verifyCardOwner(1, voucherHolder);
+
+            // voucherHolder should now have 2 cards and 0 vouchers left
             await verifyCardBalance(voucherHolder, 2);
             await verifyRemainingVouchers(voucherHolder, 0);
         });
