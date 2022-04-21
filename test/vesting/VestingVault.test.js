@@ -217,7 +217,7 @@ contract("VestingVault", (accounts) => {
 
     const verifyTokenBalance = async (token, address, amount) => {
         const tokenBalance = await token.balanceOf(address);
-        tokenBalance.should.be.bignumber.equal(amount);
+        tokenBalance.should.be.bignumber.equal(new BN(amount));
     };
 
     before(async () => {
@@ -696,7 +696,7 @@ contract("VestingVault", (accounts) => {
         });
     });
 
-    describe("Withdrawing Capsule Balance", async () => {
+    describe.only("Withdrawing Capsule Balance", async () => {
         beforeEach(async () => {
             await createCapsule();
         });
@@ -714,15 +714,7 @@ contract("VestingVault", (accounts) => {
                 "VestingVault: Caller is not capsule owner"
             );
         });
-        it("should fail when cliff has not been reached", async () => {
-            // Ensure capsule cliff has not been reached
-            await verifyCapsuleCliffNotReached(0);
 
-            await expectRevert(
-                withdrawCapsuleBalance(),
-                "VestingVault: No tokens to withdraw"
-            );
-        });
         it("should fail when 100% of fully vested capsule tokens have been claimed", async () => {
             // Increase time so capsule is fully vested
             await time.increase(secondsUntilFullyVested);
@@ -746,7 +738,20 @@ contract("VestingVault", (accounts) => {
         });
 
         // Passing cases
-        it("should pass when 0% of partially vested capsule tokens have been claimed", async () => {
+        it("should pass with no-op when cliff has not been reached", async () => {
+            // Ensure capsule cliff has not been reached
+            await verifyCapsuleCliffNotReached(0);
+
+            // Capsule should have no vested balance
+            await verifyVestedBalance(0, 0);
+
+            // Will withdraw no tokens, but will not revert
+            await withdrawCapsuleBalance();
+
+            // Should have no token balance from wihdrawal
+            await verifyTokenBalance(tokenInstance, capsuleOwner, 0);
+        });
+        it("should pass when none of partially vested capsule tokens have been claimed", async () => {
             // Increase time so capsule is 20% vested
             await time.increase(secondsUntil20PercVested);
 
@@ -765,7 +770,7 @@ contract("VestingVault", (accounts) => {
                 vestedBalance
             );
         });
-        it("should pass when 50% of partially vested capsule tokens have been claimed", async () => {
+        it("should pass when half of partially vested capsule tokens have been claimed", async () => {
             // Increase time so capsule is 20% vested
             await time.increase(secondsUntil20PercVested);
 
@@ -801,7 +806,7 @@ contract("VestingVault", (accounts) => {
                 totalClaimAmount
             );
         });
-        it("should pass when 0% of fully vested capsule tokens have been claimed", async () => {
+        it("should pass when none of fully vested capsule tokens have been claimed", async () => {
             // Increase time so capsule is fully vested
             await time.increase(secondsUntilFullyVested);
             const balance = await vaultInstance.vestedBalanceOf(0);
@@ -817,7 +822,7 @@ contract("VestingVault", (accounts) => {
             // Ensure withdrawn amount is equal to vested balance
             await verifyTokenBalance(tokenInstance, capsuleOwner, balance);
         });
-        it("should pass when 50% of fully vested capsule tokens have been claimed", async () => {
+        it("should pass when half of fully vested capsule tokens have been claimed", async () => {
             // Increase time so capsule is 50% vested
             await time.increase(secondsUntil50PercVested);
 

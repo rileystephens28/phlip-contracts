@@ -29,7 +29,7 @@ module.exports = {
         },
         local_test: {
             host: "127.0.0.1",
-            port: 7545,
+            port: 7555,
             chainId: 1337,
             network_id: "*",
             disableConfirmationListener: true,

@@ -380,6 +380,7 @@ contract("VestingCapsule", (accounts) => {
     });
 
     describe("Transfering Capsules", async () => {
+        //? NOTE - Need to test transfering called from an approved account
         // Passing cases
         it("should pass when both capsules are active", async () => {
             // Scheme 0 - equal schedule durations
