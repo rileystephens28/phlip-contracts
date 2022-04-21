@@ -98,7 +98,6 @@ contract VoucherRegistry {
             _voucherRegistry[_reservedTokenID] == _from,
             "VoucherRegistry: Not voucher holder"
         );
-
         // Delete from registry and decrement remaining vouchers
         delete _voucherRegistry[_reservedTokenID];
         _remainingVouchers[_from] -= 1;

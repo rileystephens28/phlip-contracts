@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "../vesting/GuardedVestingCapsule.sol";
 import "../lockable/ERC721Lockable.sol";
 import "../vouchers/VoucherRegistry.sol";
-import "./IBaseCard.sol";
-import "./ITextCard.sol";
+import "../interfaces/IBaseCard.sol";
+import "../interfaces/ITextCard.sol";
 
 /**
  * @title PhlipCard

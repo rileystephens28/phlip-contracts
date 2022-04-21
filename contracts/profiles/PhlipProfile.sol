@@ -3,7 +3,7 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./IPhlipProfile.sol";
+import "../interfaces/IPhlipProfile.sol";
 
 /**
  * @title UserProfile
