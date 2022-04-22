@@ -7,32 +7,45 @@ pragma solidity 0.8.11;
  * @dev Functions required to manage a Phlip user and their interactions with the game.
  */
 interface IPhlipProfile {
-    /**
-     * @dev Check if an address has a profile.
-     * @param _address Address to check.
-     * @return Whether or not an address has a profile
-     */
-    function hasProfile(address _address) external view returns (bool);
+    event CreateTeam(
+        uint256 indexed _team,
+        uint256 indexed _founder,
+        string _name
+    );
+    event JoinTeam(
+        uint256 indexed _team,
+        uint256 indexed _profile,
+        uint256 _numMembers
+    );
+    event LeaveTeam(
+        uint256 indexed _team,
+        uint256 indexed _profile,
+        uint256 _numMembers
+    );
+
+    event SendFriendRequest(
+        uint256 indexed _requester,
+        uint256 indexed _requested
+    );
+    event ApproveFriendRequest(
+        uint256 indexed _requester,
+        uint256 indexed _approver
+    );
+    event RemoveFriend(uint256 indexed _profile, uint256 indexed _friend);
 
     /**
-     * @dev Accessor method for array of friend addresses of a profile.
+     * @dev Accessor function for getting a profiles current team.
      * @param _profileID ID of the profile to query.
-     * @return An array of profile IDs (friends) of the given profile.
+     * @return ID of the profiles current team ID (0 if no team).
      */
-    function getFriends(uint256 _profileID)
-        external
-        view
-        returns (uint256[] memory);
+    function teamOf(uint256 _profileID) external view returns (uint256);
 
     /**
-     * @dev Accessor method for array of addresses that are members of team.
-     * @param _teamID ID of the team to query.
-     * @return The address array of all team members
+     * @dev Accessor function for getting a profiles number of friends.
+     * @param _profileID ID of the profile to query.
+     * @return Number of approved friends the profile has.
      */
-    function getTeamMembers(uint256 _teamID)
-        external
-        view
-        returns (uint256[] memory);
+    function friendCountOf(uint256 _profileID) external view returns (uint256);
 
     /**
      * @dev Mint a new profile to address
@@ -48,22 +61,30 @@ interface IPhlipProfile {
 
     /**
      * @dev Sets the currentTeam of an existing profile.
-     * @param _profileID The ID of the profile joining a team.
      * @param _teamID ID of the team to join
      */
-    function joinTeam(uint256 _profileID, uint256 _teamID) external;
+    function joinTeam(uint256 _teamID) external;
 
     /**
-     * @dev Appends an address to the friends array of an existing profile.
-     * @param _profileID The ID of the profile to add friend to.
-     * @param _friendID The ID of the profile being adding as a friend.
+     * @dev Sets the team of an existing profile to 0.
      */
-    function addFriend(uint256 _profileID, uint256 _friendID) external;
+    function leaveTeam() external;
 
     /**
-     * @dev Remove an address from the friends array of an existing profile.
-     * @param _profileID The ID of the profile to remove a friend from.
-     * @param _friendIndex The index of the friend in the friends array.
+     * @dev Request a friendship with another profile.
+     * @param _friendID The ID of the profile being requested.
      */
-    function removeFriend(uint256 _profileID, uint256 _friendIndex) external;
+    function requestFriend(uint256 _friendID) external;
+
+    /**
+     * @dev Approve a friendship request from another profile.
+     * @param _requesterID The ID of the profile that requested a friendship.
+     */
+    function approveFriend(uint256 _requesterID) external;
+
+    /**
+     * @dev Remove friendship between profiles.
+     * @param _friendID The ID of the profile to remove as friend.
+     */
+    function removeFriend(uint256 _friendID) external;
 }
