@@ -3,9 +3,7 @@
   * [CrowdSale](reference/CrowdSale.md)
   * affiliates
     * [CampaignAttribution](reference/affiliates/CampaignAttribution.md)
-    * [IAffiliateCampaign](reference/affiliates/IAffiliateCampaign.md)
   * cards
-    * [CardSettingsControl](reference/cards/CardSettingsControl.md)
     * [PhlipCard](reference/cards/PhlipCard.md)
     * [PinkCard](reference/cards/PinkCard.md)
     * [WhiteCard](reference/cards/WhiteCard.md)
@@ -15,36 +13,43 @@
   * gameRecords
     * [AdminGameRecord](reference/gameRecords/AdminGameRecord.md)
     * [GameRecord](reference/gameRecords/GameRecord.md)
+  * interfaces
+    * [IAffiliateCampaign](reference/interfaces/IAffiliateCampaign.md)
+    * [IBaseCard](reference/interfaces/IBaseCard.md)
+    * [IBlankCard](reference/interfaces/IBlankCard.md)
+    * [IImageCard](reference/interfaces/IImageCard.md)
+    * [ILockOperator](reference/interfaces/ILockOperator.md)
+    * [IPhlipProfile](reference/interfaces/IPhlipProfile.md)
+    * [ITextCard](reference/interfaces/ITextCard.md)
+    * [IVestingVault](reference/interfaces/IVestingVault.md)
+    * [IVoucherIssuer](reference/interfaces/IVoucherIssuer.md)
+    * [IWeightedBallot](reference/interfaces/IWeightedBallot.md)
   * lists
     * [Blacklistable](reference/lists/Blacklistable.md)
     * [Blacklister](reference/lists/Blacklister.md)
     * [Whitelistable](reference/lists/Whitelistable.md)
   * lockable
     * [ERC721Lockable](reference/lockable/ERC721Lockable.md)
-    * [ILockOperator](reference/lockable/ILockOperator.md)
   * mocks
     * [AdminGameRecordMock](reference/mocks/AdminGameRecordMock.md)
     * [BlacklistMock](reference/mocks/BlacklistMock.md)
     * [ERC20Mock](reference/mocks/ERC20Mock.md)
     * [ERC721LockableMock](reference/mocks/ERC721LockableMock.md)
     * [GameRecordMock](reference/mocks/GameRecordMock.md)
+    * [VestingCapsuleMock](reference/mocks/VestingCapsuleMock.md)
+    * [VestingVaultMock](reference/mocks/VestingVaultMock.md)
     * [VoucherRegistryMock](reference/mocks/VoucherRegistryMock.md)
     * [WeightedBallotMock](reference/mocks/WeightedBallotMock.md)
     * [WhitelistMock](reference/mocks/WhitelistMock.md)
   * profiles
-    * [IPhlipProfile](reference/profiles/IPhlipProfile.md)
     * [PhlipProfile](reference/profiles/PhlipProfile.md)
   * utils
     * [BlackholePrevention](reference/utils/BlackholePrevention.md)
   * vesting
     * [GuardedVestingCapsule](reference/vesting/GuardedVestingCapsule.md)
-    * [GuardedVestingVault](reference/vesting/GuardedVestingVault.md)
-    * [IVestingVault](reference/vesting/IVestingVault.md)
     * [VestingCapsule](reference/vesting/VestingCapsule.md)
     * [VestingVault](reference/vesting/VestingVault.md)
   * voting
-    * [IWeightedBallot](reference/voting/IWeightedBallot.md)
     * [WeightedBallot](reference/voting/WeightedBallot.md)
   * vouchers
-    * [IVoucherIssuer](reference/vouchers/IVoucherIssuer.md)
     * [VoucherRegistry](reference/vouchers/VoucherRegistry.md)

@@ -10,32 +10,23 @@ join too. Joining a team does not provide any direct game benefits to Players. H
 frequently win can rise through the leaderboards and gain a lot of publicity (play-to-advertise model).
 
 ## Functions
-### hasProfile
+### constructor
 ```solidity
-  function hasProfile(
-    address _address
-  ) public returns (bool)
+  function constructor(
+  ) public
 ```
 
-Check if an address has a profile.
 
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_address` | address | Address to check.
 
-#### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| address | or not an address has a profile
-### getProfile
+
+### teamOf
 ```solidity
-  function getProfile(
+  function teamOf(
     uint256 _profileID
-  ) public returns (struct PhlipProfile.Profile)
+  ) public returns (uint256)
 ```
 
-Accessor method to get the details of a profile.
+Accessor function for getting a profiles current team.
 
 #### Parameters:
 | Name | Type | Description                                                          |
@@ -45,15 +36,15 @@ Accessor method to get the details of a profile.
 #### Return Values:
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | profile struct data for the given profile ID.
-### getFriends
+|`ID`| uint256 | of the profiles current team ID (0 if no team).
+### friendCountOf
 ```solidity
-  function getFriends(
+  function friendCountOf(
     uint256 _profileID
-  ) public returns (uint256[])
+  ) public returns (uint256)
 ```
 
-Accessor method to get the friends of a profile.
+Accessor function for getting a profiles number of friends.
 
 #### Parameters:
 | Name | Type | Description                                                          |
@@ -63,7 +54,7 @@ Accessor method to get the friends of a profile.
 #### Return Values:
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`An`| uint256 | array of profile IDs (friends) of the given profile.
+|`Number`| uint256 | of approved friends the profile has.
 ### getTeamInfo
 ```solidity
   function getTeamInfo(
@@ -82,24 +73,49 @@ Accessor method to get the details of a team.
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
 |`The`| uint256 | profile struct data for the given profile ID.
-### getTeamMembers
+### tokenURI
 ```solidity
-  function getTeamMembers(
-    uint256 _teamID
-  ) public returns (uint256[])
+  function tokenURI(
+    uint256 _tokenId
+  ) public returns (string)
 ```
 
-Accessor method to get the array of addresses that belong to team.
+Accessor function for getting profiles URI from ID
+Modified implementation of ERC721URIStorage.tokenURI
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_teamID` | uint256 | ID of the team to query.
+|`_tokenId` | uint256 | ID of the card to get URI of
 
 #### Return Values:
 | Name                           | Type          | Description                                                                  |
 | :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | address array of all team members
+|`URI`| uint256 | of the card
+### supportsInterface
+```solidity
+  function supportsInterface(
+  ) public returns (bool)
+```
+
+Override of ERC721 and AccessControl supportsInterface
+
+
+### setBaseURI
+```solidity
+  function setBaseURI(
+    string _newURI
+  ) public
+```
+
+Allows settings admin to set the base
+URI for all tokens created by this contract
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_newURI` | string | New base URI
+
 ### createProfile
 ```solidity
   function createProfile(
@@ -132,57 +148,84 @@ note: Should the founder be added to the team by default?
 ### joinTeam
 ```solidity
   function joinTeam(
-    uint256 _profileID,
     uint256 _teamID
   ) external
 ```
 
-Sets the currentTeam of an existing profile.
+Sets the team of an existing profile.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | The ID of the profile joining a team.
 |`_teamID` | uint256 | ID of the team to join
 
-### addFriend
+### leaveTeam
 ```solidity
-  function addFriend(
-    uint256 _profileID,
+  function leaveTeam(
+  ) external
+```
+
+Sets the team of an existing profile to 0.
+
+
+### requestFriend
+```solidity
+  function requestFriend(
     uint256 _friendID
   ) external
 ```
 
-Appends an address to the friends array of an existing profile.
+Request a friendship with another profile.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | The ID of the profile to add friend to.
-|`_friendID` | uint256 | The ID of the profile being adding as a friend.
+|`_friendID` | uint256 | The ID of the profile being requested.
+
+### approveFriend
+```solidity
+  function approveFriend(
+    uint256 _requesterID
+  ) external
+```
+
+Approve a friendship request from another profile.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_requesterID` | uint256 | The ID of the profile that requested a friendship.
 
 ### removeFriend
 ```solidity
   function removeFriend(
-    uint256 _profileID,
-    uint256 _friendIndex
+    uint256 _friendID
   ) external
 ```
 
-Remove an address from the friends array of an existing profile.
+Remove friendship between profiles.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_profileID` | uint256 | The ID of the profile to remove a friend from.
-|`_friendIndex` | uint256 | The index of the friend in the friends array.
+|`_friendID` | uint256 | The ID of the profile to remove as friend.
 
-### supportsInterface
+### _beforeTokenTransfer
 ```solidity
-  function supportsInterface(
-  ) public returns (bool)
+  function _beforeTokenTransfer(
+    address _from,
+    address _to,
+    uint256 _tokenId
+  ) internal
 ```
 
-Override of ERC721 and AccessControl supportsInterface
+Function called before tokens are transferred. Override to
+make sure that receiving address does not already have a profile.
 
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_from` | address | The address tokens will be transferred from
+|`_to` | address | The address tokens will be transferred  to
+|`_tokenId` | uint256 | The ID of the token to transfer
 

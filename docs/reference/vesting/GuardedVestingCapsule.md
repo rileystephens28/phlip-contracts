@@ -5,15 +5,6 @@ treasury management of vesting shedules and their respective reserves.
 NOTE - This contract is intended to hold ERC20 tokens on behalf of capsule owners.
 
 ## Functions
-### constructor
-```solidity
-  function constructor(
-  ) public
-```
-
-Create a new CapsuleManager instance and grant msg.sender TREASURER role.
-
-
 ### fillReserves
 ```solidity
   function fillReserves(
