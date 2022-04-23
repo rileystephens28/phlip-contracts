@@ -1,34 +1,7 @@
 
-Implementation of a PhlipCard that supports text and image cards.
+Functionality required to for implmenting Phlip image card.
 
 ## Functions
-### constructor
-```solidity
-  function constructor(
-  ) public
-```
-
-
-
-
-### typeOf
-```solidity
-  function typeOf(
-    uint256 _cardID
-  ) public returns (uint256)
-```
-
-Accessor function to get type of card
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_cardID` | uint256 | The ID of the card to check
-
-#### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`0`| uint256 | if image, 1 if image
 ### mintImageCard
 ```solidity
   function mintImageCard(
@@ -37,7 +10,7 @@ Accessor function to get type of card
   ) external
 ```
 
-Allow minter to mint a image card to a given address.
+Mint a image card to a given address.
 
 #### Parameters:
 | Name | Type | Description                                                          |
@@ -52,7 +25,7 @@ Allow minter to mint a image card to a given address.
   ) external
 ```
 
-Allow minter to issue a image card voucher to a given address.
+Issue a image card voucher to a given address.
 
 #### Parameters:
 | Name | Type | Description                                                          |
@@ -67,7 +40,7 @@ Allow minter to issue a image card voucher to a given address.
   ) external
 ```
 
-Allow minter to issue many image card vouchers to a given address.
+Issue many image card vouchers to a given address.
 
 #### Parameters:
 | Name | Type | Description                                                          |

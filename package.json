@@ -17,6 +17,7 @@
         "chai-bignumber": "^3.0.0",
         "dotenv": "^16.0.0",
         "eth-gas-reporter": "^0.2.25",
+        "nodemon": "^2.0.15",
         "solidity-coverage": "^0.7.20",
         "truffle-plugin-verify": "^0.5.20"
     },
@@ -27,6 +28,7 @@
         "console": "truffle console",
         "verify": "truffle run verify",
         "test": "truffle test",
+        "test:watch": "nodemon --ext 'js,sol' --exec 'truffle test --network develop'",
         "docify": "node docify.js"
     }
 }

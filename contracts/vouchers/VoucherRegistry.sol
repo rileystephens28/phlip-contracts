@@ -20,7 +20,7 @@ contract VoucherRegistry {
     modifier onlyVoucherHolders() {
         require(
             _remainingVouchers[msg.sender] > 0,
-            "VoucherRegistry: Caller has no vouchers."
+            "VoucherRegistry: No vouchers"
         );
         _;
     }
@@ -77,7 +77,7 @@ contract VoucherRegistry {
         );
         require(
             _voucherRegistry[_reservedTokenID] == address(0),
-            "VoucherRegistry: Voucher already exists."
+            "VoucherRegistry: Voucher already exists"
         );
 
         // Update registry and increment remaining vouchers
@@ -96,9 +96,8 @@ contract VoucherRegistry {
     {
         require(
             _voucherRegistry[_reservedTokenID] == _from,
-            "VoucherRegistry: Not voucher holder."
+            "VoucherRegistry: Not voucher holder"
         );
-
         // Delete from registry and decrement remaining vouchers
         delete _voucherRegistry[_reservedTokenID];
         _remainingVouchers[_from] -= 1;

@@ -11,7 +11,7 @@ contract VestingCapsuleMock is VestingCapsule {
     constructor() ERC721("VestingCapsuleMock", "VEST") {}
 
     function fillReserves(uint256 _scheduleID, uint256 _fillAmount) external {
-        _fillReserves(_scheduleID, _fillAmount);
+        _fillReserves(msg.sender, _scheduleID, _fillAmount);
     }
 
     function createVestingSchedule(
@@ -38,7 +38,11 @@ contract VestingCapsuleMock is VestingCapsule {
         _burn(_id);
     }
 
-    function setVestingScheme(uint256[] calldata _ids) external {
-        _setVestingSchedule(_ids);
+    function addVestingScheme(uint256 _scheme1, uint256 _scheme2) external {
+        _addVestingScheme(_scheme1, _scheme2);
+    }
+
+    function setVestingScheme(uint256 _id) external {
+        _setVestingScheme(_id);
     }
 }

@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "../vesting/GuardedVestingCapsule.sol";
 import "../lockable/ERC721Lockable.sol";
-import "../lists/Blacklister.sol";
-import "../voting/WeightedBallot.sol";
 import "../vouchers/VoucherRegistry.sol";
-import "./CardSettingsControl.sol";
+import "../interfaces/IBaseCard.sol";
+import "../interfaces/ITextCard.sol";
 
 /**
  * @title PhlipCard
@@ -24,11 +21,6 @@ import "./CardSettingsControl.sol";
  * Updatable Metadata - Card minters (must also be owner) are allowed to change their cards URI once
  * if their card has been downvoted too many times. Once a cards URI has been updated, the cards stats
  * should be reset to reflect that the card is basically new.
- *
- * Automated Ballots - Addresses that hold a predetermined number of PhlipDAO tokens can cast up or down votes
- * on cards. If a card has received the maximum number of downvotes allowed, the card is marked unplayable
- * and as a result no longer accumulating winnings.Address can only cast one vote per card and card owners
- * cannot vote on their own card.
  *
  * Redeemable Vouchers - Grants addresses the ability to mint a specified number of cards directly from the contract
  * rather than requiring a MINTER to do it for them. Vouchers can be granted to certain addresses (SOTM owners)
@@ -44,51 +36,54 @@ contract PhlipCard is
     AccessControl,
     GuardedVestingCapsule,
     ERC721Lockable,
-    CardSettingsControl,
-    WeightedBallot,
     VoucherRegistry,
-    Blacklister,
-    Pausable
+    Pausable,
+    IBaseCard,
+    ITextCard
 {
     using Counters for Counters.Counter;
 
+    string public BASE_URI;
+    uint256 public MAX_URI_CHANGES;
+
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant SETTINGS_ROLE = keccak256("SETTINGS_ROLE");
 
-    struct Card {
-        string uri;
-        uint256 uriChangeCount;
-        bool blank;
-        bool playable;
-    }
+    Counters.Counter internal _tokenIds;
 
-    Counters.Counter private _cardIdCounter;
-    Counters.Counter private _playableInCirculation;
-    mapping(uint256 => Card) private _cards;
-    mapping(uint256 => address) private _minters;
+    // Token ID => URI string
+    mapping(uint256 => string) internal _tokenURIs;
+
+    // Token ID => Number of times URI has been updated
+    mapping(uint256 => uint256) internal _metadataChangeCounts;
+
+    // Token ID => Address of token minter
+    mapping(uint256 => address) internal _minters;
 
     constructor(
         string memory _name,
         string memory _symbol,
         string memory _baseUri,
-        uint256 _maxDownvotes,
-        uint256 _maxUriChanges,
-        uint256 _minDaoTokensRequired,
-        address _daoTokenAddress
-    ) GuardedVestingCapsule(_name, _symbol) {
-        // Grant roles to contract creator
+        uint256 _maxUriChanges
+    ) ERC721(_name, _symbol) {
+        // Grant roles for this contract
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(SETTINGS_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
-        _grantRole(BLOCKER_ROLE, msg.sender);
+        _grantRole(SETTINGS_ROLE, msg.sender);
 
-        // Set constants
+        // Grant role for GuardedVestingCapsule
+        _grantRole(TREASURER_ROLE, msg.sender);
+
+        // Set globals
         setBaseURI(_baseUri);
-        setMaxDownvotes(_maxDownvotes);
         setMaxUriChanges(_maxUriChanges);
-        setMinDaoTokensRequired(_minDaoTokensRequired);
-        setDaoTokenAddress(_daoTokenAddress);
     }
+
+    /***********************************|
+    |          View Functions           |
+    |__________________________________*/
 
     /**
      * @dev Accessor function to get address of card minter
@@ -97,136 +92,6 @@ contract PhlipCard is
      */
     function minterOf(uint256 _cardID) public view returns (address) {
         return _minters[_cardID];
-    }
-
-    /**
-     * @dev View function to see if card is playable
-     * @param _cardID The ID of the card to check
-     * @return True if card is playable, false otherwise
-     */
-    function isPlayable(uint256 _cardID) public view returns (bool) {
-        return _cards[_cardID].playable;
-    }
-
-    /**
-     * @dev View function to see if card is blank (no URI)
-     * @param _cardID The ID of the card to check
-     * @return True if card is blank, false otherwise
-     */
-    function isBlank(uint256 _cardID) public view returns (bool) {
-        return _cards[_cardID].blank;
-    }
-
-    /**
-     * @dev View function to see number of cards in that are playable
-     * @return Number of cards in circulation that are not blank and have been voted out
-     */
-    function getPlayableCardCount() public view returns (uint256) {
-        return _playableInCirculation.current();
-    }
-
-    /**
-     * @dev Allow address with MINTER role to mint tokens to a given address.
-     * @param _to The address to mint tokens to.
-     * @param _uri The IPFS CID referencing the new tokens metadata.
-     */
-    function mintCard(address _to, string memory _uri)
-        external
-        onlyRole(MINTER_ROLE)
-    {
-        // Get the next token ID then increment the counter
-        uint256 tokenId = _cardIdCounter.current();
-        _cardIdCounter.increment();
-        _mintCard(tokenId, _to, _uri);
-    }
-
-    /**
-     * @dev Allows owner of a card to update the URI of their card. Requires
-     * that the owner is also the minter of the card and has not already updated
-     * the card's metadata before. If the URI was not set during mint, this function
-     * allows the owner to set it without it counting towards the number of URI changes.
-     * @param _cardID The ID of the card to update
-     * @param _uri The IPFS CID referencing the updated metadata
-     */
-    function updateCardURI(uint256 _cardID, string memory _uri) external {
-        require(_exists(_cardID), "PhlipCard: Card does not exist.");
-        require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty.");
-        require(
-            msg.sender == ownerOf(_cardID),
-            "PhlipCard: Address does not own this card."
-        );
-        require(
-            msg.sender == minterOf(_cardID),
-            "PhlipCard: Only the minter can update the URI."
-        );
-        Card storage card = _cards[_cardID];
-        require(
-            card.uriChangeCount < MAX_URI_CHANGES,
-            "PhlipCard: Maximum number of URI changes reached."
-        );
-
-        if (bytes(card.uri).length > 0) {
-            // Card has set URI at least once, increment URI change count
-            card.uriChangeCount += 1;
-        }
-        card.uri = _uri;
-    }
-
-    /**
-     * @dev Records upvote for a card. Requires that the voter
-     * is not the owner and has not voted on the card already
-     * @param _cardID The ID of the token upvoted
-     */
-    function upVote(uint256 _cardID) external noBlacklisters {
-        require(_exists(_cardID), "PhlipCard: Card does not exist.");
-        require(
-            ownerOf(_cardID) != msg.sender,
-            "PhlipCard: Cannot vote on your own card."
-        );
-        require(
-            _holdsMinDaoTokens(msg.sender),
-            "PhlipCard: Must own PhlipDAO tokens to vote."
-        );
-        // NOTE - Should we allow upvotes on unplayable cards?
-        _castUpVote(_cardID, msg.sender);
-    }
-
-    /**
-     * @dev Records down vote for a card. Requires that the voter
-     * is not the owner and has not voted on the card already. If the
-     * card has been downvoted more than the allowed number of times,
-     * it should be marked unplayable.
-     * @param _cardID The ID of the token upvoted
-     */
-    function downVote(uint256 _cardID) external noBlacklisters {
-        require(_exists(_cardID), "PhlipCard: Card does not exist.");
-        require(
-            ownerOf(_cardID) != msg.sender,
-            "PhlipCard: Cannot vote on your own card."
-        );
-        require(
-            _holdsMinDaoTokens(msg.sender),
-            "PhlipCard: Must own PhlipDAO tokens to vote."
-        );
-        // NOTE - Should we allow downvotes on unplayable cards?
-        _castDownVote(_cardID, msg.sender);
-
-        // NOTE - Need to take into account the number of upvotes
-        if (downVoteValueOf(_cardID) >= MAX_DOWNVOTES) {
-            _cards[_cardID].playable = false;
-            _playableInCirculation.decrement();
-        }
-    }
-
-    /**
-     * @dev Allows MINTER to set the address of the PhlipDAO token contract
-     * @param _ids New contract address
-     */
-    function setVestingSchedule(uint256[] calldata _ids)
-        public
-        onlyRole(MINTER_ROLE)
-    {
-        _setVestingSchedule(_ids);
     }
 
     /**
@@ -242,25 +107,205 @@ contract PhlipCard is
         override
         returns (string memory)
     {
-        require(
-            _exists(_tokenId),
-            "PhlipCard.tokenURI: URI query for nonexistent token"
-        );
+        require(_exists(_tokenId), "PhlipCard: Card does not exist");
 
-        string memory _tokenURI = _cards[_tokenId].uri;
-        string memory base = _baseURI();
+        string storage uri = _tokenURIs[_tokenId];
 
         // If there is no base URI, return the token URI.
-        if (bytes(base).length == 0) {
-            return _tokenURI;
+        if (bytes(BASE_URI).length == 0) {
+            return uri;
         }
         // If both are set, concatenate the baseURI and tokenURI (via abi.encodePacked).
-        if (bytes(_tokenURI).length > 0) {
-            return string(abi.encodePacked(base, _tokenURI));
+        if (bytes(uri).length > 0) {
+            return string(abi.encodePacked(BASE_URI, uri));
         }
 
         return super.tokenURI(_tokenId);
     }
+
+    /***********************************|
+    |     Settings Admin Functions      |
+    |__________________________________*/
+
+    /**
+     * @dev Allows MINTER to set the base URI for
+     * all tokens created by this contract
+     * @param _newURI New base URI
+     */
+    function setBaseURI(string memory _newURI) public onlyRole(SETTINGS_ROLE) {
+        BASE_URI = _newURI;
+    }
+
+    /**
+     * @dev Allows Settings Admin to set max number
+     * of times minter can change the URI of a card.
+     * @param _newMax New max changes allowed
+     */
+    function setMaxUriChanges(uint256 _newMax) public onlyRole(SETTINGS_ROLE) {
+        MAX_URI_CHANGES = _newMax;
+    }
+
+    /**
+     * @dev Allows Settings Admin to set the vesting
+     * scheme ID for future card capsules to use
+     * @param _id ID of vesting scheme to set
+     */
+    function setVestingScheme(uint256 _id) external onlyRole(SETTINGS_ROLE) {
+        _setVestingScheme(_id);
+    }
+
+    /**
+     * @dev Allows Settings Admin to create a new vesting
+     * scheme with 2 vesting schedule IDs
+     * @param _scheme1 ID of first schedule in vesting scheme
+     * @param _scheme2 ID of second schedule in vesting scheme
+     */
+    function addVestingScheme(uint256 _scheme1, uint256 _scheme2)
+        external
+        onlyRole(SETTINGS_ROLE)
+    {
+        _addVestingScheme(_scheme1, _scheme2);
+    }
+
+    /***********************************|
+    |      Pauser Admin Functions       |
+    |__________________________________*/
+
+    /**
+     * @dev Allow address with PAUSER role to pause card transfers
+     */
+    function pause() external onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    /**
+     * @dev Allow address with PAUSER role to unpause card transfers
+     */
+    function unpause() external onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
+
+    /***********************************|
+    |      Minter Admin Functions       |
+    |__________________________________*/
+
+    /**
+     * @dev Allow minter to mint a text card to a given address.
+     * @param _to The address to mint to.
+     * @param _uri The IPFS CID referencing the new cards text metadata.
+     */
+    function mintTextCard(address _to, string memory _uri)
+        external
+        virtual
+        onlyRole(MINTER_ROLE)
+    {
+        // Get the next token ID then increment the counter
+        uint256 tokenId = _tokenIds.current();
+        _tokenIds.increment();
+
+        // Mint card for _to address
+        _mintCard(tokenId, _to, _uri);
+    }
+
+    /**
+     * @dev Allow minter to issue a text card voucher to a given address.
+     * @param _to The address to issue voucher to.
+     */
+    function issueTextCardVoucher(address _to)
+        external
+        virtual
+        onlyRole(MINTER_ROLE)
+    {
+        // Get the next token ID then increment the counter
+        uint256 reservedTokenId = _tokenIds.current();
+        _tokenIds.increment();
+
+        // Issue voucher for reserved token ID
+        _issueVoucher(_to, reservedTokenId);
+    }
+
+    /**
+     * @dev Allow minter to issue many text card vouchers to a given address.
+     * @param _to The address to mint tokens to.
+     * @param _amount The number of card vouchers to issue.
+     */
+    function batchIssueTextCardVouchers(address _to, uint256 _amount)
+        external
+        virtual
+        onlyRole(MINTER_ROLE)
+    {
+        for (uint256 i = 0; i < _amount; i++) {
+            // Get the next token ID then increment the counter
+            uint256 reservedTokenId = _tokenIds.current();
+            _tokenIds.increment();
+            _issueVoucher(_to, reservedTokenId);
+        }
+    }
+
+    /***********************************|
+    |     Public/External Functions     |
+    |__________________________________*/
+
+    /**
+     * @dev Allows owner of a card to update the URI of their card. Requires
+     * that the owner is also the minter of the card and has not already updated
+     * the card's metadata before. If the URI was not set during mint, this function
+     * allows the owner to set it without it counting towards the number of URI changes.
+     * @param _cardID The ID of the card to update
+     * @param _uri The IPFS CID referencing the updated metadata
+     */
+    function updateMetadata(uint256 _cardID, string memory _uri)
+        public
+        virtual
+    {
+        require(_exists(_cardID), "PhlipCard: Card does not exist");
+        require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty");
+        require(msg.sender == ownerOf(_cardID), "PhlipCard: Must be owner");
+        require(msg.sender == _minters[_cardID], "PhlipCard: Must be minter");
+        require(
+            _metadataChangeCounts[_cardID] < MAX_URI_CHANGES,
+            "PhlipCard: Exceeded max URI changes"
+        );
+
+        if (bytes(_tokenURIs[_cardID]).length > 0) {
+            // Card has set URI at least once, increment URI change count
+            _metadataChangeCounts[_cardID] += 1;
+        }
+        _tokenURIs[_cardID] = _uri;
+    }
+
+    /**
+     * @dev Mint card with ID that has been reserved by the callers voucher
+     * Requires that caller has >=1 remaining card vouchers.
+     * @param _reservedID ID reserved by the callers voucher
+     * @param _uri The IPFS CID referencing the new tokens metadata
+     */
+    function redeemVoucher(uint256 _reservedID, string memory _uri)
+        public
+        virtual
+        whenNotPaused
+    {
+        // Checks that caller holds voucher for reserved ID
+        // Deletes voucher record from the registry
+        _redeemVoucher(msg.sender, _reservedID);
+
+        // Mints card with reserved ID to caller
+        _mintCard(_reservedID, msg.sender, _uri);
+    }
+
+    /**
+     * @dev Transfer creatorship of a card to a new address.
+     * @param _to The address to transfer creatorship to.
+     * @param _cardID ID of the card whose creatorship to transfer
+     */
+    function transferCreatorship(address _to, uint256 _cardID) external {
+        require(msg.sender == _minters[_cardID], "PhlipCard: Must be minter");
+        _minters[_cardID] = _to;
+    }
+
+    /***********************************|
+    |         Private Functions         |
+    |__________________________________*/
 
     /**
      * @dev Mints card to the given address and initilizes a ballot for it.
@@ -273,24 +318,11 @@ contract PhlipCard is
         address _to,
         string memory _uri
     ) internal virtual {
-        _safeMint(_to, _cardID, "");
-
-        // Check if card is minted blank
-        bool blank = bytes(_uri).length == 0;
-
-        // Store the new card data then mint the token
-        _cards[_cardID] = Card(_uri, 0, blank, !blank);
+        // Set card URI and minters address
+        _tokenURIs[_cardID] = _uri;
         _minters[_cardID] = _to;
 
-        // Update card counters
-        _playableInCirculation.increment();
-    }
-
-    /**
-     * @dev Override of ERC721._baseURI
-     */
-    function _baseURI() internal view virtual override returns (string memory) {
-        return BASE_URI;
+        _safeMint(_to, _cardID, "");
     }
 
     /**
@@ -304,7 +336,7 @@ contract PhlipCard is
         address _from,
         address _to,
         uint256 _tokenId
-    ) internal override(ERC721, ERC721Lockable) whenNotPaused {
+    ) internal override(VestingCapsule, ERC721Lockable) whenNotPaused {
         super._beforeTokenTransfer(_from, _to, _tokenId);
     }
 
@@ -321,17 +353,6 @@ contract PhlipCard is
         uint256 _tokenId
     ) internal override(ERC721, VestingCapsule) {
         super._afterTokenTransfer(_from, _to, _tokenId);
-    }
-
-    /**
-     * @dev Checks if the given address has PhlipDAO token balance > 0
-     * @param _account Address to check.
-     * @return Wether the address has any PhlipDAO tokens.
-     */
-    function _holdsMinDaoTokens(address _account) internal view returns (bool) {
-        return
-            IERC20(DAO_TOKEN_ADDRESS).balanceOf(_account) >
-            MIN_DAO_TOKENS_REQUIRED;
     }
 
     function supportsInterface(bytes4 interfaceId)

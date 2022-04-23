@@ -11,18 +11,9 @@ import "./VestingCapsule.sol";
  *
  * NOTE - This contract is intended to hold ERC20 tokens on behalf of capsule owners.
  */
-contract GuardedVestingCapsule is VestingCapsule, AccessControl {
+abstract contract GuardedVestingCapsule is VestingCapsule, AccessControl {
+    // Role required for filling reserves and creating schedules
     bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
-
-    /**
-     * @dev Create a new CapsuleManager instance and grant msg.sender TREASURER role.
-     */
-    constructor(string memory _name, string memory _symbol)
-        ERC721(_name, _symbol)
-    {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(TREASURER_ROLE, msg.sender);
-    }
 
     /***********************************|
     |       Treasurer Functions         |
@@ -37,7 +28,7 @@ contract GuardedVestingCapsule is VestingCapsule, AccessControl {
         external
         onlyRole(TREASURER_ROLE)
     {
-        _fillReserves(_scheduleID, _fillAmount);
+        _fillReserves(msg.sender, _scheduleID, _fillAmount);
     }
 
     /**
