@@ -1,5 +1,4 @@
 const PhlipProfile = artifacts.require("PhlipProfile");
-const ERC20Mock = artifacts.require("ERC20Mock");
 const {
     BN, // Big Number support
     constants, // Common constants, like the zero address and largest integers
@@ -10,32 +9,57 @@ require("chai").should();
 
 contract("PhlipProfile", (accounts) => {
     let beforeEachSnapshot;
-    const [admin, accountWithProfile, otherAccount] = accounts;
+    const [admin, profileOwner, otherAccount] = accounts;
 
-    const profileUri = "uri123";
-    const teamName = "team123";
-    const context = {};
+    const baseProfileUri = "uri123";
+    const baseTeamName = "team123";
 
-    const createProfile = async (uri = profileUri, from = otherAccount) => {
-        return await context.profileInstance.createProfile(uri, { from });
+    const createProfile = async (uri = baseProfileUri, from = profileOwner) => {
+        return await profileInstance.createProfile(uri, { from });
     };
 
-    const createTeam = async (name = teamName, from = accountWithProfile) => {
-        return await context.profileInstance.createTeam(name, { from });
+    const createTeam = async (name = baseTeamName, from = profileOwner) => {
+        return await profileInstance.createTeam(name, { from });
+    };
+
+    const joinTeam = async (profileId = 0, teamId = 1, from = profileOwner) => {
+        return await profileInstance.joinTeam(profileId, teamId, {
+            from,
+        });
+    };
+
+    const addFriend = async (
+        profileId = 0,
+        friendId = 1,
+        from = profileOwner
+    ) => {
+        return await profileInstance.addFriend(profileId, friendId, {
+            from,
+        });
+    };
+
+    const removeFriend = async (
+        profileId = 0,
+        friendIndex = 0,
+        from = profileOwner
+    ) => {
+        return await profileInstance.removeFriend(profileId, friendIndex, {
+            from,
+        });
     };
 
     const verifyAddressHasProfile = async (address, bool = true) => {
-        const hasProfile = await context.profileInstance.hasProfile(address);
+        const hasProfile = await profileInstance.hasProfile(address);
         hasProfile.should.be.equal(bool);
     };
 
-    before(async () => {
-        context.profileInstance = await PhlipProfile.new({ from: admin });
-        context.tokenInstance = await ERC20Mock.new({ from: admin });
+    const verifyCurrentTeam = async (profileId, teamId) => {
+        const team = await profileInstance.teamOf(profileId);
+        team.should.be.bignumber.equal(new BN(teamId));
+    };
 
-        // Create base schedule and capsule with index 0 to be use throughout tests
-        await createProfile(profileUri, accountWithProfile);
-        await createTeam();
+    before(async () => {
+        profileInstance = await PhlipProfile.new({ from: admin });
     });
 
     beforeEach(async () => {
@@ -48,67 +72,133 @@ contract("PhlipProfile", (accounts) => {
 
     describe("Minting Profiles", async () => {
         // Failure cases
-        it("should fail when msg.sender already has a profile", async () => {
-            await expectRevert(
-                createProfile(profileUri, accountWithProfile),
-                "PhlipProfile: Address already has a profile."
-            );
-        });
         it("should fail when URI is blank ", async () => {
             await expectRevert(
                 createProfile(""),
-                "PhlipProfile: URI cannot be blank."
+                "PhlipProfile: URI cannot be blank"
+            );
+        });
+        it("should fail when caller already has a profile", async () => {
+            await createProfile();
+            await expectRevert(
+                createProfile(),
+                "PhlipProfile: Already has profile"
             );
         });
 
         // Passing cases
-        it("should pass when msg.sender does not have profile and URI is not blank", async () => {
+        it("should pass when caller does not have profile and URI is not blank", async () => {
             await createProfile();
-            await verifyAddressHasProfile(otherAccount);
+            await verifyAddressHasProfile(profileOwner);
 
-            // Token ID is 1 because we created a profile with index 0 in before()
-            const newProfile = await context.profileInstance.getProfile(1);
-
-            // check that the new schedule has correct values
-            newProfile["uri"].should.be.equal(profileUri);
+            // Ensure that the profile was created properly
+            const newProfile = await profileInstance.getProfile(0);
+            newProfile["uri"].should.be.equal(baseProfileUri);
             newProfile["currentTeam"].should.be.bignumber.equal(new BN(0));
             newProfile["numFriends"].should.be.bignumber.equal(new BN(0));
         });
     });
 
-    describe.skip("Creating Teams", async () => {
+    //? All teams IDs will be >= 1 since 0 is reserved for no team
+    describe("Creating Teams", async () => {
+        beforeEach(async () => {
+            await createProfile();
+        });
         // Failure cases
-        it("should fail when team name is blank", async () => {});
-        it("should fail when msg.sender does not have a profile", async () => {});
+        it("should fail when team name is blank", async () => {
+            await expectRevert(
+                createTeam(""),
+                "PhlipProfile: Team name cannot be blank"
+            );
+        });
+        it("should fail when caller does not have a profile", async () => {
+            await expectRevert(
+                createTeam(baseTeamName, otherAccount),
+                "PhlipProfile: Does not have profile"
+            );
+        });
 
         // Passing cases
-        it("should pass when msg.sender has a profile and team name is not blank", async () => {});
+        it("should pass when caller has a profile and team name is not blank", async () => {
+            await createTeam();
+
+            // Ensure that the team was created properly
+            const newTeam = await profileInstance.getTeamInfo(1);
+            newTeam["name"].should.be.equal(baseTeamName);
+            newTeam["founder"].should.be.equal(profileOwner);
+            newTeam["numMembers"].should.be.bignumber.equal(new BN(0));
+        });
     });
 
-    describe.skip("Joining Teams", async () => {
+    describe("Joining Teams", async () => {
+        beforeEach(async () => {
+            await createProfile();
+            await createTeam();
+        });
         // Failure cases
-        it("should fail when team ID is out of bounds", async () => {});
-        it("should fail when msg.sender does not have a profile", async () => {});
+        it("should fail when team ID is out of bounds", async () => {
+            await expectRevert(
+                joinTeam(0, 2),
+                "PhlipProfile: Team does not exist"
+            );
+        });
+        it("should fail when caller is not profile owner", async () => {
+            await expectRevert(
+                joinTeam(0, 1, otherAccount),
+                "PhlipProfile: Not profile owner"
+            );
+        });
+
+        it("should fail when caller has already joined the team", async () => {
+            await joinTeam();
+            await expectRevert(
+                joinTeam(),
+                "PhlipProfile: Already joined this team"
+            );
+        });
 
         // Passing cases
-        it("should pass when msg.sender has a profile and team ID is valid", async () => {});
+        it("should pass when caller has a profile and team ID is valid", async () => {
+            await joinTeam();
+            await verifyCurrentTeam(0, 1);
+        });
     });
 
-    describe.skip("Adding Friends", async () => {
+    describe("Adding Friends", async () => {
+        beforeEach(async () => {
+            // Create 2 profiles to interact with
+            await createProfile();
+            await createProfile(baseProfileUri, otherAccount);
+        });
         // Failure cases
-        it("should fail when friend ID is out of bounds", async () => {});
-        it("should fail when msg.sender does not have a profile", async () => {});
+        it("should fail when caller is not profile owner", async () => {
+            await expectRevert(
+                addFriend(0, 1, admin),
+                "PhlipProfile: Not profile owner"
+            );
+        });
+        it("should fail when team ID is out of bounds", async () => {
+            await expectRevert(
+                addFriend(0, 2),
+                "PhlipProfile: Friend does not exist"
+            );
+        });
 
         // Passing cases
-        it("should pass when msg.sender has a profile and friend ID is valid", async () => {});
+        it("should pass when params are valid and profile has no friends", async () => {
+            await addFriend();
+            const friends = await profileInstance.getFriends(1);
+            console.log(friends);
+        });
+        it("should pass when params are valid and profile has existing friends", async () => {});
     });
 
     describe.skip("Removing Friends", async () => {
         // Failure cases
         it("should fail when friend index is out of bounds", async () => {});
-        it("should fail when msg.sender does not have a profile", async () => {});
+        it("should fail when caller does not have a profile", async () => {});
 
         // Passing cases
-        it("should pass when msg.sender has a profile and friend index is valid", async () => {});
+        it("should pass when caller has a profile and friend index is valid", async () => {});
     });
 });
