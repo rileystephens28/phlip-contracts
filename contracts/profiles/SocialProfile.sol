@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "../interfaces/IPhlipProfile.sol";
+import "../interfaces/ISocialProfile.sol";
 
 /**
  * @title UserProfile
@@ -19,7 +19,7 @@ import "../interfaces/IPhlipProfile.sol";
  * join too. Joining a team does not provide any direct game benefits to Players. However, teams that
  * frequently win can rise through the leaderboards and gain a lot of publicity (play-to-advertise model).
  */
-contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
+contract SocialProfile is ERC721, AccessControl, ISocialProfile {
     using Counters for Counters.Counter;
 
     string public BASE_URI;
@@ -93,7 +93,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
     function getTeamInfo(uint256 _teamID) public view returns (Team memory) {
         require(
             _teamID < _teamIdCounter.current(),
-            "PhlipProfile: Team does not exist"
+            "SocialProfile: Team does not exist"
         );
         return _teams[_teamID];
     }
@@ -111,7 +111,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
         override
         returns (string memory)
     {
-        require(_exists(_tokenId), "PhlipProfile: Profile does not exist");
+        require(_exists(_tokenId), "SocialProfile: Profile does not exist");
 
         string storage uri = _profiles[_tokenId].uri;
 
@@ -163,10 +163,10 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
      * @param _uri The IPFS CID referencing the new profile's metadata
      */
     function createProfile(string memory _uri) external {
-        require(bytes(_uri).length > 0, "PhlipProfile: URI is blank");
+        require(bytes(_uri).length > 0, "SocialProfile: URI is blank");
         require(
             balanceOf(msg.sender) == 0,
-            "PhlipProfile: Already has profile"
+            "SocialProfile: Already has profile"
         );
 
         uint256 tokenId = _tokenIdCounter.current();
@@ -187,9 +187,9 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
      * @param _name Name of the team.
      */
     function createTeam(string memory _name) external {
-        require(balanceOf(msg.sender) > 0, "PhlipProfile: Must have profile");
-        require(bytes(_name).length > 0, "PhlipProfile: Name is blank");
-        require(bytes(_name).length < 50, "PhlipProfile: Name too long");
+        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
+        require(bytes(_name).length > 0, "SocialProfile: Name is blank");
+        require(bytes(_name).length < 50, "SocialProfile: Name too long");
 
         uint256 teamId = _teamIdCounter.current();
         _teamIdCounter.increment();
@@ -207,18 +207,18 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
      * @param _teamID ID of the team to join
      */
     function joinTeam(uint256 _teamID) external {
-        require(balanceOf(msg.sender) > 0, "PhlipProfile: Must have profile");
-        require(_teamID > 0, "PhlipProfile: Invalid team ID");
+        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
+        require(_teamID > 0, "SocialProfile: Invalid team ID");
         require(
             _teamID < _teamIdCounter.current(),
-            "PhlipProfile: Invalid team ID"
+            "SocialProfile: Invalid team ID"
         );
 
         uint256 profileID = _ownerProfileLookup[msg.sender];
         Profile storage profile = _profiles[profileID];
         Team storage team = _teams[_teamID];
 
-        require(profile.team != _teamID, "PhlipProfile: Already on team");
+        require(profile.team != _teamID, "SocialProfile: Already on team");
 
         // If profile has already joined a team, remove them
         // from that team before adding them to the new team
@@ -242,7 +242,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
      * @dev Sets the team of an existing profile to 0.
      */
     function leaveTeam() external {
-        require(balanceOf(msg.sender) > 0, "PhlipProfile: Must have profile");
+        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
 
         uint256 profileID = _ownerProfileLookup[msg.sender];
         Profile storage profile = _profiles[profileID];
@@ -250,7 +250,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
         uint256 teamID = profile.team;
         Team storage team = _teams[profile.team];
 
-        require(teamID != 0, "PhlipProfile: Not on team");
+        require(teamID != 0, "SocialProfile: Not on team");
 
         // Decrement team members and set current team to 0 (no team)
         team.numMembers -= 1;
@@ -264,15 +264,15 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
      * @param _friendID The ID of the profile being requested.
      */
     function requestFriend(uint256 _friendID) external {
-        require(balanceOf(msg.sender) > 0, "PhlipProfile: Must have profile");
-        require(_exists(_friendID), "PhlipProfile: Friend does not exist");
+        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
+        require(_exists(_friendID), "SocialProfile: Friend does not exist");
 
         uint256 requesterID = _ownerProfileLookup[msg.sender];
         Profile storage requester = _profiles[requesterID];
 
         require(
             requester.friends[_friendID] == FriendStatus.STRANGER,
-            "PhlipProfile: Already friends or requested"
+            "SocialProfile: Already friends or requested"
         );
 
         requester.friends[_friendID] = FriendStatus.PENDING;
@@ -285,7 +285,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
      * @param _requesterID The ID of the profile that requested a friendship.
      */
     function approveFriend(uint256 _requesterID) external {
-        require(balanceOf(msg.sender) > 0, "PhlipProfile: Must have profile");
+        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
 
         uint256 approverID = _ownerProfileLookup[msg.sender];
         Profile storage approver = _profiles[approverID];
@@ -293,7 +293,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
 
         require(
             requester.friends[approverID] == FriendStatus.PENDING,
-            "PhlipProfile: No pending request"
+            "SocialProfile: No pending request"
         );
 
         // Approve friendship for both profiles
@@ -312,7 +312,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
      * @param _friendID The ID of the profile to remove as friend.
      */
     function removeFriend(uint256 _friendID) external {
-        require(balanceOf(msg.sender) > 0, "PhlipProfile: Must have profile");
+        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
 
         uint256 removerID = _ownerProfileLookup[msg.sender];
         Profile storage remover = _profiles[removerID];
@@ -320,7 +320,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
 
         require(
             remover.friends[_friendID] == FriendStatus.APPROVED,
-            "PhlipProfile: Not friends"
+            "SocialProfile: Not friends"
         );
 
         // Remove friendship for both profiles
@@ -352,7 +352,7 @@ contract PhlipProfile is ERC721, AccessControl, IPhlipProfile {
     ) internal override {
         require(
             balanceOf(msg.sender) == 0,
-            "PhlipProfile: Already has profile"
+            "SocialProfile: Already has profile"
         );
         super._beforeTokenTransfer(_from, _to, _tokenId);
     }

@@ -6,7 +6,7 @@ pragma solidity 0.8.13;
  * @author Riley Stephens
  * @dev Functions required to manage a Phlip user and their interactions with the game.
  */
-interface IPhlipProfile {
+interface ISocialProfile {
     event CreateTeam(
         uint256 indexed _team,
         uint256 indexed _founder,

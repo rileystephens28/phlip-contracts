@@ -1,4 +1,4 @@
-const PhlipProfile = artifacts.require("PhlipProfile");
+const SocialProfile = artifacts.require("SocialProfile");
 const {
     BN, // Big Number support
     constants, // Common constants, like the zero address and largest integers
@@ -7,7 +7,7 @@ const {
 } = require("@openzeppelin/test-helpers");
 require("chai").should();
 
-contract("PhlipProfile", (accounts) => {
+contract("SocialProfile", (accounts) => {
     let beforeEachSnapshot;
     const [admin, profileOwner, otherAccount] = accounts;
 
@@ -59,7 +59,7 @@ contract("PhlipProfile", (accounts) => {
     };
 
     before(async () => {
-        profileInstance = await PhlipProfile.new({ from: admin });
+        profileInstance = await SocialProfile.new({ from: admin });
     });
 
     beforeEach(async () => {
@@ -75,14 +75,14 @@ contract("PhlipProfile", (accounts) => {
         it("should fail when URI is blank ", async () => {
             await expectRevert(
                 createProfile(""),
-                "PhlipProfile: URI cannot be blank"
+                "SocialProfile: URI cannot be blank"
             );
         });
         it("should fail when caller already has a profile", async () => {
             await createProfile();
             await expectRevert(
                 createProfile(),
-                "PhlipProfile: Already has profile"
+                "SocialProfile: Already has profile"
             );
         });
 
@@ -108,13 +108,13 @@ contract("PhlipProfile", (accounts) => {
         it("should fail when team name is blank", async () => {
             await expectRevert(
                 createTeam(""),
-                "PhlipProfile: Team name cannot be blank"
+                "SocialProfile: Team name cannot be blank"
             );
         });
         it("should fail when caller does not have a profile", async () => {
             await expectRevert(
                 createTeam(baseTeamName, otherAccount),
-                "PhlipProfile: Does not have profile"
+                "SocialProfile: Does not have profile"
             );
         });
 
@@ -139,13 +139,13 @@ contract("PhlipProfile", (accounts) => {
         it("should fail when team ID is out of bounds", async () => {
             await expectRevert(
                 joinTeam(0, 2),
-                "PhlipProfile: Team does not exist"
+                "SocialProfile: Team does not exist"
             );
         });
         it("should fail when caller is not profile owner", async () => {
             await expectRevert(
                 joinTeam(0, 1, otherAccount),
-                "PhlipProfile: Not profile owner"
+                "SocialProfile: Not profile owner"
             );
         });
 
@@ -153,7 +153,7 @@ contract("PhlipProfile", (accounts) => {
             await joinTeam();
             await expectRevert(
                 joinTeam(),
-                "PhlipProfile: Already joined this team"
+                "SocialProfile: Already joined this team"
             );
         });
 
@@ -174,13 +174,13 @@ contract("PhlipProfile", (accounts) => {
         it("should fail when caller is not profile owner", async () => {
             await expectRevert(
                 addFriend(0, 1, admin),
-                "PhlipProfile: Not profile owner"
+                "SocialProfile: Not profile owner"
             );
         });
         it("should fail when team ID is out of bounds", async () => {
             await expectRevert(
                 addFriend(0, 2),
-                "PhlipProfile: Friend does not exist"
+                "SocialProfile: Friend does not exist"
             );
         });
 
