@@ -696,7 +696,7 @@ contract("VestingVault", (accounts) => {
         });
     });
 
-    describe.only("Withdrawing Capsule Balance", async () => {
+    describe("Withdrawing Capsule Balance", async () => {
         beforeEach(async () => {
             await createCapsule();
         });

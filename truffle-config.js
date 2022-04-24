@@ -13,6 +13,7 @@ module.exports = {
         bscscan: process.env.BSCSCAN_API_KEY,
     },
     mocha: {
+        package: require("mocha-parallel-tests").default,
         reporter: "eth-gas-reporter",
         reporterOptions: {
             coinmarketcap: "d7e5fdac-7c5d-4c95-a0b2-dd494bf2db93",
@@ -20,8 +21,26 @@ module.exports = {
             showTimeSpent: true,
         },
     },
+    compilers: {
+        solc: {
+            version: "0.8.13",
+            parser: "solcjs",
+            settings: {
+                optimizer: {
+                    enabled: true,
+                    runs: 200,
+                },
+            },
+        },
+    },
     networks: {
-        develop: {
+        development: {
+            host: "127.0.0.1",
+            port: 8545,
+            network_id: "*",
+            disableConfirmationListener: true,
+        },
+        ganache: {
             host: "127.0.0.1",
             port: 7545,
             chainId: 1337,
@@ -185,18 +204,6 @@ module.exports = {
                 ),
             network_id: 42161,
             skipDryRun: true,
-        },
-    },
-    compilers: {
-        solc: {
-            version: "0.8.13",
-            docker: true,
-            settings: {
-                optimizer: {
-                    enabled: true,
-                    runs: 200,
-                },
-            },
         },
     },
 };
