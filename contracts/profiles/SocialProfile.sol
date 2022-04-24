@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "../interfaces/ISocialProfile.sol";
 
 /**
- * @title UserProfile
+ * @title SocialProfile
  * @author Riley Stephens
  * @dev ERC721 contract representing a Phlip user and their interactions with the game.
  *
@@ -83,6 +83,24 @@ contract SocialProfile is ERC721, AccessControl, ISocialProfile {
      */
     function friendCountOf(uint256 _profileID) public view returns (uint256) {
         return _profiles[_profileID].numFriends;
+    }
+
+    /**
+     * @dev Accessor function for getting relation status of friends.
+     * @param _baseProfile ID of the profile whose friends to check.
+     * @param _queryProfile ID of the profile to check.
+     * @return Integer representing the friendship status of _queryProfile in relation to _baseProfile.
+     *
+     * 0 = STRANGER
+     * 1 = PENDING
+     * 2 = APPROVED
+     */
+    function getFriendshipStatus(uint256 _baseProfile, uint256 _queryProfile)
+        public
+        view
+        returns (uint256)
+    {
+        return uint256(_profiles[_baseProfile].friends[_queryProfile]);
     }
 
     /**
@@ -189,7 +207,7 @@ contract SocialProfile is ERC721, AccessControl, ISocialProfile {
     function createTeam(string memory _name) external {
         require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
         require(bytes(_name).length > 0, "SocialProfile: Name is blank");
-        require(bytes(_name).length < 50, "SocialProfile: Name too long");
+        require(bytes(_name).length < 65, "SocialProfile: Name too long");
 
         uint256 teamId = _teamIdCounter.current();
         _teamIdCounter.increment();
@@ -207,12 +225,12 @@ contract SocialProfile is ERC721, AccessControl, ISocialProfile {
      * @param _teamID ID of the team to join
      */
     function joinTeam(uint256 _teamID) external {
-        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
         require(_teamID > 0, "SocialProfile: Invalid team ID");
         require(
             _teamID < _teamIdCounter.current(),
             "SocialProfile: Invalid team ID"
         );
+        require(balanceOf(msg.sender) > 0, "SocialProfile: Must have profile");
 
         uint256 profileID = _ownerProfileLookup[msg.sender];
         Profile storage profile = _profiles[profileID];
@@ -350,10 +368,7 @@ contract SocialProfile is ERC721, AccessControl, ISocialProfile {
         address _to,
         uint256 _tokenId
     ) internal override {
-        require(
-            balanceOf(msg.sender) == 0,
-            "SocialProfile: Already has profile"
-        );
+        require(balanceOf(_to) == 0, "SocialProfile: Already has profile");
         super._beforeTokenTransfer(_from, _to, _tokenId);
     }
 }
