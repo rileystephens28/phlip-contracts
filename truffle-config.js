@@ -189,7 +189,7 @@ module.exports = {
     },
     compilers: {
         solc: {
-            version: "0.8.11",
+            version: "0.8.13",
             docker: true,
             settings: {
                 optimizer: {
