@@ -9,16 +9,16 @@ pragma solidity 0.8.13;
  * it is recommended to use the 'Claimable' extension.
  */
 contract Whitelistable {
+    event AddToWhitelist(address indexed account);
+    event RemoveFromWhitelist(address indexed account);
+
     mapping(address => bool) private _whitelist;
 
     /**
      * @dev Require msg.sender to not be blacklisted and reverts if not.
      */
     modifier onlyWhitelisters() {
-        require(
-            _whitelist[msg.sender],
-            "Whitelistable: Address is not whitelisted"
-        );
+        require(_whitelist[msg.sender], "Whitelistable: Not whitelisted");
         _;
     }
 
@@ -35,11 +35,11 @@ contract Whitelistable {
      * @param _address The address to add to the whitelist
      */
     function _addToWhitelist(address _address) internal virtual {
-        require(
-            !_whitelist[_address],
-            "Whitelistable: Address is already whitelisted"
-        );
+        require(!_whitelist[_address], "Whitelistable: Already whitelisted");
+
         _whitelist[_address] = true;
+
+        emit AddToWhitelist(_address);
     }
 
     /**
@@ -47,10 +47,10 @@ contract Whitelistable {
      * @param _address The address to remove from the whitelist
      */
     function _removeFromWhitelist(address _address) internal virtual {
-        require(
-            _whitelist[_address],
-            "Whitelistable: Address is not on the whitelist"
-        );
+        require(_whitelist[_address], "Whitelistable: Not whitelisted");
+
         _whitelist[_address] = false;
+
+        emit RemoveFromWhitelist(_address);
     }
 }

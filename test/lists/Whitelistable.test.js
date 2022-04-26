@@ -1,5 +1,5 @@
 const WhitelistMock = artifacts.require("WhitelistMock");
-const { expectRevert } = require("@openzeppelin/test-helpers");
+const { expectRevert, expectEvent } = require("@openzeppelin/test-helpers");
 require("chai").should();
 
 contract("Whitelistable", (accounts) => {
@@ -42,13 +42,16 @@ contract("Whitelistable", (accounts) => {
             await verifyWhitelisted(account2);
             await expectRevert(
                 addToWhitelist(),
-                "Whitelistable: Address is already whitelisted"
+                "Whitelistable: Already whitelisted"
             );
         });
 
         // Passing case
         it("should pass when address has not been whitelisted", async () => {
-            await addToWhitelist();
+            const receipt = await addToWhitelist();
+            await expectEvent(receipt, "AddToWhitelist", {
+                account: account2,
+            });
             await verifyWhitelisted(account2);
         });
     });
@@ -58,15 +61,21 @@ contract("Whitelistable", (accounts) => {
         it("should fail when address has not been whitelisted", async () => {
             await expectRevert(
                 removeFromWhitelist(),
-                "Whitelistable: Address is not on the whitelist"
+                "Whitelistable: Not whitelisted"
             );
         });
 
         // Passing case
         it("should pass when address has been whitelisted", async () => {
+            // Add to whitelist
             await addToWhitelist();
             await verifyWhitelisted(account2);
-            await removeFromWhitelist();
+
+            // Remove from whitelist
+            const receipt = await removeFromWhitelist();
+            await expectEvent(receipt, "RemoveFromWhitelist", {
+                account: account2,
+            });
             await verifyNotWhitelisted(account2);
         });
     });
@@ -76,7 +85,7 @@ contract("Whitelistable", (accounts) => {
         it("should fail when address is not whitelisted", async () => {
             await expectRevert(
                 whitelistInstance.protectedAction({ from: account1 }),
-                "Whitelistable: Address is not whitelisted"
+                "Whitelistable: Not whitelisted"
             );
             const didAction = await whitelistInstance.didProtectedAction();
             didAction.should.be.equal(false);
