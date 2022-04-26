@@ -104,11 +104,11 @@ abstract contract ERC721Lockable is ERC721, ILockOperator {
      * @param _tokenID The ID of the token to lock
      */
     function lock(uint256 _tokenID) external virtual {
-        require(
-            !_isLocked(_tokenID),
-            "ERC721Lockable: Token is already locked"
-        );
+        require(!_isLocked(_tokenID), "ERC721Lockable: Already locked");
+
         _setLock(_tokenID, true);
+
+        emit Lock(msg.sender, _tokenID);
     }
 
     /**
@@ -116,11 +116,11 @@ abstract contract ERC721Lockable is ERC721, ILockOperator {
      * @param _tokenID The ID of the token to lock
      */
     function unlock(uint256 _tokenID) external virtual {
-        require(
-            _isLocked(_tokenID),
-            "ERC721Lockable: Token is already unlocked"
-        );
+        require(_isLocked(_tokenID), "ERC721Lockable: Already unlocked");
+
         _setLock(_tokenID, false);
+
+        emit Unlock(msg.sender, _tokenID);
     }
 
     /**
@@ -218,7 +218,6 @@ abstract contract ERC721Lockable is ERC721, ILockOperator {
      * @param _tokenID The ID of the token to check
      */
     function _setLock(uint256 _tokenID, bool _lockVal) internal virtual {
-        require(_exists(_tokenID), "ERC721Lockable: Token does not exist");
         require(
             _hasValidOperator(_tokenID),
             "ERC721Lockable: No approved operator"
@@ -243,30 +242,30 @@ abstract contract ERC721Lockable is ERC721, ILockOperator {
         uint256 _expiration
     ) internal virtual {
         require(_exists(_tokenID), "ERC721Lockable: Token does not exist");
+        require(ownerOf(_tokenID) == _owner, "ERC721Lockable: Must be owner");
         require(
             !_hasValidOperator(_tokenID),
-            "ERC721Lockable: Token has existing operator agreement"
+            "ERC721Lockable: Existing operator agreement"
         );
         require(
             _prospect != address(0),
-            "ERC721Lockable: Pending operator cannot be 0x0"
+            "ERC721Lockable: Operator cannot be 0x0"
         );
         require(
             _prospect != _owner,
-            "ERC721Lockable: Pending operator cannot be owner"
+            "ERC721Lockable: Operator cannot be owner"
         );
         require(
             _expiration == 0 || _expiration > block.timestamp,
             "ERC721Lockable: Invalid expiration"
         );
-        require(
-            ownerOf(_tokenID) == _owner,
-            "ERC721Lockable: Owner must initiate operator agreement"
-        );
+
         OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
         agreement.operator = _prospect;
         agreement.status = OperatorStatus.APPROVAL_PENDING;
         agreement.expiration = _expiration;
+
+        emit InitiateAgreement(_owner, _prospect, _tokenID, _expiration);
     }
 
     /**
@@ -281,13 +280,21 @@ abstract contract ERC721Lockable is ERC721, ILockOperator {
         OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
         require(
             agreement.status == OperatorStatus.APPROVAL_PENDING,
-            "ERC721Lockable: No pending operator agreement"
+            "ERC721Lockable: No pending agreement"
         );
         require(
             agreement.operator == _operator,
             "ERC721Lockable: Not pending operator"
         );
+
         agreement.status = OperatorStatus.APPROVED;
+
+        emit FinalizeAgreement(
+            ownerOf(_tokenID),
+            _operator,
+            _tokenID,
+            agreement.expiration
+        );
     }
 
     /**
@@ -321,18 +328,17 @@ abstract contract ERC721Lockable is ERC721, ILockOperator {
         internal
         virtual
     {
-        require(
-            ownerOf(_tokenID) == _owner,
-            "ERC721Lockable: Owner must approve resignation"
-        );
+        require(ownerOf(_tokenID) == _owner, "ERC721Lockable: Must be owner");
         OperatorAgreement storage agreement = _operatorAgreements[_tokenID];
         require(
             agreement.status == OperatorStatus.RESIGNATION_PENDING,
-            "ERC721Lockable: Operator has not initiated resignation"
+            "ERC721Lockable: No pending resignation"
         );
 
         // Ensure the token is not locked
         _lockedByOperator[_tokenID] = false;
+
+        emit TerminateAgreement(_owner, agreement.operator, _tokenID);
 
         // Delete operator agreement
         delete _operatorAgreements[_tokenID];

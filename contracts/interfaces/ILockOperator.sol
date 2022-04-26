@@ -8,6 +8,30 @@ pragma solidity 0.8.13;
  * required to allow an external address to lock and unlock a token.
  */
 interface ILockOperator {
+    event InitiateAgreement(
+        address indexed owner,
+        address indexed operator,
+        uint256 indexed token,
+        uint256 expiration
+    );
+
+    event FinalizeAgreement(
+        address indexed owner,
+        address indexed operator,
+        uint256 indexed token,
+        uint256 expiration
+    );
+
+    event TerminateAgreement(
+        address indexed owner,
+        address indexed operator,
+        uint256 indexed token
+    );
+
+    event Lock(address indexed operator, uint256 indexed token);
+
+    event Unlock(address indexed operator, uint256 indexed token);
+
     /**
      * @dev Accessor to check if a token is locked
      * @param _tokenID The ID of the token to check

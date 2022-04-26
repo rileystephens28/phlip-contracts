@@ -1,6 +1,7 @@
 const ERC721Lockable = artifacts.require("ERC721LockableMock");
 const {
     expectRevert,
+    expectEvent,
     snapshot,
     time,
     constants,
@@ -133,7 +134,7 @@ contract("ERC721Lockable", (accounts) => {
         it("should fail when pending operator is 0x0", async () => {
             await expectRevert(
                 initiateOperatorAgreement(0, constants.ZERO_ADDRESS),
-                "ERC721Lockable: Pending operator cannot be 0x0"
+                "ERC721Lockable: Operator cannot be 0x0"
             );
 
             // Operator agreement status should be 0 (UNSET)
@@ -148,7 +149,7 @@ contract("ERC721Lockable", (accounts) => {
         it("should fail when pending operator is token owner", async () => {
             await expectRevert(
                 initiateOperatorAgreement(0, account),
-                "ERC721Lockable: Pending operator cannot be owner"
+                "ERC721Lockable: Operator cannot be owner"
             );
 
             // Operator agreement status should be 0 (UNSET)
@@ -180,7 +181,7 @@ contract("ERC721Lockable", (accounts) => {
         it("should fail when caller is not token owner", async () => {
             await expectRevert(
                 initiateOperatorAgreement(0, lockOperator, 0, otherAccount),
-                "ERC721Lockable: Owner must initiate operator agreement"
+                "ERC721Lockable: Must be owner"
             );
 
             // Operator agreement status should be 0 (UNSET)
@@ -195,7 +196,15 @@ contract("ERC721Lockable", (accounts) => {
 
         // Passing case
         it("should pass when params are valid and expiration is 0", async () => {
-            await initiateOperatorAgreement();
+            const receipt = await initiateOperatorAgreement();
+
+            // Should emit a InitiateAgreement event
+            expectEvent(receipt, "InitiateAgreement", {
+                owner: account,
+                operator: lockOperator,
+                token: new BN(0),
+                expiration: new BN(0),
+            });
 
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
@@ -209,7 +218,19 @@ contract("ERC721Lockable", (accounts) => {
         it("should pass when params are valid and expiration is in the future", async () => {
             const currentTimeSeconds = new Date().getTime() / 1000;
             const oneWeekFromNow = currentTimeSeconds + 604800;
-            await initiateOperatorAgreement(0, lockOperator, oneWeekFromNow);
+            const receipt = await initiateOperatorAgreement(
+                0,
+                lockOperator,
+                oneWeekFromNow
+            );
+
+            // Should emit a InitiateAgreement event
+            expectEvent(receipt, "InitiateAgreement", {
+                owner: account,
+                operator: lockOperator,
+                token: new BN(0),
+                expiration: new BN(oneWeekFromNow),
+            });
 
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
@@ -222,7 +243,15 @@ contract("ERC721Lockable", (accounts) => {
         });
         it("should pass when overriding pending operator agreement", async () => {
             // Create pending operator agreement
-            await initiateOperatorAgreement();
+            const receipt1 = await initiateOperatorAgreement();
+
+            // Should emit a InitiateAgreement event
+            expectEvent(receipt1, "InitiateAgreement", {
+                owner: account,
+                operator: lockOperator,
+                token: new BN(0),
+                expiration: new BN(0),
+            });
 
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
@@ -234,7 +263,15 @@ contract("ERC721Lockable", (accounts) => {
             await verifyOperatorAddress(0, lockOperator);
 
             // Override pending operator agreement
-            await initiateOperatorAgreement(0, otherAccount);
+            const receipt2 = await initiateOperatorAgreement(0, otherAccount);
+
+            // Should emit a InitiateAgreement event
+            expectEvent(receipt2, "InitiateAgreement", {
+                owner: account,
+                operator: otherAccount,
+                token: new BN(0),
+                expiration: new BN(0),
+            });
 
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
@@ -249,7 +286,20 @@ contract("ERC721Lockable", (accounts) => {
             // Create agreement that expires in one week
             const currentTimeSeconds = new Date().getTime() / 1000;
             const oneWeekFromNow = currentTimeSeconds + 604800;
-            await initiateOperatorAgreement(0, lockOperator, oneWeekFromNow);
+            const receipt1 = await initiateOperatorAgreement(
+                0,
+                lockOperator,
+                oneWeekFromNow
+            );
+
+            // Should emit a InitiateAgreement event
+            expectEvent(receipt1, "InitiateAgreement", {
+                owner: account,
+                operator: lockOperator,
+                token: new BN(0),
+                expiration: new BN(oneWeekFromNow),
+            });
+
             await finalizeOperatorAgreement();
 
             // Operator agreement status should be 2 (APPROVED)
@@ -268,7 +318,15 @@ contract("ERC721Lockable", (accounts) => {
             await verifyOperatorAddress(0, constants.ZERO_ADDRESS);
 
             // Initiate new agreement
-            await initiateOperatorAgreement();
+            const receipt2 = await initiateOperatorAgreement();
+
+            // Should emit a InitiateAgreement event
+            expectEvent(receipt2, "InitiateAgreement", {
+                owner: account,
+                operator: lockOperator,
+                token: new BN(0),
+                expiration: new BN(0),
+            });
 
             // Operator agreement status should be 1 (APPROVAL_PENDING)
             await verifyAgreementStatus(0, 1);
@@ -286,7 +344,7 @@ contract("ERC721Lockable", (accounts) => {
         it("should fail when token does not have pending agreement", async () => {
             await expectRevert(
                 finalizeOperatorAgreement(),
-                "ERC721Lockable: No pending operator agreement"
+                "ERC721Lockable: No pending agreement"
             );
             // Operator agreement status should be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
@@ -317,7 +375,14 @@ contract("ERC721Lockable", (accounts) => {
         it("should pass when params are valid and caller is pending operator", async () => {
             // Create approved operator agreement
             await initiateOperatorAgreement();
-            await finalizeOperatorAgreement();
+            const receipt = await finalizeOperatorAgreement();
+
+            expectEvent(receipt, "FinalizeAgreement", {
+                owner: account,
+                operator: lockOperator,
+                token: new BN(0),
+                expiration: new BN(0),
+            });
 
             // Operator agreement status should be 2 (APPROVED)
             await verifyAgreementStatus(0, 2);
@@ -394,7 +459,7 @@ contract("ERC721Lockable", (accounts) => {
             await initiateResignation();
             await expectRevert(
                 finalizeResignation(0, otherAccount),
-                "ERC721Lockable: Owner must approve resignation"
+                "ERC721Lockable: Must be owner"
             );
 
             // Operator agreement status should be 3 (RESIGNATION_PENDING)
@@ -412,7 +477,7 @@ contract("ERC721Lockable", (accounts) => {
             await finalizeOperatorAgreement();
             await expectRevert(
                 finalizeResignation(),
-                "ERC721Lockable: Operator has not initiated resignation"
+                "ERC721Lockable: No pending resignation"
             );
 
             // Operator agreement status should be 2 (APPROVED)
@@ -430,7 +495,14 @@ contract("ERC721Lockable", (accounts) => {
             await initiateOperatorAgreement();
             await finalizeOperatorAgreement();
             await initiateResignation();
-            await finalizeResignation();
+
+            const receipt = await finalizeResignation();
+
+            expectEvent(receipt, "TerminateAgreement", {
+                owner: account,
+                operator: lockOperator,
+                token: new BN(0),
+            });
 
             // Operator agreement status should now be 0 (UNSET)
             await verifyAgreementStatus(0, 0);
@@ -449,7 +521,7 @@ contract("ERC721Lockable", (accounts) => {
             // Create agreement for token 0
             await initiateOperatorAgreement();
             await finalizeOperatorAgreement();
-            await expectRevert(lock(1), "ERC721Lockable: Token does not exist");
+            await expectRevert(lock(1), "ERC721Lockable: No approved operator");
 
             // Token should still be unlocked
             await verifyUnlocked(0);
@@ -482,10 +554,7 @@ contract("ERC721Lockable", (accounts) => {
             await lock();
             await verifyLocked(0);
 
-            await expectRevert(
-                lock(),
-                "ERC721Lockable: Token is already locked"
-            );
+            await expectRevert(lock(), "ERC721Lockable: Already locked");
             // Token should still be unlocked
             await verifyLocked(0);
         });
@@ -520,7 +589,12 @@ contract("ERC721Lockable", (accounts) => {
             // Create agreement and lock token
             await initiateOperatorAgreement();
             await finalizeOperatorAgreement();
-            await lock();
+
+            const receipt = await lock();
+            expectEvent(receipt, "Lock", {
+                operator: lockOperator,
+                token: new BN(0),
+            });
 
             // Token should be locked
             await verifyLocked(0);
@@ -535,10 +609,7 @@ contract("ERC721Lockable", (accounts) => {
             await finalizeOperatorAgreement();
 
             // Nonexistant token defaults to be unlocked
-            await expectRevert(
-                unlock(1),
-                "ERC721Lockable: Token is already unlocked"
-            );
+            await expectRevert(unlock(1), "ERC721Lockable: Already unlocked");
 
             // Token should still be unlocked
             await verifyUnlocked(0);
@@ -546,10 +617,8 @@ contract("ERC721Lockable", (accounts) => {
 
         it("should fail when token does not have approved operator", async () => {
             // Token with no operator defaults to be unlocked
-            await expectRevert(
-                unlock(),
-                "ERC721Lockable: Token is already unlocked"
-            );
+            await expectRevert(unlock(), "ERC721Lockable: Already unlocked");
+
             // Token should still be unlocked
             await verifyUnlocked(0);
         });
@@ -575,10 +644,8 @@ contract("ERC721Lockable", (accounts) => {
             await initiateOperatorAgreement();
             await finalizeOperatorAgreement();
 
-            await expectRevert(
-                unlock(),
-                "ERC721Lockable: Token is already unlocked"
-            );
+            await expectRevert(unlock(), "ERC721Lockable: Already unlocked");
+
             // Token should still be unlocked
             await verifyUnlocked(0);
         });
@@ -608,10 +675,7 @@ contract("ERC721Lockable", (accounts) => {
             // Token should be unlocked since agreement has expired
             await verifyUnlocked(0);
 
-            await expectRevert(
-                unlock(),
-                "ERC721Lockable: Token is already unlocked"
-            );
+            await expectRevert(unlock(), "ERC721Lockable: Already unlocked");
         });
 
         // Passing case
@@ -625,7 +689,11 @@ contract("ERC721Lockable", (accounts) => {
             await verifyLocked(0);
 
             // Unlock then verify token is unlocked
-            await unlock();
+            const receipt = await unlock();
+            expectEvent(receipt, "Unlock", {
+                operator: lockOperator,
+                token: new BN(0),
+            });
             await verifyUnlocked(0);
         });
     });
