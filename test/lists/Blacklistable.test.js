@@ -1,5 +1,5 @@
 const BlacklistMock = artifacts.require("BlacklistMock");
-const { expectRevert } = require("@openzeppelin/test-helpers");
+const { expectRevert, expectEvent } = require("@openzeppelin/test-helpers");
 require("chai").should();
 
 contract("Blacklistable", (accounts) => {
@@ -42,13 +42,16 @@ contract("Blacklistable", (accounts) => {
             await verifyBlacklisted(account2);
             await expectRevert(
                 addToBlacklist(),
-                "Blacklistable: Address is already blacklisted"
+                "Blacklistable: Already blacklisted"
             );
         });
 
         // Passing case
         it("should pass when address has not been blacklisted", async () => {
-            await addToBlacklist();
+            const receipt = await addToBlacklist();
+            await expectEvent(receipt, "AddToBlacklist", {
+                account: account2,
+            });
             await verifyBlacklisted(account2);
         });
     });
@@ -58,15 +61,21 @@ contract("Blacklistable", (accounts) => {
         it("should fail when address has not been blacklisted", async () => {
             await expectRevert(
                 removeFromBlacklist(),
-                "Blacklistable: Address is not on the blacklist"
+                "Blacklistable: Not blacklisted"
             );
         });
 
         // Passing case
         it("should pass when address has been blacklisted", async () => {
+            // Add to blacklist
             await addToBlacklist();
             await verifyBlacklisted(account2);
-            await removeFromBlacklist();
+
+            // Remove from blacklist
+            const receipt = await removeFromBlacklist();
+            await expectEvent(receipt, "RemoveFromBlacklist", {
+                account: account2,
+            });
             await verifyNotBlacklisted(account2);
         });
     });
@@ -78,7 +87,7 @@ contract("Blacklistable", (accounts) => {
             await verifyBlacklisted(account2);
             await expectRevert(
                 blacklistInstance.protectedAction({ from: account2 }),
-                "Blacklistable: Blacklisted addresses are forbidden"
+                "Blacklistable: On blacklist"
             );
             const didAction = await blacklistInstance.didProtectedAction();
             didAction.should.be.equal(false);
