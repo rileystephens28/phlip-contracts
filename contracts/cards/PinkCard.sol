@@ -3,7 +3,6 @@ pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./PhlipCard.sol";
-import "../interfaces/IImageCard.sol";
 
 /**
  * @title PinkCard
