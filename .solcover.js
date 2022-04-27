@@ -7,5 +7,9 @@ module.exports = {
         "gameRecords",
         "voting",
         "utils",
+        "lists/Blacklist.sol",
+        "lists/Blacklister.sol",
+        "affiliates",
+        "CrowdSale.sol",
     ],
 };

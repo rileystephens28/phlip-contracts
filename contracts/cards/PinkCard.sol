@@ -3,14 +3,13 @@ pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./PhlipCard.sol";
-import "../interfaces/IImageCard.sol";
 
 /**
  * @title PinkCard
  * @author Riley Stephens
  * @dev Implementation of a PhlipCard that supports text and image cards.
  */
-contract PinkCard is PhlipCard, IImageCard {
+contract PinkCard is PhlipCard {
     using Counters for Counters.Counter;
 
     // Possible data types of a card
@@ -27,69 +26,57 @@ contract PinkCard is PhlipCard, IImageCard {
     {}
 
     /***********************************|
-    |          View Functions           |
+    |        External Functions         |
     |__________________________________*/
 
     /**
-     * @dev Accessor function to get type of card
-     * @param _cardID The ID of the card to check
-     * @return 0 if image, 1 if image
+     * @dev Mint card with ID that has been reserved by the callers voucher
+     * Requires that caller has >=1 remaining card vouchers.
+     * @param _reservedID ID reserved by the callers voucher
+     * @param _uri Should be left blank. Only used to match interface function signature.
      */
-    function typeOf(uint256 _cardID) public view returns (uint256) {
-        return uint256(_cardTypes[_cardID]);
+    function redeemVoucher(uint256 _reservedID, string memory _uri)
+        public
+        virtual
+        override
+    {
+        // Passes empty uri
+        require(bytes(_uri).length > 0, "PinkCard: URI cannot be empty");
+        super.redeemVoucher(_reservedID, _uri);
     }
 
     /***********************************|
-    |      Minter Admin Functions       |
+    |        Private Functions          |
     |__________________________________*/
 
     /**
-     * @dev Allow minter to mint a image card to a given address.
-     * @param _to The address to mint to.
-     * @param _uri The IPFS CID referencing the new cards image metadata.
+     * @dev Override of PhlipCard._setCardType to handle setting
+     * card to type TEXT or IMAGE.
+     * @param _cardID The ID of card whose type to set
+     * @param _type Int type of card (0 - text, 1 - image)
      */
-    function mintImageCard(address _to, string memory _uri)
-        external
-        onlyRole(MINTER_ROLE)
+    function _setCardType(uint256 _cardID, uint256 _type)
+        internal
+        virtual
+        override
     {
-        // Get the next token ID then increment the counter
-        uint256 tokenId = _tokenIds.current();
-        _tokenIds.increment();
-
-        // Mint card for _to address
-        _mintCard(tokenId, _to, _uri);
-        _cardTypes[tokenId] = CardType.IMAGE;
+        require(_type < 2, "PinkCard: Invalid card type");
+        _cardTypes[_cardID] = CardType(_type);
     }
 
     /**
-     * @dev Allow minter to issue a image card voucher to a given address.
-     * @param _to The address to issue voucher to.
+     * @dev Override of PhlipCard._setCardType to handle accessing
+     * whether card is a TEXT or IMAGE card.
+     * @param _cardID The ID of card whose type to set
+     * @return Integer type of card (0 - text, 1 - image, etc)
      */
-    function issueImageCardVoucher(address _to) external onlyRole(MINTER_ROLE) {
-        // Get the next token ID then increment the counter
-        uint256 reservedTokenId = _tokenIds.current();
-        _tokenIds.increment();
-
-        // Issue voucher for reserved token ID
-        _issueVoucher(_to, reservedTokenId);
-        _cardTypes[reservedTokenId] = CardType.IMAGE;
-    }
-
-    /**
-     * @dev Allow minter to issue many image card vouchers to a given address.
-     * @param _to The address to mint tokens to.
-     * @param _amount The number of card vouchers to issue.
-     */
-    function batchIssueImageCardVouchers(address _to, uint256 _amount)
-        external
-        onlyRole(MINTER_ROLE)
+    function _getCardType(uint256 _cardID)
+        internal
+        view
+        virtual
+        override
+        returns (uint256)
     {
-        for (uint256 i = 0; i < _amount; i++) {
-            // Get the next token ID then increment the counter
-            uint256 reservedTokenId = _tokenIds.current();
-            _tokenIds.increment();
-            _issueVoucher(_to, reservedTokenId);
-            _cardTypes[reservedTokenId] = CardType.IMAGE;
-        }
+        return uint256(_cardTypes[_cardID]);
     }
 }
