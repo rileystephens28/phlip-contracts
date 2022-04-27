@@ -7,8 +7,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "../vesting/GuardedVestingCapsule.sol";
 import "../lockable/ERC721Lockable.sol";
 import "../vouchers/VoucherRegistry.sol";
-import "../interfaces/IBaseCard.sol";
-import "../interfaces/ITextCard.sol";
+import "../interfaces/IPhlipCard.sol";
 
 /**
  * @title PhlipCard
@@ -38,8 +37,7 @@ contract PhlipCard is
     ERC721Lockable,
     VoucherRegistry,
     Pausable,
-    IBaseCard,
-    ITextCard
+    IPhlipCard
 {
     using Counters for Counters.Counter;
 
@@ -95,6 +93,15 @@ contract PhlipCard is
     }
 
     /**
+     * @dev Accessor function to get type of card
+     * @param _cardID The ID of the card to check
+     * @return 0 if image, 1 if image
+     */
+    function typeOf(uint256 _cardID) public view returns (uint256) {
+        return _getCardType(_cardID);
+    }
+
+    /**
      * @dev Accessor function for getting card's URI from ID
      * Modified implementation of ERC721URIStorage.tokenURI
      * @param _tokenId ID of the card to get URI of
@@ -104,7 +111,7 @@ contract PhlipCard is
         public
         view
         virtual
-        override
+        override(ERC721, IPhlipCard)
         returns (string memory)
     {
         require(_exists(_tokenId), "PhlipCard: Card does not exist");
@@ -193,25 +200,28 @@ contract PhlipCard is
      * @dev Allow minter to mint a text card to a given address.
      * @param _to The address to mint to.
      * @param _uri The IPFS CID referencing the new cards text metadata.
+     * @param _type The type of card to mint (text, image, blank, etc)
      */
-    function mintTextCard(address _to, string memory _uri)
-        external
-        virtual
-        onlyRole(MINTER_ROLE)
-    {
+    function mintCard(
+        address _to,
+        string memory _uri,
+        uint256 _type
+    ) external virtual onlyRole(MINTER_ROLE) {
         // Get the next token ID then increment the counter
         uint256 tokenId = _tokenIds.current();
         _tokenIds.increment();
 
         // Mint card for _to address
         _mintCard(tokenId, _to, _uri);
+        _setCardType(tokenId, _type);
     }
 
     /**
      * @dev Allow minter to issue a text card voucher to a given address.
      * @param _to The address to issue voucher to.
+     * @param _type The type of card to mint (text, image, blank, etc)
      */
-    function issueTextCardVoucher(address _to)
+    function issueCardVoucher(address _to, uint256 _type)
         external
         virtual
         onlyRole(MINTER_ROLE)
@@ -220,25 +230,31 @@ contract PhlipCard is
         uint256 reservedTokenId = _tokenIds.current();
         _tokenIds.increment();
 
-        // Issue voucher for reserved token ID
         _issueVoucher(_to, reservedTokenId);
+        _setCardType(reservedTokenId, _type);
     }
 
     /**
      * @dev Allow minter to issue many text card vouchers to a given address.
      * @param _to The address to mint tokens to.
      * @param _amount The number of card vouchers to issue.
+     * @param _types Array of card types vouchers can be redeemed for  (text, image, blank, etc)
      */
-    function batchIssueTextCardVouchers(address _to, uint256 _amount)
-        external
-        virtual
-        onlyRole(MINTER_ROLE)
-    {
+    function batchIssueCardVouchers(
+        address _to,
+        uint256 _amount,
+        uint256[] calldata _types
+    ) external virtual onlyRole(MINTER_ROLE) {
+        require(
+            _amount == _types.length,
+            "PhlipCard: _types length must match _amount"
+        );
         for (uint256 i = 0; i < _amount; i++) {
             // Get the next token ID then increment the counter
             uint256 reservedTokenId = _tokenIds.current();
             _tokenIds.increment();
             _issueVoucher(_to, reservedTokenId);
+            _setCardType(reservedTokenId, _types[i]);
         }
     }
 
@@ -308,7 +324,7 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Mints card to the given address and initilizes a ballot for it.
+     * @dev Mints card to the given address.
      * @param _cardID The ID of card being minted
      * @param _to The address to mint card to
      * @param _uri The IPFS CID referencing the new card's metadata
@@ -324,6 +340,27 @@ contract PhlipCard is
 
         _safeMint(_to, _cardID, "");
     }
+
+    /**
+     * @dev This function is called when a card is created or a voucher is issued.
+     *  It is intended to be overridden by child contracts to allow for custom type logic.
+     * @param _cardID The ID of card whose type to set
+     * @param _type Int type of card to mint (text, image, blank, etc)
+     */
+    function _setCardType(uint256 _cardID, uint256 _type) internal virtual {}
+
+    /**
+     * @dev This function is called by typeOf. It is intended to be
+     * overridden by child contracts to allow for custom type logic.
+     * @param _cardID The ID of card whose type to set
+     * @return Integer type of card (0 - text, 1 - image, etc)
+     */
+    function _getCardType(uint256 _cardID)
+        internal
+        view
+        virtual
+        returns (uint256)
+    {}
 
     /**
      * @dev Function called before tokens are transferred. Override to

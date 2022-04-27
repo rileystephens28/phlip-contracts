@@ -10,7 +10,7 @@ import "../interfaces/IImageCard.sol";
  * @author Riley Stephens
  * @dev Implementation of a PhlipCard that supports text and image cards.
  */
-contract PinkCard is PhlipCard, IImageCard {
+contract PinkCard is PhlipCard {
     using Counters for Counters.Counter;
 
     // Possible data types of a card
@@ -27,69 +27,37 @@ contract PinkCard is PhlipCard, IImageCard {
     {}
 
     /***********************************|
-    |          View Functions           |
+    |        Private Functions          |
     |__________________________________*/
 
     /**
-     * @dev Accessor function to get type of card
-     * @param _cardID The ID of the card to check
-     * @return 0 if image, 1 if image
+     * @dev Override of PhlipCard._setCardType to handle setting
+     * card to type TEXT or IMAGE.
+     * @param _cardID The ID of card whose type to set
+     * @param _type Int type of card (0 - text, 1 - image)
      */
-    function typeOf(uint256 _cardID) public view returns (uint256) {
+    function _setCardType(uint256 _cardID, uint256 _type)
+        internal
+        virtual
+        override
+    {
+        require(_type < 2, "PinkCard: Invalid card type");
+        _cardTypes[_cardID] = CardType(_type);
+    }
+
+    /**
+     * @dev Override of PhlipCard._setCardType to handle accessing
+     * whether card is a TEXT or IMAGE card.
+     * @param _cardID The ID of card whose type to set
+     * @return Integer type of card (0 - text, 1 - image, etc)
+     */
+    function _getCardType(uint256 _cardID)
+        internal
+        view
+        virtual
+        override
+        returns (uint256)
+    {
         return uint256(_cardTypes[_cardID]);
-    }
-
-    /***********************************|
-    |      Minter Admin Functions       |
-    |__________________________________*/
-
-    /**
-     * @dev Allow minter to mint a image card to a given address.
-     * @param _to The address to mint to.
-     * @param _uri The IPFS CID referencing the new cards image metadata.
-     */
-    function mintImageCard(address _to, string memory _uri)
-        external
-        onlyRole(MINTER_ROLE)
-    {
-        // Get the next token ID then increment the counter
-        uint256 tokenId = _tokenIds.current();
-        _tokenIds.increment();
-
-        // Mint card for _to address
-        _mintCard(tokenId, _to, _uri);
-        _cardTypes[tokenId] = CardType.IMAGE;
-    }
-
-    /**
-     * @dev Allow minter to issue a image card voucher to a given address.
-     * @param _to The address to issue voucher to.
-     */
-    function issueImageCardVoucher(address _to) external onlyRole(MINTER_ROLE) {
-        // Get the next token ID then increment the counter
-        uint256 reservedTokenId = _tokenIds.current();
-        _tokenIds.increment();
-
-        // Issue voucher for reserved token ID
-        _issueVoucher(_to, reservedTokenId);
-        _cardTypes[reservedTokenId] = CardType.IMAGE;
-    }
-
-    /**
-     * @dev Allow minter to issue many image card vouchers to a given address.
-     * @param _to The address to mint tokens to.
-     * @param _amount The number of card vouchers to issue.
-     */
-    function batchIssueImageCardVouchers(address _to, uint256 _amount)
-        external
-        onlyRole(MINTER_ROLE)
-    {
-        for (uint256 i = 0; i < _amount; i++) {
-            // Get the next token ID then increment the counter
-            uint256 reservedTokenId = _tokenIds.current();
-            _tokenIds.increment();
-            _issueVoucher(_to, reservedTokenId);
-            _cardTypes[reservedTokenId] = CardType.IMAGE;
-        }
     }
 }
