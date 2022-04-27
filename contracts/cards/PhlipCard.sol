@@ -93,7 +93,8 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Accessor function to get type of card
+     * @dev Accessor function to get type of card.
+     * Note - This function will also return the type of a voucher
      * @param _cardID The ID of the card to check
      * @return 0 if image, 1 if image
      */
@@ -237,19 +238,14 @@ contract PhlipCard is
     /**
      * @dev Allow minter to issue many text card vouchers to a given address.
      * @param _to The address to mint tokens to.
-     * @param _amount The number of card vouchers to issue.
-     * @param _types Array of card types vouchers can be redeemed for  (text, image, blank, etc)
+     * @param _types Array of integer card types vouchers can be redeemed for.
      */
-    function batchIssueCardVouchers(
-        address _to,
-        uint256 _amount,
-        uint256[] calldata _types
-    ) external virtual onlyRole(MINTER_ROLE) {
-        require(
-            _amount == _types.length,
-            "PhlipCard: _types length must match _amount"
-        );
-        for (uint256 i = 0; i < _amount; i++) {
+    function batchIssueCardVouchers(address _to, uint256[] calldata _types)
+        external
+        virtual
+        onlyRole(MINTER_ROLE)
+    {
+        for (uint256 i = 0; i < _types.length; i++) {
             // Get the next token ID then increment the counter
             uint256 reservedTokenId = _tokenIds.current();
             _tokenIds.increment();
