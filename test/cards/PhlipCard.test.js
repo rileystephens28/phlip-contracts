@@ -80,34 +80,26 @@ contract("PhlipCard", (accounts) => {
         });
     };
 
-    const mintTextCard = async (
-        to = cardOwner,
-        cid = baseCid,
-        from = admin
-    ) => {
-        return await cardInstance.mintTextCard(to, cid, {
+    const mintCard = async (to = cardOwner, cid = baseCid, from = admin) => {
+        return await cardInstance.mintCard(to, cid, new BN(0), {
             from: from,
         });
     };
 
-    const issueTextCardVoucher = async (to = voucherHolder, from = admin) => {
-        return await cardInstance.issueTextCardVoucher(to, {
+    const issueCardVoucher = async (to = voucherHolder, from = admin) => {
+        return await cardInstance.issueCardVoucher(to, new BN(0), {
             from: from,
         });
     };
 
-    const batchIssueTextCardVouchers = async (
+    const batchIssueCardVouchers = async (
         to = voucherHolder,
-        amount = 2,
+        types = [new BN(0), new BN(1)],
         from = admin
     ) => {
-        return await cardInstance.batchIssueTextCardVouchers(
-            to,
-            new BN(amount),
-            {
-                from: from,
-            }
-        );
+        return await cardInstance.batchIssueCardVouchers(to, types, {
+            from: from,
+        });
     };
 
     const transfer = async (
@@ -360,12 +352,12 @@ contract("PhlipCard", (accounts) => {
         });
     });
 
-    describe("Minting Text Cards", () => {
+    describe("Minting Cards", () => {
         // Failing cases
         it("should fail when caller is not minter admin", async () => {
             const revertReason = getRoleRevertReason(otherAccount, MINTER);
             await expectRevert(
-                mintTextCard(recipient, baseCid, otherAccount),
+                mintCard(recipient, baseCid, otherAccount),
                 revertReason
             );
         });
@@ -373,7 +365,7 @@ contract("PhlipCard", (accounts) => {
         it("should fail when recipient is 0x0", async () => {
             // BUG: This test fails because it uses all gas not because of zero address
             await expectRevert(
-                mintTextCard(constants.ZERO_ADDRESS),
+                mintCard(constants.ZERO_ADDRESS),
                 "ERC721: mint to the zero address"
             );
         });
@@ -381,7 +373,7 @@ contract("PhlipCard", (accounts) => {
         // Passing cases
         it("should pass when caller is minter admin", async () => {
             // Mints new card with ID = 3. (IDs 0, 1, 2 are used in before() function)
-            await mintTextCard();
+            await mintCard();
 
             // account should have 1 card
             await verifyCardBalance(cardOwner, 1);
@@ -394,7 +386,7 @@ contract("PhlipCard", (accounts) => {
 
     describe("Transfering Cards", () => {
         beforeEach(async () => {
-            await mintTextCard();
+            await mintCard();
         });
         // Failing cases
         it("should fail when from caller is not card owner", async () => {
@@ -443,7 +435,7 @@ contract("PhlipCard", (accounts) => {
 
     describe("Updating Card Metadata", () => {
         beforeEach(async () => {
-            await mintTextCard();
+            await mintCard();
         });
         // Failing cases
         it("should fail when card ID is out of bounds", async () => {
@@ -495,26 +487,26 @@ contract("PhlipCard", (accounts) => {
         });
     });
 
-    describe("Issuing Text Card Vouchers", () => {
+    describe("Issuing Card Vouchers", () => {
         // Failing cases
         it("should fail when caller is not card minter admin", async () => {
             const revertReason = getRoleRevertReason(otherAccount, MINTER);
             await expectRevert(
-                issueTextCardVoucher(voucherHolder, otherAccount),
+                issueCardVoucher(voucherHolder, otherAccount),
                 revertReason
             );
         });
         it("should fail when recipient is 0x0", async () => {
             // BUG: This test fails because it uses all gas not because of zero address
             await expectRevert(
-                issueTextCardVoucher(constants.ZERO_ADDRESS),
+                issueCardVoucher(constants.ZERO_ADDRESS),
                 "VoucherRegistry: Cannot issue voucher to 0x0"
             );
         });
 
         // Passing cases
         it("should pass when caller is minter admin and address is valid", async () => {
-            await issueTextCardVoucher();
+            await issueCardVoucher();
 
             // Ensure voucher was properly issued to voucherHolder
             await verifyAddressHasVoucher(voucherHolder, true);
@@ -523,26 +515,30 @@ contract("PhlipCard", (accounts) => {
         });
     });
 
-    describe("Batch Issuing Text Card Vouchers", () => {
+    describe("Batch Issuing Card Vouchers", () => {
         // Failing cases
         it("should fail when caller is not card minter admin", async () => {
             const revertReason = getRoleRevertReason(otherAccount, MINTER);
             await expectRevert(
-                batchIssueTextCardVouchers(voucherHolder, 2, otherAccount),
+                batchIssueCardVouchers(
+                    voucherHolder,
+                    [new BN(0), new BN(1)],
+                    otherAccount
+                ),
                 revertReason
             );
         });
         it("should fail when recipient is 0x0", async () => {
             // BUG: This test fails because it uses all gas not because of zero address
             await expectRevert(
-                batchIssueTextCardVouchers(constants.ZERO_ADDRESS),
+                batchIssueCardVouchers(constants.ZERO_ADDRESS),
                 "VoucherRegistry: Cannot issue voucher to 0x0"
             );
         });
 
         // Passing cases
         it("should pass when caller is minter admin and address is valid", async () => {
-            await batchIssueTextCardVouchers();
+            await batchIssueCardVouchers();
 
             // Ensure voucher was properly issued to voucherHolder
             await verifyAddressHasVoucher(voucherHolder, true);
@@ -554,7 +550,7 @@ contract("PhlipCard", (accounts) => {
 
     describe("Redeeming Card Vouchers", () => {
         beforeEach(async () => {
-            await batchIssueTextCardVouchers();
+            await batchIssueCardVouchers();
         });
         // Failing cases
         it("should fail when caller has no vouchers", async () => {
