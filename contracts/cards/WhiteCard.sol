@@ -63,7 +63,7 @@ contract WhiteCard is PhlipCard {
     {
         require(
             _cardTypes[_cardID] == CardType.TEXT,
-            "Cannot update blank card URI"
+            "WhiteCard: Cannot update blank card URI"
         );
         super.updateMetadata(_cardID, _uri);
     }
@@ -72,15 +72,19 @@ contract WhiteCard is PhlipCard {
      * @dev Mint card with ID that has been reserved by the callers voucher
      * Requires that caller has >=1 remaining card vouchers.
      * @param _reservedID ID reserved by the callers voucher
-     * @param _uri Should be left blank. Only used to match interface function signature.
+     * @param _uri URI of text card (pass empty string for blank cards)
      */
     function redeemVoucher(uint256 _reservedID, string memory _uri)
         public
         virtual
         override
     {
-        // Passes empty uri
-        super.redeemVoucher(_reservedID, "");
+        if (_cardTypes[_reservedID] == CardType.BLANK) {
+            super.redeemVoucher(_reservedID, "");
+        } else {
+            require(bytes(_uri).length > 0, "WhiteCard: URI cannot be empty");
+            super.redeemVoucher(_reservedID, _uri);
+        }
     }
 
     /***********************************|

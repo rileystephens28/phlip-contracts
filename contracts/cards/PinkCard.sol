@@ -27,6 +27,26 @@ contract PinkCard is PhlipCard {
     {}
 
     /***********************************|
+    |        External Functions         |
+    |__________________________________*/
+
+    /**
+     * @dev Mint card with ID that has been reserved by the callers voucher
+     * Requires that caller has >=1 remaining card vouchers.
+     * @param _reservedID ID reserved by the callers voucher
+     * @param _uri Should be left blank. Only used to match interface function signature.
+     */
+    function redeemVoucher(uint256 _reservedID, string memory _uri)
+        public
+        virtual
+        override
+    {
+        // Passes empty uri
+        require(bytes(_uri).length > 0, "PinkCard: URI cannot be empty");
+        super.redeemVoucher(_reservedID, _uri);
+    }
+
+    /***********************************|
     |        Private Functions          |
     |__________________________________*/
 
