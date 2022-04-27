@@ -6,7 +6,11 @@ const mnemonic = fs.existsSync(".secret")
 require("dotenv").config();
 
 module.exports = {
-    plugins: ["truffle-plugin-verify", "solidity-coverage"],
+    plugins: [
+        "truffle-plugin-verify",
+        "solidity-coverage",
+        "truffle-contract-size",
+    ],
     api_keys: {
         etherscan: process.env.ETHERSCAN_API_KEY,
         polygonscan: process.env.POLYGONSCAN_API_KEY,

@@ -19,6 +19,7 @@
         "eth-gas-reporter": "^0.2.25",
         "nodemon": "^2.0.15",
         "solidity-coverage": "^0.7.20",
+        "truffle-contract-size": "^2.0.1",
         "truffle-plugin-verify": "^0.5.20"
     },
     "scripts": {
