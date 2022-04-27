@@ -29,6 +29,7 @@ contract("WhiteCard", (accounts) => {
     const baseCid = "base123";
     const testCid = "test123";
 
+    const TEXT_CARD = new BN(0);
     const BLANK_CARD = new BN(1);
 
     const fillReserves = async (
@@ -80,34 +81,50 @@ contract("WhiteCard", (accounts) => {
         });
     };
 
+    const mintTextCard = async (
+        to = cardOwner,
+        cid = baseCid,
+        from = admin
+    ) => {
+        return await cardInstance.mintCard(to, cid, TEXT_CARD, {
+            from: from,
+        });
+    };
+
     const mintBlankCard = async (to = cardOwner, from = admin) => {
-        return await cardInstance.mintBlankCard(to, {
+        return await cardInstance.mintCard(to, "", BLANK_CARD, {
+            from: from,
+        });
+    };
+
+    const issueTextCardVoucher = async (to = voucherHolder, from = admin) => {
+        return await cardInstance.issueCardVoucher(to, TEXT_CARD, {
             from: from,
         });
     };
 
     const issueBlankCardVoucher = async (to = voucherHolder, from = admin) => {
-        return await cardInstance.issueBlankCardVoucher(to, {
+        return await cardInstance.issueCardVoucher(to, BLANK_CARD, {
             from: from,
         });
     };
 
-    const batchIssueBlankCardVouchers = async (
+    const batchIssueCardVouchers = async (
         to = voucherHolder,
-        amount = 2,
+        types = [TEXT_CARD, BLANK_CARD],
         from = admin
     ) => {
-        return await cardInstance.batchIssueBlankCardVouchers(
-            to,
-            new BN(amount),
-            {
-                from: from,
-            }
-        );
+        return await cardInstance.batchIssueCardVouchers(to, types, {
+            from: from,
+        });
     };
 
-    const redeemVoucher = async (reservedID = 0, from = voucherHolder) => {
-        return await cardInstance.redeemVoucher(reservedID, "", {
+    const redeemVoucher = async (
+        reservedID = 0,
+        uri = baseCid,
+        from = voucherHolder
+    ) => {
+        return await cardInstance.redeemVoucher(reservedID, uri, {
             from: from,
         });
     };
@@ -195,104 +212,216 @@ contract("WhiteCard", (accounts) => {
         await this.snapshot.restore();
     });
 
-    describe("Minting Blank Cards", () => {
-        // Failing cases
-        it("should fail when caller is not minter admin", async () => {
-            const revertReason = getRoleRevertReason(otherAccount, MINTER);
-            await expectRevert(
-                mintBlankCard(recipient, otherAccount),
-                revertReason
-            );
+    describe("Minting Cards", () => {
+        context("Text Cards", () => {
+            // Failing cases
+            it("should fail when caller is not minter admin", async () => {
+                const revertReason = getRoleRevertReason(otherAccount, MINTER);
+                await expectRevert(
+                    mintTextCard(cardOwner, baseCid, otherAccount),
+                    revertReason
+                );
+            });
+
+            it("should fail when recipient is 0x0", async () => {
+                // BUG: This test fails because it uses all gas not because of zero address
+                await expectRevert(
+                    mintTextCard(constants.ZERO_ADDRESS),
+                    "ERC721: mint to the zero address"
+                );
+            });
+
+            // Passing cases
+            it("should pass when caller is minter admin", async () => {
+                await mintTextCard();
+
+                // account should have 1 card
+                await verifyCardBalance(cardOwner, 1);
+
+                // Verify card minter and URI are correct
+                await verifyCardMinter(0, cardOwner);
+                await verifyCardURI(0, baseUri + baseCid);
+                await verifyCardType(0, TEXT_CARD);
+            });
         });
+        context("Blank Cards", () => {
+            // Failing cases
+            it("should fail when caller is not minter admin", async () => {
+                const revertReason = getRoleRevertReason(otherAccount, MINTER);
+                await expectRevert(
+                    mintBlankCard(cardOwner, otherAccount),
+                    revertReason
+                );
+            });
 
-        it("should fail when recipient is 0x0", async () => {
-            // BUG: This test fails because it uses all gas not because of zero address
-            await expectRevert(
-                mintBlankCard(constants.ZERO_ADDRESS),
-                "ERC721: mint to the zero address"
-            );
-        });
+            it("should fail when recipient is 0x0", async () => {
+                // BUG: This test fails because it uses all gas not because of zero address
+                await expectRevert(
+                    mintBlankCard(constants.ZERO_ADDRESS),
+                    "ERC721: mint to the zero address"
+                );
+            });
 
-        // Passing cases
-        it("should pass when caller is minter admin", async () => {
-            // Mints new card with ID = 3. (IDs 0, 1, 2 are used in before() function)
-            await mintBlankCard();
+            // Passing cases
+            it("should pass when caller is minter admin", async () => {
+                await mintBlankCard();
 
-            // account should have 1 card
-            await verifyCardBalance(cardOwner, 1);
+                // account should have 1 card
+                await verifyCardBalance(cardOwner, 1);
 
-            // Verify card minter and URI are correct
-            await verifyCardMinter(0, cardOwner);
-            await verifyCardURI(0, "");
-            await verifyCardType(0, BLANK_CARD);
+                // Verify card minter and URI are correct
+                await verifyCardMinter(0, cardOwner);
+                await verifyCardURI(0, "");
+                await verifyCardType(0, BLANK_CARD);
+            });
         });
     });
 
-    describe("Issuing Blank Card Vouchers", () => {
+    describe("Issuing Vouchers", () => {
+        context("For Text Cards", () => {
+            // Failing cases
+            it("should fail when caller is not card minter admin", async () => {
+                const revertReason = getRoleRevertReason(otherAccount, MINTER);
+                await expectRevert(
+                    issueTextCardVoucher(voucherHolder, otherAccount),
+                    revertReason
+                );
+            });
+            it("should fail when recipient is 0x0", async () => {
+                // BUG: This test fails because it uses all gas not because of zero address
+                await expectRevert(
+                    issueTextCardVoucher(constants.ZERO_ADDRESS),
+                    "VoucherRegistry: Cannot issue voucher to 0x0"
+                );
+            });
+
+            // Passing cases
+            it("should pass when caller is minter admin and address is valid", async () => {
+                await issueTextCardVoucher();
+
+                // Ensure voucher was properly issued to voucherHolder
+                await verifyAddressHasVoucher(voucherHolder, true);
+                await verifyRemainingVouchers(voucherHolder, 1);
+                await verifyVoucherHolder(0, voucherHolder);
+                await verifyCardType(0, TEXT_CARD);
+            });
+        });
+
+        context("For Blank Cards", () => {
+            // Failing cases
+            it("should fail when caller is not card minter admin", async () => {
+                const revertReason = getRoleRevertReason(otherAccount, MINTER);
+                await expectRevert(
+                    issueBlankCardVoucher(voucherHolder, otherAccount),
+                    revertReason
+                );
+            });
+            it("should fail when recipient is 0x0", async () => {
+                // BUG: This test fails because it uses all gas not because of zero address
+                await expectRevert(
+                    issueBlankCardVoucher(constants.ZERO_ADDRESS),
+                    "VoucherRegistry: Cannot issue voucher to 0x0"
+                );
+            });
+
+            // Passing cases
+            it("should pass when caller is minter admin and address is valid", async () => {
+                await issueBlankCardVoucher();
+
+                // Ensure voucher was properly issued to voucherHolder
+                await verifyAddressHasVoucher(voucherHolder, true);
+                await verifyRemainingVouchers(voucherHolder, 1);
+                await verifyVoucherHolder(0, voucherHolder);
+                await verifyCardType(0, BLANK_CARD);
+            });
+        });
+    });
+
+    describe("Batch Issuing Vouchers", () => {
         // Failing cases
         it("should fail when caller is not card minter admin", async () => {
             const revertReason = getRoleRevertReason(otherAccount, MINTER);
             await expectRevert(
-                issueBlankCardVoucher(voucherHolder, otherAccount),
+                batchIssueCardVouchers(
+                    voucherHolder,
+                    [TEXT_CARD, BLANK_CARD],
+                    otherAccount
+                ),
                 revertReason
             );
         });
         it("should fail when recipient is 0x0", async () => {
             // BUG: This test fails because it uses all gas not because of zero address
             await expectRevert(
-                issueBlankCardVoucher(constants.ZERO_ADDRESS),
+                batchIssueCardVouchers(constants.ZERO_ADDRESS),
                 "VoucherRegistry: Cannot issue voucher to 0x0"
             );
         });
 
         // Passing cases
-        it("should pass when caller is minter admin and address is valid", async () => {
-            await issueBlankCardVoucher();
+        it("should pass when issuing all text card vouchers", async () => {
+            const types = [TEXT_CARD, TEXT_CARD];
+            await batchIssueCardVouchers(voucherHolder, types);
 
-            // Ensure voucher was properly issued to voucherHolder
-            await verifyAddressHasVoucher(voucherHolder, true);
-            await verifyRemainingVouchers(voucherHolder, 1);
-            await verifyVoucherHolder(0, voucherHolder);
-        });
-    });
-
-    describe("Batch Issuing Blank Card Vouchers", () => {
-        // Failing cases
-        it("should fail when caller is not card minter admin", async () => {
-            const revertReason = getRoleRevertReason(otherAccount, MINTER);
-            await expectRevert(
-                batchIssueBlankCardVouchers(voucherHolder, 2, otherAccount),
-                revertReason
-            );
-        });
-        it("should fail when recipient is 0x0", async () => {
-            // BUG: This test fails because it uses all gas not because of zero address
-            await expectRevert(
-                batchIssueBlankCardVouchers(constants.ZERO_ADDRESS),
-                "VoucherRegistry: Cannot issue voucher to 0x0"
-            );
-        });
-
-        // Passing cases
-        it("should pass when caller is minter admin and address is valid", async () => {
-            await batchIssueBlankCardVouchers();
-
-            // Ensure voucher was properly issued to voucherHolder
+            // Ensure voucher was properly issued
             await verifyAddressHasVoucher(voucherHolder, true);
             await verifyRemainingVouchers(voucherHolder, 2);
+
+            // voucherOwner should own vouchers 0 and 1
             await verifyVoucherHolder(0, voucherHolder);
             await verifyVoucherHolder(1, voucherHolder);
+
+            // Both vouchers should be for TEXT_CARDs
+            await verifyCardType(0, TEXT_CARD);
+            await verifyCardType(1, TEXT_CARD);
+        });
+
+        it("should pass when issuing all blank card vouchers", async () => {
+            const types = [BLANK_CARD, BLANK_CARD];
+            await batchIssueCardVouchers(voucherHolder, types);
+
+            // Ensure voucher was properly issued
+            await verifyAddressHasVoucher(voucherHolder, true);
+            await verifyRemainingVouchers(voucherHolder, 2);
+
+            // voucherOwner should own vouchers 0 and 1
+            await verifyVoucherHolder(0, voucherHolder);
+            await verifyVoucherHolder(1, voucherHolder);
+
+            // Both vouchers should be for BLANK_CARDs
+            await verifyCardType(0, BLANK_CARD);
+            await verifyCardType(1, BLANK_CARD);
+        });
+
+        it("should pass when issuing 1 text and 1 blank card voucher", async () => {
+            const types = [TEXT_CARD, BLANK_CARD];
+            await batchIssueCardVouchers(voucherHolder, types);
+
+            // Ensure voucher was properly issued
+            await verifyAddressHasVoucher(voucherHolder, true);
+            await verifyRemainingVouchers(voucherHolder, 2);
+
+            // voucherOwner should own vouchers 0 and 1
+            await verifyVoucherHolder(0, voucherHolder);
+            await verifyVoucherHolder(1, voucherHolder);
+
+            // Voucher 0 should be for TEXT_CARD
+            await verifyCardType(0, TEXT_CARD);
+
+            // Voucher 1 should be for BLANK_CARD
+            await verifyCardType(1, BLANK_CARD);
         });
     });
 
     describe("Redeeming Card Vouchers", () => {
         beforeEach(async () => {
-            await batchIssueBlankCardVouchers();
+            const types = [TEXT_CARD, BLANK_CARD];
+            await batchIssueCardVouchers(voucherHolder, types);
         });
         // Failing cases
         it("should fail when caller has no vouchers", async () => {
             await expectRevert(
-                redeemVoucher(0, otherAccount),
+                redeemVoucher(0, baseCid, otherAccount),
                 "VoucherRegistry: Not voucher holder"
             );
         });
@@ -330,9 +459,7 @@ contract("WhiteCard", (accounts) => {
             // voucherHolder should still hold voucher 1 and own card 0
             await verifyVoucherHolder(1, voucherHolder);
             await verifyCardOwner(0, voucherHolder);
-
-            // Should have minted a blank card
-            await verifyCardType(0, BLANK_CARD);
+            await verifyCardType(0, TEXT_CARD);
 
             // voucherHolder should now have 1 card and 1 voucher left
             await verifyCardBalance(voucherHolder, 1);
@@ -359,8 +486,8 @@ contract("WhiteCard", (accounts) => {
             await verifyCardOwner(0, voucherHolder);
             await verifyCardOwner(1, voucherHolder);
 
-            // Cards should be blank
-            await verifyCardType(0, BLANK_CARD);
+            // Should have 1 text card and 1 blank card
+            await verifyCardType(0, TEXT_CARD);
             await verifyCardType(1, BLANK_CARD);
 
             // voucherHolder should now have 2 cards and 0 vouchers left
