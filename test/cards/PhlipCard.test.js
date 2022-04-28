@@ -64,42 +64,72 @@ contract("PhlipCard", (accounts) => {
         );
     };
 
-    const addVestingScheme = async (scheduleIds = [0, 1], from = admin) => {
-        return await cardInstance.addVestingScheme(
-            scheduleIds[0],
-            scheduleIds[1],
+    const mintCard = async (
+        to = cardOwner,
+        cid = baseCid,
+        scheduleIds = [new BN(0), new BN(1)],
+        from = admin
+    ) => {
+        const getEstimate = await cardInstance.mintCard.estimateGas(
+            to,
+            cid,
+            new BN(0),
+            scheduleIds,
             {
                 from: from,
             }
         );
-    };
-
-    const setVestingScheme = async (scheduleId = 0, from = admin) => {
-        return await cardInstance.setVestingScheme(scheduleId, {
+        return await cardInstance.mintCard(to, cid, new BN(0), scheduleIds, {
             from: from,
+            gas: getEstimate,
         });
     };
 
-    const mintCard = async (to = cardOwner, cid = baseCid, from = admin) => {
-        return await cardInstance.mintCard(to, cid, new BN(0), {
+    const issueCardVoucher = async (
+        to = voucherHolder,
+        scheduleIds = [new BN(0), new BN(1)],
+        from = admin
+    ) => {
+        const getEstimate = await cardInstance.issueCardVoucher.estimateGas(
+            to,
+            new BN(0),
+            scheduleIds,
+            {
+                from: from,
+            }
+        );
+        return await cardInstance.issueCardVoucher(to, new BN(0), scheduleIds, {
             from: from,
-        });
-    };
-
-    const issueCardVoucher = async (to = voucherHolder, from = admin) => {
-        return await cardInstance.issueCardVoucher(to, new BN(0), {
-            from: from,
+            gas: getEstimate,
         });
     };
 
     const batchIssueCardVouchers = async (
         to = voucherHolder,
-        types = [new BN(0), new BN(1)],
+        amount = 2,
+        scheduleIds = [new BN(0), new BN(1)],
         from = admin
     ) => {
-        return await cardInstance.batchIssueCardVouchers(to, types, {
-            from: from,
-        });
+        const getEstimate =
+            await cardInstance.batchIssueCardVouchers.estimateGas(
+                to,
+                new BN(0),
+                new BN(amount),
+                scheduleIds,
+                {
+                    from: from,
+                }
+            );
+        return await cardInstance.batchIssueCardVouchers(
+            to,
+            new BN(0),
+            new BN(amount),
+            scheduleIds,
+            {
+                from: from,
+                gas: getEstimate,
+            }
+        );
     };
 
     const transfer = async (
@@ -190,13 +220,22 @@ contract("PhlipCard", (accounts) => {
         hasVoucher.should.be.equal(bool);
     };
 
+    const verifyCapsuleIsActive = async (capsuleId, bool) => {
+        const isActive = await cardInstance.isCapsuleActive(capsuleId);
+        isActive.should.be.equal(bool);
+    };
+
+    const verifyCapsuleOwner = async (capsuleId, address) => {
+        const owner = await cardInstance.capsuleOwnerOf(capsuleId);
+        owner.should.be.equal(address);
+    };
+
     const getRoleRevertReason = (address, role) => {
         return (
             "AccessControl: account " +
             address.toLowerCase() +
             " is missing role " +
-            role +
-            "."
+            role
         );
     };
 
@@ -226,9 +265,6 @@ contract("PhlipCard", (accounts) => {
         // Fill schedule reserves with tokens 1 & 2
         await fillReserves(0, 5000, tokenInstance1);
         await fillReserves(1, 5000, tokenInstance2);
-
-        await addVestingScheme([0, 1]);
-        await setVestingScheme(0);
     });
 
     beforeEach(async () => {
@@ -357,7 +393,12 @@ contract("PhlipCard", (accounts) => {
         it("should fail when caller is not minter admin", async () => {
             const revertReason = getRoleRevertReason(otherAccount, MINTER);
             await expectRevert(
-                mintCard(recipient, baseCid, otherAccount),
+                mintCard(
+                    recipient,
+                    baseCid,
+                    [new BN(0), new BN(1)],
+                    otherAccount
+                ),
                 revertReason
             );
         });
@@ -372,7 +413,6 @@ contract("PhlipCard", (accounts) => {
 
         // Passing cases
         it("should pass when caller is minter admin", async () => {
-            // Mints new card with ID = 3. (IDs 0, 1, 2 are used in before() function)
             await mintCard();
 
             // account should have 1 card
@@ -381,6 +421,12 @@ contract("PhlipCard", (accounts) => {
             // Verify card minter and URI are correct
             await verifyCardMinter(0, cardOwner);
             await verifyCardURI(0, baseUri + baseCid);
+
+            // verify cards capsules where created
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, true);
+            await verifyCapsuleOwner(0, cardOwner);
+            await verifyCapsuleOwner(1, cardOwner);
         });
     });
 
@@ -430,6 +476,12 @@ contract("PhlipCard", (accounts) => {
 
             // Verify previous owner has no cards
             await verifyCardBalance(cardOwner, 0);
+
+            // verify cards capsules where transferred
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, true);
+            await verifyCapsuleOwner(0, recipient);
+            await verifyCapsuleOwner(1, recipient);
         });
     });
 
@@ -492,7 +544,11 @@ contract("PhlipCard", (accounts) => {
         it("should fail when caller is not card minter admin", async () => {
             const revertReason = getRoleRevertReason(otherAccount, MINTER);
             await expectRevert(
-                issueCardVoucher(voucherHolder, otherAccount),
+                issueCardVoucher(
+                    voucherHolder,
+                    [new BN(0), new BN(1)],
+                    otherAccount
+                ),
                 revertReason
             );
         });
@@ -522,6 +578,7 @@ contract("PhlipCard", (accounts) => {
             await expectRevert(
                 batchIssueCardVouchers(
                     voucherHolder,
+                    2,
                     [new BN(0), new BN(1)],
                     otherAccount
                 ),
@@ -607,6 +664,12 @@ contract("PhlipCard", (accounts) => {
             // voucherHolder should now have 1 card and 1 voucher left
             await verifyCardBalance(voucherHolder, 1);
             await verifyRemainingVouchers(voucherHolder, 1);
+
+            // verify cards capsules where created when voucher was redeemed
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, true);
+            await verifyCapsuleOwner(0, voucherHolder);
+            await verifyCapsuleOwner(1, voucherHolder);
         });
         it("should pass when caller redeems all vouchers", async () => {
             const remainingVouchers = await cardInstance.remainingVouchers(
@@ -632,6 +695,18 @@ contract("PhlipCard", (accounts) => {
             // voucherHolder should now have 2 cards and 0 vouchers left
             await verifyCardBalance(voucherHolder, 2);
             await verifyRemainingVouchers(voucherHolder, 0);
+
+            // verify capsules where created when 1st voucher was redeemed
+            await verifyCapsuleIsActive(0, true);
+            await verifyCapsuleIsActive(1, true);
+            await verifyCapsuleOwner(0, voucherHolder);
+            await verifyCapsuleOwner(1, voucherHolder);
+
+            // verify capsules where created when 2nd voucher was redeemed
+            await verifyCapsuleIsActive(2, true);
+            await verifyCapsuleIsActive(3, true);
+            await verifyCapsuleOwner(2, voucherHolder);
+            await verifyCapsuleOwner(3, voucherHolder);
         });
     });
 });

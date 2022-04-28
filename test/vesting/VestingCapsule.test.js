@@ -25,16 +25,6 @@ contract("VestingCapsule", (accounts) => {
     // 1 token unit per second
     const baseRate = new BN(1);
 
-    const secondsUntil20PercVested = startTimeOffset.add(
-        baseDuration.div(new BN(5))
-    );
-
-    const secondsUntil50PercVested = startTimeOffset.add(
-        baseDuration.div(new BN(2))
-    );
-
-    const secondsUntilFullyVested = startTimeOffset.add(baseDuration);
-
     const fillReserves = async (
         scheduleId = 0,
         amount = new BN(1000),
