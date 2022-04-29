@@ -27,7 +27,7 @@ contract VestingVault {
      * @param amount The total amount of tokens to be vested.
      * @param cliff The cliff period in seconds.
      * @param duration The number of seconds to until fully vested.
-     * @param tokenRatePerSecond The rate of vesting in tokens per second.
+     * @param rate The number of tokens vesting per second.
      */
     struct VestingSchedule {
         address token;
@@ -264,29 +264,23 @@ contract VestingVault {
     /**
      * @dev Creates a new VestingSchedule that can be used by future Capsules.
      * @param _token The token to be vested.
-     * @param _cliffSeconds The number of seconds after schedule starts and vesting begins.
-     * @param _tokenRatePerSecond The number of tokens to be vested per second.
+     * @param _cliff The number of seconds after schedule starts and vesting begins.
+     * @param _duration The number of seconds until vesting ends.
+     * @param _amount Desired amount of tokens (10^18 denominated) to be vested.
+     * Ex: If the schedule should vest 100 tokens, _amount should be 100000000000000000000
+     * @return The ID of the newly created vesting schedule.
      */
     function _createSchedule(
         address _token,
-        uint256 _cliffSeconds,
-        uint256 _durationSeconds,
-        uint256 _tokenRatePerSecond
-    ) internal {
+        uint256 _cliff,
+        uint256 _duration,
+        uint256 _amount
+    ) internal returns (uint256) {
+        require(_token != address(0), "VestingVault: Token cannot be 0x0");
+        require(_duration > 0, "VestingVault: Duration cannot be 0");
+        require(_amount > 0, "VestingVault: Amount cannot be 0");
         require(
-            _token != address(0),
-            "VestingVault: Token address cannot be 0x0"
-        );
-        require(
-            _durationSeconds > 0,
-            "VestingVault: Duration must be greater than 0"
-        );
-        require(
-            _tokenRatePerSecond > 0,
-            "VestingVault: Token release rate must be greater than 0"
-        );
-        require(
-            _cliffSeconds < _durationSeconds,
+            _cliff < _duration,
             "VestingVault: Cliff must be less than duration"
         );
 
@@ -298,11 +292,12 @@ contract VestingVault {
         _registeredSchedules[currentScheduleId] = true;
         _vestingSchedules[currentScheduleId] = VestingSchedule(
             _token,
-            _durationSeconds * _tokenRatePerSecond,
-            _cliffSeconds,
-            _durationSeconds,
-            _tokenRatePerSecond
+            _amount,
+            _cliff,
+            _duration,
+            _amount / _duration
         );
+        return currentScheduleId;
     }
 
     /***********************************|
@@ -311,9 +306,10 @@ contract VestingVault {
 
     /**
      * @dev Deposits tokens to fill a future capsules for a specified schedule.
-     * Requires that TREASURER approves this contract to spend schedule tokens.
+     * @param _filler Address that holds tokens to be deposited.
+     * Requires that _filler approves caller to spend schedule tokens.
      * @param _scheduleID The ID of the schedule to fill.
-     * @param _fillAmount Amount of tokens transfered from sender to contract.
+     * @param _fillAmount Amount of tokens (10^18 denominated) transfered from sender to contract.
      */
     function _fillReserves(
         address _filler,
@@ -387,7 +383,7 @@ contract VestingVault {
         );
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
         require(
-            _availableScheduleReserves[_scheduleID] >= schedule.amount,
+            _availableScheduleReserves[_scheduleID] > schedule.amount - 1,
             "VestingVault: Insufficient token reserves"
         );
 

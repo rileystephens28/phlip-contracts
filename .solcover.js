@@ -10,6 +10,5 @@ module.exports = {
         "lists/Blacklist.sol",
         "lists/Blacklister.sol",
         "affiliates",
-        "CrowdSale.sol",
     ],
 };

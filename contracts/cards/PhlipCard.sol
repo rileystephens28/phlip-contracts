@@ -59,6 +59,9 @@ contract PhlipCard is
     // Token ID => Address of token minter
     mapping(uint256 => address) internal _minters;
 
+    // Token ID => Array of vesting schedule IDs used to mint card when voucher is redeemed
+    mapping(uint256 => uint256[]) internal _voucherVestingSchemes;
+
     constructor(
         string memory _name,
         string memory _symbol,
@@ -153,28 +156,6 @@ contract PhlipCard is
         MAX_URI_CHANGES = _newMax;
     }
 
-    /**
-     * @dev Allows Settings Admin to set the vesting
-     * scheme ID for future card capsules to use
-     * @param _id ID of vesting scheme to set
-     */
-    function setVestingScheme(uint256 _id) external onlyRole(SETTINGS_ROLE) {
-        _setVestingScheme(_id);
-    }
-
-    /**
-     * @dev Allows Settings Admin to create a new vesting
-     * scheme with 2 vesting schedule IDs
-     * @param _scheme1 ID of first schedule in vesting scheme
-     * @param _scheme2 ID of second schedule in vesting scheme
-     */
-    function addVestingScheme(uint256 _scheme1, uint256 _scheme2)
-        external
-        onlyRole(SETTINGS_ROLE)
-    {
-        _addVestingScheme(_scheme1, _scheme2);
-    }
-
     /***********************************|
     |      Pauser Admin Functions       |
     |__________________________________*/
@@ -202,18 +183,20 @@ contract PhlipCard is
      * @param _to The address to mint to.
      * @param _uri The IPFS CID referencing the new cards text metadata.
      * @param _type The type of card to mint (text, image, blank, etc)
+     * @param _scheduleIDs Array of vesting schedule IDs to create card's vesting capsules from
      */
     function mintCard(
         address _to,
         string memory _uri,
-        uint256 _type
+        uint256 _type,
+        uint256[] calldata _scheduleIDs
     ) external virtual onlyRole(MINTER_ROLE) {
         // Get the next token ID then increment the counter
         uint256 tokenId = _tokenIds.current();
         _tokenIds.increment();
 
         // Mint card for _to address
-        _mintCard(tokenId, _to, _uri);
+        _mintCard(tokenId, _to, _uri, _scheduleIDs);
         _setCardType(tokenId, _type);
     }
 
@@ -221,36 +204,46 @@ contract PhlipCard is
      * @dev Allow minter to issue a text card voucher to a given address.
      * @param _to The address to issue voucher to.
      * @param _type The type of card to mint (text, image, blank, etc)
+     * @param _scheduleIDs Array of vesting schedule IDs to create future card with
      */
-    function issueCardVoucher(address _to, uint256 _type)
-        external
-        virtual
-        onlyRole(MINTER_ROLE)
-    {
+    function issueCardVoucher(
+        address _to,
+        uint256 _type,
+        uint256[] calldata _scheduleIDs
+    ) external virtual onlyRole(MINTER_ROLE) {
         // Get the next token ID then increment the counter
         uint256 reservedTokenId = _tokenIds.current();
         _tokenIds.increment();
+
+        // Set vesting scheme for reserved card
+        _voucherVestingSchemes[reservedTokenId] = _scheduleIDs;
 
         _issueVoucher(_to, reservedTokenId);
         _setCardType(reservedTokenId, _type);
     }
 
     /**
-     * @dev Allow minter to issue many text card vouchers to a given address.
+     * @dev Allow minter to issue many card vouchers (with same type) to a given address.
      * @param _to The address to mint tokens to.
-     * @param _types Array of integer card types vouchers can be redeemed for.
+     * @param _type Integer card type that vouchers can be redeemed for.
+     * @param _amount Number of vouchers to issue.
+     * @param _scheduleIDs Array of vesting schedule IDs to create future cards with
      */
-    function batchIssueCardVouchers(address _to, uint256[] calldata _types)
-        external
-        virtual
-        onlyRole(MINTER_ROLE)
-    {
-        for (uint256 i = 0; i < _types.length; i++) {
+    function batchIssueCardVouchers(
+        address _to,
+        uint256 _type,
+        uint256 _amount,
+        uint256[] calldata _scheduleIDs
+    ) external virtual onlyRole(MINTER_ROLE) {
+        for (uint256 i = 0; i < _amount; i++) {
             // Get the next token ID then increment the counter
             uint256 reservedTokenId = _tokenIds.current();
             _tokenIds.increment();
+
+            _voucherVestingSchemes[reservedTokenId] = _scheduleIDs;
+
             _issueVoucher(_to, reservedTokenId);
-            _setCardType(reservedTokenId, _types[i]);
+            _setCardType(reservedTokenId, _type);
         }
     }
 
@@ -302,7 +295,14 @@ contract PhlipCard is
         _redeemVoucher(msg.sender, _reservedID);
 
         // Mints card with reserved ID to caller
-        _mintCard(_reservedID, msg.sender, _uri);
+        _mintCard(
+            _reservedID,
+            msg.sender,
+            _uri,
+            _voucherVestingSchemes[_reservedID]
+        );
+
+        delete _voucherVestingSchemes[_reservedID];
     }
 
     /**
@@ -328,13 +328,15 @@ contract PhlipCard is
     function _mintCard(
         uint256 _cardID,
         address _to,
-        string memory _uri
+        string memory _uri,
+        uint256[] memory _scheduleIDs
     ) internal virtual {
         // Set card URI and minters address
         _tokenURIs[_cardID] = _uri;
         _minters[_cardID] = _to;
 
-        _safeMint(_to, _cardID, "");
+        _mint(_to, _cardID);
+        _createTokenCapsules(_cardID, _to, block.timestamp, _scheduleIDs);
     }
 
     /**
@@ -369,7 +371,7 @@ contract PhlipCard is
         address _from,
         address _to,
         uint256 _tokenId
-    ) internal override(VestingCapsule, ERC721Lockable) whenNotPaused {
+    ) internal override(ERC721, ERC721Lockable) whenNotPaused {
         super._beforeTokenTransfer(_from, _to, _tokenId);
     }
 

@@ -28,6 +28,7 @@ contract("WhiteCard", (accounts) => {
     const baseMaxUriChanges = new BN(1);
     const baseCid = "base123";
     const testCid = "test123";
+    const baseScheduleIds = [new BN(0), new BN(1)];
 
     const TEXT_CARD = new BN(0);
     const BLANK_CARD = new BN(1);
@@ -44,9 +45,14 @@ contract("WhiteCard", (accounts) => {
                 from: from,
             });
         }
-        return await cardInstance.fillReserves(scheduleId, new BN(amount), {
-            from: from,
-        });
+        return await cardInstance.fillReserves(
+            from,
+            scheduleId,
+            new BN(amount),
+            {
+                from: from,
+            }
+        );
     };
 
     const createSchedule = async (
@@ -65,58 +71,118 @@ contract("WhiteCard", (accounts) => {
         );
     };
 
-    const addVestingScheme = async (scheduleIds = [0, 1], from = admin) => {
-        return await cardInstance.addVestingScheme(
-            scheduleIds[0],
-            scheduleIds[1],
+    const mintTextCard = async (
+        to = cardOwner,
+        cid = baseCid,
+        scheduleIds = baseScheduleIds,
+        from = admin
+    ) => {
+        const getEstimate = await cardInstance.mintCard.estimateGas(
+            to,
+            cid,
+            BLANK_CARD,
+            scheduleIds,
             {
                 from: from,
             }
         );
-    };
-
-    const setVestingScheme = async (scheduleId = 0, from = admin) => {
-        return await cardInstance.setVestingScheme(scheduleId, {
+        return await cardInstance.mintCard(to, cid, TEXT_CARD, scheduleIds, {
             from: from,
+            gas: getEstimate,
         });
     };
 
-    const mintTextCard = async (
+    const mintBlankCard = async (
         to = cardOwner,
         cid = baseCid,
+        scheduleIds = baseScheduleIds,
         from = admin
     ) => {
-        return await cardInstance.mintCard(to, cid, TEXT_CARD, {
+        const getEstimate = await cardInstance.mintCard.estimateGas(
+            to,
+            cid,
+            BLANK_CARD,
+            scheduleIds,
+            {
+                from: from,
+            }
+        );
+        return await cardInstance.mintCard(to, cid, BLANK_CARD, scheduleIds, {
             from: from,
+            gas: getEstimate,
         });
     };
 
-    const mintBlankCard = async (to = cardOwner, from = admin) => {
-        return await cardInstance.mintCard(to, "", BLANK_CARD, {
+    const issueTextCardVoucher = async (
+        to = voucherHolder,
+        scheduleIds = baseScheduleIds,
+        from = admin
+    ) => {
+        const getEstimate = await cardInstance.issueCardVoucher.estimateGas(
+            to,
+            TEXT_CARD,
+            scheduleIds,
+            {
+                from: from,
+            }
+        );
+        return await cardInstance.issueCardVoucher(to, TEXT_CARD, scheduleIds, {
             from: from,
+            gas: getEstimate,
         });
     };
 
-    const issueTextCardVoucher = async (to = voucherHolder, from = admin) => {
-        return await cardInstance.issueCardVoucher(to, TEXT_CARD, {
-            from: from,
-        });
-    };
-
-    const issueBlankCardVoucher = async (to = voucherHolder, from = admin) => {
-        return await cardInstance.issueCardVoucher(to, BLANK_CARD, {
-            from: from,
-        });
+    const issueBlankCardVoucher = async (
+        to = voucherHolder,
+        scheduleIds = baseScheduleIds,
+        from = admin
+    ) => {
+        const getEstimate = await cardInstance.issueCardVoucher.estimateGas(
+            to,
+            BLANK_CARD,
+            scheduleIds,
+            {
+                from: from,
+            }
+        );
+        return await cardInstance.issueCardVoucher(
+            to,
+            BLANK_CARD,
+            scheduleIds,
+            {
+                from: from,
+                gas: getEstimate,
+            }
+        );
     };
 
     const batchIssueCardVouchers = async (
         to = voucherHolder,
-        types = [TEXT_CARD, BLANK_CARD],
+        amount = 2,
+        type = BLANK_CARD,
+        scheduleIds = baseScheduleIds,
         from = admin
     ) => {
-        return await cardInstance.batchIssueCardVouchers(to, types, {
-            from: from,
-        });
+        const getEstimate =
+            await cardInstance.batchIssueCardVouchers.estimateGas(
+                to,
+                type,
+                new BN(amount),
+                scheduleIds,
+                {
+                    from: from,
+                }
+            );
+        return await cardInstance.batchIssueCardVouchers(
+            to,
+            type,
+            new BN(amount),
+            scheduleIds,
+            {
+                from: from,
+                gas: getEstimate,
+            }
+        );
     };
 
     const redeemVoucher = async (
@@ -174,8 +240,7 @@ contract("WhiteCard", (accounts) => {
             "AccessControl: account " +
             address.toLowerCase() +
             " is missing role " +
-            role +
-            "."
+            role
         );
     };
 
@@ -199,9 +264,6 @@ contract("WhiteCard", (accounts) => {
         // Fill schedule reserves with tokens 1 & 2
         await fillReserves(0, 5000, tokenInstance1);
         await fillReserves(1, 5000, tokenInstance2);
-
-        await addVestingScheme([0, 1]);
-        await setVestingScheme(0);
     });
 
     beforeEach(async () => {
@@ -218,7 +280,12 @@ contract("WhiteCard", (accounts) => {
             it("should fail when caller is not minter admin", async () => {
                 const revertReason = getRoleRevertReason(otherAccount, MINTER);
                 await expectRevert(
-                    mintTextCard(cardOwner, baseCid, otherAccount),
+                    mintTextCard(
+                        recipient,
+                        baseCid,
+                        baseScheduleIds,
+                        otherAccount
+                    ),
                     revertReason
                 );
             });
@@ -249,7 +316,12 @@ contract("WhiteCard", (accounts) => {
             it("should fail when caller is not minter admin", async () => {
                 const revertReason = getRoleRevertReason(otherAccount, MINTER);
                 await expectRevert(
-                    mintBlankCard(cardOwner, otherAccount),
+                    mintBlankCard(
+                        recipient,
+                        baseCid,
+                        baseScheduleIds,
+                        otherAccount
+                    ),
                     revertReason
                 );
             });
@@ -283,7 +355,11 @@ contract("WhiteCard", (accounts) => {
             it("should fail when caller is not card minter admin", async () => {
                 const revertReason = getRoleRevertReason(otherAccount, MINTER);
                 await expectRevert(
-                    issueTextCardVoucher(voucherHolder, otherAccount),
+                    issueTextCardVoucher(
+                        voucherHolder,
+                        baseScheduleIds,
+                        otherAccount
+                    ),
                     revertReason
                 );
             });
@@ -312,7 +388,11 @@ contract("WhiteCard", (accounts) => {
             it("should fail when caller is not card minter admin", async () => {
                 const revertReason = getRoleRevertReason(otherAccount, MINTER);
                 await expectRevert(
-                    issueBlankCardVoucher(voucherHolder, otherAccount),
+                    issueBlankCardVoucher(
+                        voucherHolder,
+                        baseScheduleIds,
+                        otherAccount
+                    ),
                     revertReason
                 );
             });
@@ -344,7 +424,9 @@ contract("WhiteCard", (accounts) => {
             await expectRevert(
                 batchIssueCardVouchers(
                     voucherHolder,
-                    [TEXT_CARD, BLANK_CARD],
+                    2,
+                    BLANK_CARD,
+                    baseScheduleIds,
                     otherAccount
                 ),
                 revertReason
@@ -359,9 +441,8 @@ contract("WhiteCard", (accounts) => {
         });
 
         // Passing cases
-        it("should pass when issuing all text card vouchers", async () => {
-            const types = [TEXT_CARD, TEXT_CARD];
-            await batchIssueCardVouchers(voucherHolder, types);
+        it("should pass when issuing text cards", async () => {
+            await batchIssueCardVouchers(voucherHolder, 2, TEXT_CARD);
 
             // Ensure voucher was properly issued
             await verifyAddressHasVoucher(voucherHolder, true);
@@ -377,8 +458,7 @@ contract("WhiteCard", (accounts) => {
         });
 
         it("should pass when issuing all blank card vouchers", async () => {
-            const types = [BLANK_CARD, BLANK_CARD];
-            await batchIssueCardVouchers(voucherHolder, types);
+            await batchIssueCardVouchers(voucherHolder, 2, BLANK_CARD);
 
             // Ensure voucher was properly issued
             await verifyAddressHasVoucher(voucherHolder, true);
@@ -392,31 +472,12 @@ contract("WhiteCard", (accounts) => {
             await verifyCardType(0, BLANK_CARD);
             await verifyCardType(1, BLANK_CARD);
         });
-
-        it("should pass when issuing 1 text and 1 blank card voucher", async () => {
-            const types = [TEXT_CARD, BLANK_CARD];
-            await batchIssueCardVouchers(voucherHolder, types);
-
-            // Ensure voucher was properly issued
-            await verifyAddressHasVoucher(voucherHolder, true);
-            await verifyRemainingVouchers(voucherHolder, 2);
-
-            // voucherOwner should own vouchers 0 and 1
-            await verifyVoucherHolder(0, voucherHolder);
-            await verifyVoucherHolder(1, voucherHolder);
-
-            // Voucher 0 should be for TEXT_CARD
-            await verifyCardType(0, TEXT_CARD);
-
-            // Voucher 1 should be for BLANK_CARD
-            await verifyCardType(1, BLANK_CARD);
-        });
     });
 
     describe("Redeeming Card Vouchers", () => {
         beforeEach(async () => {
-            const types = [TEXT_CARD, BLANK_CARD];
-            await batchIssueCardVouchers(voucherHolder, types);
+            await issueTextCardVoucher();
+            await issueBlankCardVoucher();
         });
         // Failing cases
         it("should fail when caller has no vouchers", async () => {

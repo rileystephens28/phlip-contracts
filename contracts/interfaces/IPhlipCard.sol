@@ -48,18 +48,25 @@ interface IPhlipCard {
      * @dev Issue a card voucher to a given address.
      * @param _to The address to issue voucher to.
      * @param _type The type of card voucher can be redeemed for (text, image, blank, etc)
+     * @param _scheduleIDs Array of vesting schedule IDs to create future card with
      */
-    function issueCardVoucher(address _to, uint256 _type) external;
+    function issueCardVoucher(
+        address _to,
+        uint256 _type,
+        uint256[] calldata _scheduleIDs
+    ) external;
 
     /**
      * @dev Mint a card to a given address.
      * @param _to The address to mint to.
      * @param _uri The IPFS CID referencing the new cards text metadata.
      * @param _type Int type of card to mint (text, image, blank, etc)
+     * @param _scheduleIDs Array of vesting schedule IDs to create card's vesting capsules from
      */
     function mintCard(
         address _to,
         string memory _uri,
-        uint256 _type
+        uint256 _type,
+        uint256[] calldata _scheduleIDs
     ) external;
 }

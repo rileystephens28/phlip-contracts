@@ -28,21 +28,18 @@ contract VestingCapsuleMock is VestingCapsule {
         );
     }
 
-    function mint(address _to) external {
+    function mint(
+        address _to,
+        uint256 _startTime,
+        uint256[] calldata _scheduleIDs
+    ) external {
         uint256 id = tokenIds.current();
         tokenIds.increment();
         _mint(_to, id);
+        _createTokenCapsules(id, _to, _startTime, _scheduleIDs);
     }
 
     function burn(uint256 _id) external {
         _burn(_id);
-    }
-
-    function addVestingScheme(uint256 _scheme1, uint256 _scheme2) external {
-        _addVestingScheme(_scheme1, _scheme2);
-    }
-
-    function setVestingScheme(uint256 _id) external {
-        _setVestingScheme(_id);
     }
 }
