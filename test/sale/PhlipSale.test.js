@@ -792,7 +792,7 @@ contract("PhlipSale", (accounts) => {
         });
     });
 
-    describe.only("Purchasing Card package", async () => {
+    describe("Purchasing Card package", async () => {
         beforeEach(async () => {
             await createSingleCardPackage();
             await createMultiCardPackage(1);
@@ -824,7 +824,7 @@ contract("PhlipSale", (accounts) => {
         });
 
         // Passing case
-        it.only("should pass when purchasing single card package", async () => {
+        it("should pass when purchasing single card package", async () => {
             const receipt = await purchasePackage();
             expectEvent(receipt, "PurchasePackage", {
                 id: new BN(0),
