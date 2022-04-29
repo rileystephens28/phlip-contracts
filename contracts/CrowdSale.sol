@@ -50,6 +50,9 @@ import "./interfaces/IPhlipCard.sol";
 contract PhlipSale is Ownable {
     using SafeERC20 for IERC20;
 
+    event CreatePackage(uint256 id, uint256 price, uint128 numForSale);
+    event PurchasePackage(uint256 indexed id, address purchaser);
+
     enum Color {
         PINK,
         WHITE
@@ -68,7 +71,7 @@ contract PhlipSale is Ownable {
         uint128 mintedSupply;
     }
 
-    struct CardPackageDetails {
+    struct CardBundle {
         uint128 cardID;
         uint128 numCards;
         uint256[2] scheduleIDs;
@@ -77,7 +80,7 @@ contract PhlipSale is Ownable {
         uint256 price;
         uint128 numForSale;
         uint128 numSold;
-        CardPackageDetails[] cardDetails;
+        CardBundle[] cardBundles;
     }
 
     // Each pink card will have at least 1,000,000 dao tokens
@@ -97,6 +100,7 @@ contract PhlipSale is Ownable {
     uint256 private whiteTextCard = 0;
 
     mapping(uint256 => PresalePackage) private _packages;
+    mapping(uint256 => bool) private _registeredPackages;
 
     bool private _presaleActive;
     bool private _generalSaleActive;
@@ -167,19 +171,73 @@ contract PhlipSale is Ownable {
         wbCard.totalSupply = 625;
     }
 
+    /**
+     * @dev Ensures the presale is active and reverts if not.
+     */
     modifier onlyPresale() {
         require(_presaleActive, "Presale is not active");
         _;
     }
 
+    /**
+     * @dev Getter for presale active state.
+     */
     function presaleActive() public view returns (bool) {
         return _presaleActive;
     }
 
+    /**
+     * @dev Getter for the price in WEI of a presale package.
+     * @param _packageID ID of the package to query
+     */
+    function priceOf(uint256 _packageID) public view returns (uint256) {
+        return _packages[_packageID].price;
+    }
+
+    /**
+     * @dev Getter for number of remaining presale packages available for sale
+     * @param _packageID ID of the package to query
+     */
+    function getPackagesRemaining(uint256 _packageID)
+        public
+        view
+        returns (uint128)
+    {
+        PresalePackage storage package = _packages[_packageID];
+        return package.numForSale - package.numSold;
+    }
+
+    /**
+     * @dev Getter for number of remaining presale packages available for sale
+     * @param _packageID ID of the package to query
+     */
+    function getCardBundles(uint256 _packageID)
+        public
+        view
+        returns (CardBundle[] memory)
+    {
+        PresalePackage storage package = _packages[_packageID];
+        return package.cardBundles;
+    }
+
+    /**
+     * @dev Allows contract owner to set presale active state.
+     * @param _active New presale active state.
+     */
     function setPresaleActive(bool _active) public onlyOwner {
         _presaleActive = _active;
     }
 
+    /**
+     * @dev Allows contract owner to create a presale package that contains 1 card type
+     * @param _packageID ID of the package to create (or overwrite)
+     * @param _weiPrice The price of the package in wei
+     * @param _numForSale Number of packages that can be bought
+     * @param _numCards Number of cards in the package
+     * @param _cardID ID of the card in the package (can be 0-3)
+     * @param _daoAmount The amount of DAO tokens that will vest in card
+     * @param _p2eAmount The amount of P2E tokens that will vest in card
+     */
     function createSingleCardPackage(
         uint256 _packageID,
         uint256 _weiPrice,
@@ -189,23 +247,39 @@ contract PhlipSale is Ownable {
         uint256 _daoAmount,
         uint256 _p2eAmount
     ) public onlyOwner {
+        require(!_registeredPackages[_packageID], "Package already exists");
+        require(_weiPrice > 0, "Price cannot be 0");
+        require(_numForSale > 0, "Number of packages cannot be 0");
+
+        _registeredPackages[_packageID] = true;
         PresalePackage storage package = _packages[_packageID];
         package.price = _weiPrice;
         package.numForSale = _numForSale;
 
-        uint256 totalCards = uint256(_numForSale) * uint256(_numCards);
-
         // Add vesting info with card info and number of card in package
-        package.cardDetails.push(
-            _createCardPackage(
+        package.cardBundles.push(
+            _initCardPackage(
                 _cardID,
                 _numCards,
-                _daoAmount * totalCards,
-                _p2eAmount * totalCards
+                _numForSale,
+                _daoAmount,
+                _p2eAmount
             )
         );
+
+        emit CreatePackage(_packageID, _weiPrice, _numForSale);
     }
 
+    /**
+     * @dev Allows contract owner to create a presale package that contains 1 card type
+     * @param _packageID ID of the package to create (or overwrite)
+     * @param _weiPrice The price of the package in wei
+     * @param _numForSale Number of packages that can be bought
+     * @param _cardIDs Array of IDs of the card in the package (can be 0-3)
+     * @param _numCards Array containing number of each card in the package
+     * @param _daoAmounts Array containing the amount of DAO tokens that will vest in each card
+     * @param _p2eAmounts Array containing the amount of P2E tokens that will vest in each card
+     */
     function createMultiCardPackage(
         uint256 _packageID,
         uint256 _weiPrice,
@@ -215,45 +289,54 @@ contract PhlipSale is Ownable {
         uint256[] calldata _daoAmounts,
         uint256[] calldata _p2eAmounts
     ) public onlyOwner {
+        _registeredPackages[_packageID] = true;
+
         PresalePackage storage package = _packages[_packageID];
         package.price = _weiPrice;
         package.numForSale = _numForSale;
 
         for (uint256 i = 0; i < _numCards.length; i++) {
-            uint256 totalCards = uint256(_numForSale) * uint256(_numCards[i]);
-
             // Add vesting info with card info and number of card in package
-            package.cardDetails.push(
-                _createCardPackage(
+            package.cardBundles.push(
+                _initCardPackage(
                     _cardIDs[i],
                     _numCards[i],
-                    _daoAmounts[i] * totalCards,
-                    _p2eAmounts[i] * totalCards
+                    _numForSale,
+                    _daoAmounts[i],
+                    _p2eAmounts[i]
                 )
             );
         }
+
+        emit CreatePackage(_packageID, _weiPrice, _numForSale);
     }
 
+    /**
+     * @dev Allows caller to purchase a presale package if they
+     * have sent the correct amount of ETH to cover the package cost.
+     * @param _packageID ID of the package to purchase.
+     */
     function purchasePackage(uint256 _packageID) public payable onlyPresale {
         PresalePackage storage package = _packages[_packageID];
         require(
             package.numSold < package.numForSale,
             "Package is no longer available"
         );
-        require(msg.value >= package.price, "Not enough ETH to cover cost");
+        require(msg.value > package.price - 1, "Not enough ETH to cover cost");
 
         package.numSold += 1;
 
         uint256[] memory schedules = new uint256[](2);
-        for (uint256 i = 0; i < package.cardDetails.length; i++) {
-            CardPackageDetails storage cardDetails = package.cardDetails[i];
-            CardInfo storage card = _cards[cardDetails.cardID];
-            card.mintedSupply += cardDetails.numCards;
+        for (uint256 i = 0; i < package.cardBundles.length; i++) {
+            CardBundle storage pkgDetails = package.cardBundles[i];
+            CardInfo storage card = _cards[pkgDetails.cardID];
+            card.mintedSupply += pkgDetails.numCards;
 
-            // Overwrite vetsing schedule IDs
-            schedules[0] = cardDetails.scheduleIDs[0];
-            schedules[1] = cardDetails.scheduleIDs[1];
-            for (uint256 j = 0; j < cardDetails.numCards; j++) {
+            for (uint256 j = 0; j < pkgDetails.numCards; j++) {
+                // Overwrite vetsing schedule IDs
+                schedules[0] = pkgDetails.scheduleIDs[0];
+                schedules[1] = pkgDetails.scheduleIDs[1];
+
                 // Mint card
                 card.instance.mintCard(
                     msg.sender,
@@ -268,15 +351,32 @@ contract PhlipSale is Ownable {
         if (refundAmount > 0) {
             payable(msg.sender).transfer(refundAmount);
         }
+
+        emit PurchasePackage(_packageID, msg.sender);
     }
 
-    function _createCardPackage(
+    /**
+     * @dev Creates vesting schedules and fills reserves for a card in package
+     * @param _cardID ID of the card in the package (can be 0-3)
+     * @param _numCards Number of cards in the package
+     * @param _numForSale Number of packages that can be bought
+     * @param _daoAmount The amount of DAO tokens that will vest in card
+     * @param _p2eAmount The amount of P2E tokens that will vest in card
+     */
+    function _initCardPackage(
         uint128 _cardID,
         uint128 _numCards,
+        uint256 _numForSale,
         uint256 _daoAmount,
         uint256 _p2eAmount
-    ) private returns (CardPackageDetails memory) {
+    ) private returns (CardBundle memory) {
+        require(_numCards > 0, "Number of cards cannot be 0");
+        require(_daoAmount > 0, "DAO token amount cannot be 0");
+        require(_p2eAmount > 0, "P2E token amount cannot be 0");
+
         CardInfo storage card = _cards[_cardID];
+
+        uint256 totalCards = _numForSale * _numCards;
 
         IVestingTreasury cardTreasury = IVestingTreasury(
             address(card.instance)
@@ -298,13 +398,20 @@ contract PhlipSale is Ownable {
 
         // Fill reserves for new schedules
         // Note: requires _daoWalletAddress to approve card contract as spender
-        cardTreasury.fillReserves(_daoWalletAddress, daoSchedule, _daoAmount);
+        cardTreasury.fillReserves(
+            _daoWalletAddress,
+            daoSchedule,
+            _daoAmount * totalCards
+        );
 
         // Note: requires _p2eWalletAddress to approve card contract as spender
-        cardTreasury.fillReserves(_p2eWalletAddress, p2eSchedule, _p2eAmount);
+        cardTreasury.fillReserves(
+            _p2eWalletAddress,
+            p2eSchedule,
+            _p2eAmount * totalCards
+        );
 
-        return
-            CardPackageDetails(_cardID, _numCards, [daoSchedule, p2eSchedule]);
+        return CardBundle(_cardID, _numCards, [daoSchedule, p2eSchedule]);
     }
 
     // function buyPinkCard(uint256[] calldata _types, string[] calldata _uris)
