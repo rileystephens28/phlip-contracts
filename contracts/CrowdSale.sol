@@ -221,6 +221,24 @@ contract PhlipSale is Ownable {
     }
 
     /**
+     * @dev Getter for max supply of a specific card.
+     * @param _cardID ID of the card to query
+     */
+    function maxSupplyOf(uint128 _cardID) public view returns (uint128) {
+        CardInfo storage card = _cards[_cardID];
+        return card.totalSupply;
+    }
+
+    /**
+     * @dev Getter for number of minted cards of a specific color & type.
+     * @param _cardID ID of the card to query
+     */
+    function mintedSupplyOf(uint128 _cardID) public view returns (uint128) {
+        CardInfo storage card = _cards[_cardID];
+        return card.mintedSupply;
+    }
+
+    /**
      * @dev Allows contract owner to set presale active state.
      * @param _active New presale active state.
      */
@@ -289,6 +307,10 @@ contract PhlipSale is Ownable {
         uint256[] calldata _daoAmounts,
         uint256[] calldata _p2eAmounts
     ) public onlyOwner {
+        require(!_registeredPackages[_packageID], "Package already exists");
+        require(_weiPrice > 0, "Price cannot be 0");
+        require(_numForSale > 0, "Number of packages cannot be 0");
+
         _registeredPackages[_packageID] = true;
 
         PresalePackage storage package = _packages[_packageID];
@@ -317,11 +339,10 @@ contract PhlipSale is Ownable {
      * @param _packageID ID of the package to purchase.
      */
     function purchasePackage(uint256 _packageID) public payable onlyPresale {
+        require(_registeredPackages[_packageID], "Package does not exist");
+
         PresalePackage storage package = _packages[_packageID];
-        require(
-            package.numSold < package.numForSale,
-            "Package is no longer available"
-        );
+        require(package.numSold < package.numForSale, "Package not available");
         require(msg.value > package.price - 1, "Not enough ETH to cover cost");
 
         package.numSold += 1;
