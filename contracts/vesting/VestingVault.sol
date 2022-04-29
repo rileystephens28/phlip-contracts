@@ -383,7 +383,7 @@ contract VestingVault {
         );
         VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
         require(
-            _availableScheduleReserves[_scheduleID] >= schedule.amount,
+            _availableScheduleReserves[_scheduleID] > schedule.amount - 1,
             "VestingVault: Insufficient token reserves"
         );
 
