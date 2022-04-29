@@ -8,6 +8,8 @@ const {
     snapshot,
     time,
 } = require("@openzeppelin/test-helpers");
+const { tokenUnits } = require("../helpers");
+
 require("chai").should();
 
 contract("VestingCapsule", (accounts) => {
@@ -23,11 +25,12 @@ contract("VestingCapsule", (accounts) => {
     const baseDuration = new BN(1000);
 
     // 1 token unit per second
-    const baseRate = new BN(1);
+    const baseRate = tokenUnits(1);
+    const baseAmount = tokenUnits(1000);
 
     const fillReserves = async (
         scheduleId = 0,
-        amount = new BN(1000),
+        amount = baseAmount,
         token = tokenInstance1,
         from = deployer,
         preApprove = true
@@ -46,14 +49,14 @@ contract("VestingCapsule", (accounts) => {
         token = tokenInstance1.address,
         cliff = baseCliff,
         duration = baseDuration,
-        rate = baseRate,
+        amount = baseAmount,
         from = deployer
     ) => {
         return await capsuleInstance.createVestingSchedule(
             token,
             new BN(cliff),
             new BN(duration),
-            new BN(rate),
+            new BN(amount),
             { from: from }
         );
     };
@@ -154,16 +157,20 @@ contract("VestingCapsule", (accounts) => {
         tokenInstance2 = await ERC20Mock.new({ from: deployer });
 
         // fund the deployer account with 10,000 of tokens 1 & 2
-        await tokenInstance1.mint(deployer, 10000, { from: deployer });
-        await tokenInstance2.mint(deployer, 10000, { from: deployer });
+        await tokenInstance1.mint(deployer, tokenUnits(10000), {
+            from: deployer,
+        });
+        await tokenInstance2.mint(deployer, tokenUnits(10000), {
+            from: deployer,
+        });
 
         // Create vesting schedules for each token
         await createSchedule(tokenInstance1.address);
         await createSchedule(tokenInstance2.address);
 
         // Fill schedule reserves with tokens 1 & 2
-        await fillReserves(0, 5000, tokenInstance1);
-        await fillReserves(1, 5000, tokenInstance2);
+        await fillReserves(0, tokenUnits(5000), tokenInstance1);
+        await fillReserves(1, tokenUnits(5000), tokenInstance2);
     });
 
     beforeEach(async () => {
@@ -246,8 +253,8 @@ contract("VestingCapsule", (accounts) => {
             await createSchedule(tokenInstance2.address);
 
             // Fill schedule reserves 2 & 3
-            await fillReserves(2, 5000, tokenInstance1);
-            await fillReserves(3, 5000, tokenInstance2);
+            await fillReserves(2, tokenUnits(5000), tokenInstance1);
+            await fillReserves(3, tokenUnits(5000), tokenInstance2);
 
             // Add and set a vesting scheme
             await mint(capsuleOwner, [
@@ -305,8 +312,16 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleIsActive(1, false);
 
             // Owner should have balance of 1000 for tokens 1 & 2
-            await verifyTokenBalance(tokenInstance1, capsuleOwner, 1000);
-            await verifyTokenBalance(tokenInstance2, capsuleOwner, 1000);
+            await verifyTokenBalance(
+                tokenInstance1,
+                capsuleOwner,
+                tokenUnits(1000)
+            );
+            await verifyTokenBalance(
+                tokenInstance2,
+                capsuleOwner,
+                tokenUnits(1000)
+            );
 
             // Burn token capsules
             await burn();
@@ -322,9 +337,10 @@ contract("VestingCapsule", (accounts) => {
             await createSchedule(
                 tokenInstance2.address,
                 baseCliff,
-                shorterDuration
+                shorterDuration,
+                baseAmount.div(new BN(2))
             );
-            await fillReserves(2, 5000, tokenInstance2);
+            await fillReserves(2, tokenUnits(5000), tokenInstance2);
 
             // Mint token with 2 capsules that have different durations
             await mint(capsuleOwner, [new BN(0), new BN(2)]);
@@ -338,7 +354,11 @@ contract("VestingCapsule", (accounts) => {
 
             // Capsule should be inactive owner should have token balance of 500
             await verifyCapsuleIsActive(1, false);
-            await verifyTokenBalance(tokenInstance2, capsuleOwner, 500);
+            await verifyTokenBalance(
+                tokenInstance2,
+                capsuleOwner,
+                tokenUnits(500)
+            );
 
             // Burn token capsules
             await burn();
@@ -390,8 +410,16 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleIsActive(1, false);
 
             // Owner should have balance of 1000 for tokens 1 & 2
-            await verifyTokenBalance(tokenInstance1, capsuleOwner, 1000);
-            await verifyTokenBalance(tokenInstance2, capsuleOwner, 1000);
+            await verifyTokenBalance(
+                tokenInstance1,
+                capsuleOwner,
+                tokenUnits(1000)
+            );
+            await verifyTokenBalance(
+                tokenInstance2,
+                capsuleOwner,
+                tokenUnits(1000)
+            );
 
             // Transfer token
             await transfer();
@@ -410,9 +438,10 @@ contract("VestingCapsule", (accounts) => {
             await createSchedule(
                 tokenInstance2.address,
                 baseCliff,
-                shorterDuration
+                shorterDuration,
+                baseAmount.div(new BN(2))
             );
-            await fillReserves(2, 5000, tokenInstance2);
+            await fillReserves(2, tokenUnits(5000), tokenInstance2);
 
             // Mint token with 2 capsules that have different durations
             await mint(capsuleOwner, [new BN(0), new BN(2)]);
@@ -427,7 +456,11 @@ contract("VestingCapsule", (accounts) => {
             // Capsule should be inactive owner should have token balance of 500
             await verifyCapsuleIsActive(0, true);
             await verifyCapsuleIsActive(1, false);
-            await verifyTokenBalance(tokenInstance2, capsuleOwner, 500);
+            await verifyTokenBalance(
+                tokenInstance2,
+                capsuleOwner,
+                tokenUnits(500)
+            );
 
             // Transfer token capsules
             await transfer();
@@ -456,18 +489,18 @@ contract("VestingCapsule", (accounts) => {
             // Withdraw tokens from both capsules
             await withdrawFromCapsules();
 
-            // Owner should have balance of 500 (+-5) of tokens 1 & 2
+            // Owner should have balance of 500 (+-10) of tokens 1 & 2
             await verifyTokenBalanceInRange(
                 tokenInstance1,
                 capsuleOwner,
-                500,
-                5
+                tokenUnits(500),
+                tokenUnits(10)
             );
             await verifyTokenBalanceInRange(
                 tokenInstance2,
                 capsuleOwner,
-                500,
-                5
+                tokenUnits(500),
+                tokenUnits(10)
             );
 
             // Verifiy capsules are active
@@ -489,8 +522,16 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleIsActive(1, false);
 
             // Owner should have balance of 1000 for tokens 1 & 2
-            await verifyTokenBalance(tokenInstance1, capsuleOwner, 1000);
-            await verifyTokenBalance(tokenInstance2, capsuleOwner, 1000);
+            await verifyTokenBalance(
+                tokenInstance1,
+                capsuleOwner,
+                tokenUnits(1000)
+            );
+            await verifyTokenBalance(
+                tokenInstance2,
+                capsuleOwner,
+                tokenUnits(1000)
+            );
         });
         it("should pass when token holds 1 active & 1 inactive capsule", async () => {
             const shorterDuration = new BN(500);
@@ -498,9 +539,10 @@ contract("VestingCapsule", (accounts) => {
             await createSchedule(
                 tokenInstance2.address,
                 baseCliff,
-                shorterDuration
+                shorterDuration,
+                baseAmount.div(new BN(2))
             );
-            await fillReserves(2, 5000, tokenInstance2);
+            await fillReserves(2, tokenUnits(5000), tokenInstance2);
 
             // Mint token with 2 capsules that have different durations
             await mint(capsuleOwner, [new BN(0), new BN(2)]);
@@ -516,10 +558,14 @@ contract("VestingCapsule", (accounts) => {
             await verifyTokenBalanceInRange(
                 tokenInstance1,
                 capsuleOwner,
-                500,
-                1
+                tokenUnits(500),
+                tokenUnits(1)
             );
-            await verifyTokenBalance(tokenInstance2, capsuleOwner, 500);
+            await verifyTokenBalance(
+                tokenInstance2,
+                capsuleOwner,
+                tokenUnits(500)
+            );
 
             // Capsule 1 should be active & capsule 2 should be inactive
             await verifyCapsuleIsActive(0, true);
