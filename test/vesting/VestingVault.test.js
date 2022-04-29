@@ -8,15 +8,10 @@ const {
     snapshot,
     time,
 } = require("@openzeppelin/test-helpers");
+
+const { tokenUnits } = require("../helpers");
+
 require("chai").should();
-
-const tokenDecimals = new BN(18);
-
-const tokenbits = new BN(10).pow(tokenDecimals);
-
-const tokenUnits = (val) => {
-    return new BN(val).mul(tokenbits);
-};
 
 contract("VestingVault", (accounts) => {
     let vaultInstance, tokenInstance, tokenInstance2, beforeEachSnapshot;
@@ -31,8 +26,8 @@ contract("VestingVault", (accounts) => {
     const baseDuration = new BN(1000);
 
     // 1 token unit per second
-    const baseRate = new BN(1).mul(tokenbits);
-    const baseAmount = new BN(1000).mul(tokenbits);
+    const baseRate = tokenUnits(1);
+    const baseAmount = tokenUnits(1000);
 
     const secondsUntil20PercVested = startTimeOffset.add(
         baseDuration.div(new BN(5))
@@ -242,7 +237,7 @@ contract("VestingVault", (accounts) => {
         await createSchedule(tokenInstance.address);
 
         // Fill schedule 0 reserves
-        await fillReserves(0, baseAmount, tokenInstance);
+        await fillReserves(0, tokenUnits(1000), tokenInstance);
     });
 
     beforeEach(async () => {
@@ -316,25 +311,31 @@ contract("VestingVault", (accounts) => {
         });
         it("should fail when caller has not approved ERC20 spending", async () => {
             await expectRevert(
-                fillReserves(0, baseAmount, tokenInstance, deployer, false),
+                fillReserves(
+                    0,
+                    tokenUnits(1000),
+                    tokenInstance,
+                    deployer,
+                    false
+                ),
                 "ERC20: insufficient allowance"
             );
         });
         // Passing cases
         it("should pass when parmas are valid and ERC20 control is approved", async () => {
             // Should have 1000 tokens in total
-            await verifyTotalReserves(0, baseAmount);
+            await verifyTotalReserves(0, tokenUnits(1000));
 
             // Should have 1000 tokens available for capsules
-            await verifyAvailableReserves(0, baseAmount);
+            await verifyAvailableReserves(0, tokenUnits(1000));
 
             await fillReserves();
 
             // Total reserves should now have 2000 tokens
-            await verifyTotalReserves(0, baseAmount.mul(new BN(2)));
+            await verifyTotalReserves(0, tokenUnits(1000).mul(new BN(2)));
 
             // Available reserves should now have 2000 tokens
-            await verifyAvailableReserves(0, baseAmount.mul(new BN(2)));
+            await verifyAvailableReserves(0, tokenUnits(1000).mul(new BN(2)));
         });
     });
 
