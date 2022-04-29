@@ -10,6 +10,14 @@ const {
 } = require("@openzeppelin/test-helpers");
 require("chai").should();
 
+const tokenDecimals = new BN(18);
+
+const tokenbits = new BN(10).pow(tokenDecimals);
+
+const tokenUnits = (val) => {
+    return new BN(val).mul(tokenbits);
+};
+
 contract("VestingVault", (accounts) => {
     let vaultInstance, tokenInstance, tokenInstance2, beforeEachSnapshot;
     const [deployer, capsuleOwner, recipient, account, otherAccount] = accounts;
@@ -23,7 +31,8 @@ contract("VestingVault", (accounts) => {
     const baseDuration = new BN(1000);
 
     // 1 token unit per second
-    const baseRate = new BN(1);
+    const baseRate = new BN(1).mul(tokenbits);
+    const baseAmount = new BN(1000).mul(tokenbits);
 
     const secondsUntil20PercVested = startTimeOffset.add(
         baseDuration.div(new BN(5))
@@ -37,7 +46,7 @@ contract("VestingVault", (accounts) => {
 
     const fillReserves = async (
         scheduleId = 0,
-        amount = new BN(1000),
+        amount = baseAmount,
         token = tokenInstance,
         from = deployer,
         preApprove = true
@@ -56,14 +65,14 @@ contract("VestingVault", (accounts) => {
         token = tokenInstance.address,
         cliff = baseCliff,
         duration = baseDuration,
-        rate = baseRate,
+        amount = baseAmount,
         from = deployer
     ) => {
         return await vaultInstance.createVestingSchedule(
             token,
             new BN(cliff),
             new BN(duration),
-            new BN(rate),
+            new BN(amount),
             { from: from }
         );
     };
@@ -225,13 +234,15 @@ contract("VestingVault", (accounts) => {
         tokenInstance = await ERC20Mock.new({ from: deployer });
 
         // fund the deployer account with 10,000 mock ERC20 tokens
-        await tokenInstance.mint(deployer, 10000, { from: deployer });
+        await tokenInstance.mint(deployer, tokenUnits(10000), {
+            from: deployer,
+        });
 
         // Create vesting schedules for each token
         await createSchedule(tokenInstance.address);
 
-        // Fill schedule reserves with tokens 1 & 2
-        await fillReserves(0, 1000, tokenInstance);
+        // Fill schedule 0 reserves
+        await fillReserves(0, baseAmount, tokenInstance);
     });
 
     beforeEach(async () => {
@@ -247,16 +258,16 @@ contract("VestingVault", (accounts) => {
         it("should fail when token address is 0x0 ", async () => {
             await expectRevert(
                 createSchedule(constants.ZERO_ADDRESS),
-                "VestingVault: Token address cannot be 0x0"
+                "VestingVault: Token cannot be 0x0"
             );
         });
-        it("should fail when durationSeconds is 0 ", async () => {
+        it("should fail when duration is 0 ", async () => {
             await expectRevert(
                 createSchedule(tokenInstance.address, baseCliff, 0),
-                "VestingVault: Duration must be greater than 0"
+                "VestingVault: Duration cannot be 0"
             );
         });
-        it("should fail when tokenRatePerSecond is 0 ", async () => {
+        it("should fail when amount is 0 ", async () => {
             await expectRevert(
                 createSchedule(
                     tokenInstance.address,
@@ -264,10 +275,10 @@ contract("VestingVault", (accounts) => {
                     baseDuration,
                     0
                 ),
-                "VestingVault: Token release rate must be greater than 0"
+                "VestingVault: Amount cannot be 0"
             );
         });
-        it("should fail when cliffSeconds >= durationSeconds ", async () => {
+        it("should fail when cliff >= duration ", async () => {
             await expectRevert(
                 createSchedule(tokenInstance.address, 2000),
                 "VestingVault: Cliff must be less than duration"
@@ -285,9 +296,7 @@ contract("VestingVault", (accounts) => {
             newSchedule["rate"].should.be.bignumber.equal(baseRate);
             newSchedule["cliff"].should.be.bignumber.equal(baseCliff);
             newSchedule["duration"].should.be.bignumber.equal(baseDuration);
-            newSchedule["amount"].should.be.bignumber.equal(
-                baseRate.mul(baseDuration)
-            );
+            newSchedule["amount"].should.be.bignumber.equal(baseAmount);
         });
     });
 
@@ -307,25 +316,25 @@ contract("VestingVault", (accounts) => {
         });
         it("should fail when caller has not approved ERC20 spending", async () => {
             await expectRevert(
-                fillReserves(0, new BN(1000), tokenInstance, deployer, false),
+                fillReserves(0, baseAmount, tokenInstance, deployer, false),
                 "ERC20: insufficient allowance"
             );
         });
         // Passing cases
         it("should pass when parmas are valid and ERC20 control is approved", async () => {
             // Should have 1000 tokens in total
-            await verifyTotalReserves(0, 1000);
+            await verifyTotalReserves(0, baseAmount);
 
             // Should have 1000 tokens available for capsules
-            await verifyAvailableReserves(0, 1000);
+            await verifyAvailableReserves(0, baseAmount);
 
             await fillReserves();
 
             // Total reserves should now have 2000 tokens
-            await verifyTotalReserves(0, 2000);
+            await verifyTotalReserves(0, baseAmount.mul(new BN(2)));
 
             // Available reserves should now have 2000 tokens
-            await verifyAvailableReserves(0, 2000);
+            await verifyAvailableReserves(0, baseAmount.mul(new BN(2)));
         });
     });
 
@@ -341,12 +350,7 @@ contract("VestingVault", (accounts) => {
 
             it("should fail when schedules available reserves < schedule amount", async () => {
                 // Create a schedule that vests 1000 tokens per second for 1000 seconds
-                await createSchedule(
-                    tokenInstance.address,
-                    baseCliff,
-                    baseDuration,
-                    new BN(1000)
-                );
+                await createSchedule();
 
                 await expectRevert(
                     createCapsule(capsuleOwner, 1),
@@ -357,7 +361,7 @@ contract("VestingVault", (accounts) => {
             // Passing cases
             it("should pass when parmas are valid", async () => {
                 // Should have 1000 tokens available for capsules
-                await verifyAvailableReserves(0, 1000);
+                await verifyAvailableReserves(0, tokenUnits(1000));
 
                 // Should have 0 tokens locked in capsules
                 await verifyLockedReserves(0, 0);
@@ -372,7 +376,7 @@ contract("VestingVault", (accounts) => {
                 await verifyAvailableReserves(0, 0);
 
                 // Reserves should now have 1000 tokens locked
-                await verifyLockedReserves(0, 1000);
+                await verifyLockedReserves(0, tokenUnits(1000));
 
                 await verifyCapsuleOwner(0, capsuleOwner);
 
@@ -407,7 +411,7 @@ contract("VestingVault", (accounts) => {
             // Passing cases
             it("should pass when owner is not 0x0 & start time is not in the past", async () => {
                 // Should have 1000 tokens available for capsules
-                await verifyAvailableReserves(0, 1000);
+                await verifyAvailableReserves(0, tokenUnits(1000));
 
                 // Should have 0 tokens locked in capsules
                 await verifyLockedReserves(0, 0);
@@ -422,7 +426,7 @@ contract("VestingVault", (accounts) => {
                 await verifyAvailableReserves(0, 0);
 
                 // Reserves should now have 1000 tokens locked
-                await verifyLockedReserves(0, 1000);
+                await verifyLockedReserves(0, tokenUnits(1000));
 
                 await verifyCapsuleOwner(0, capsuleOwner);
 
@@ -604,7 +608,7 @@ contract("VestingVault", (accounts) => {
                 await verifyCapsuleIsActive(0, false);
 
                 // Should have 1000 tokens available
-                await verifyAvailableReserves(0, 1000);
+                await verifyAvailableReserves(0, tokenUnits(1000));
             });
             it("should pass when capsule has been withdrawn from before", async () => {
                 // Increase time so capsule is 20% vested
@@ -630,7 +634,7 @@ contract("VestingVault", (accounts) => {
                 // Should have 1000 tokens available
                 await verifyAvailableReserves(
                     0,
-                    new BN(1000).sub(vestedBalance)
+                    tokenUnits(1000).sub(vestedBalance)
                 );
             });
         });
@@ -664,7 +668,7 @@ contract("VestingVault", (accounts) => {
                 await verifyCapsuleIsActive(0, false);
 
                 // Should have 1000 tokens available
-                await verifyAvailableReserves(0, 1000);
+                await verifyAvailableReserves(0, tokenUnits(1000));
             });
             it("should pass when capsule has been withdrawn from before", async () => {
                 // Increase time so capsule is 20% vested
@@ -690,7 +694,7 @@ contract("VestingVault", (accounts) => {
                 // Should have 1000 tokens available
                 await verifyAvailableReserves(
                     0,
-                    new BN(1000).sub(vestedBalance)
+                    tokenUnits(1000).sub(vestedBalance)
                 );
             });
         });
@@ -945,7 +949,10 @@ contract("VestingVault", (accounts) => {
             await verifyCapsuleIsActive(0, false);
 
             // Should have 1000 tokens available
-            await verifyAvailableReserves(0, new BN(1000).sub(vestedBalance));
+            await verifyAvailableReserves(
+                0,
+                tokenUnits(1000).sub(vestedBalance)
+            );
         });
     });
 });
