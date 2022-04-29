@@ -43,9 +43,14 @@ contract("PhlipCard", (accounts) => {
                 from: from,
             });
         }
-        return await cardInstance.fillReserves(scheduleId, new BN(amount), {
-            from: from,
-        });
+        return await cardInstance.fillReserves(
+            from,
+            scheduleId,
+            new BN(amount),
+            {
+                from: from,
+            }
+        );
     };
 
     const createSchedule = async (
