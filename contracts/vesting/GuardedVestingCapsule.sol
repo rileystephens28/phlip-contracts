@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.13;
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "../interfaces/IVestingTreasury.sol";
 import "./VestingCapsule.sol";
 
 /**
@@ -11,7 +12,11 @@ import "./VestingCapsule.sol";
  *
  * NOTE - This contract is intended to hold ERC20 tokens on behalf of capsule owners.
  */
-abstract contract GuardedVestingCapsule is VestingCapsule, AccessControl {
+abstract contract GuardedVestingCapsule is
+    IVestingTreasury,
+    VestingCapsule,
+    AccessControl
+{
     // Role required for filling reserves and creating schedules
     bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
 
@@ -21,34 +26,34 @@ abstract contract GuardedVestingCapsule is VestingCapsule, AccessControl {
 
     /**
      * @dev Deposits tokens to schedule reserves for future capsules.
+     * @param _filler Address that holds tokens to be deposited.
      * @param _scheduleID The ID of the schedule to fill.
      * @param _fillAmount Amount of tokens that will be deposited from treasurer.
      */
-    function fillReserves(uint256 _scheduleID, uint256 _fillAmount)
-        external
-        onlyRole(TREASURER_ROLE)
-    {
-        _fillReserves(msg.sender, _scheduleID, _fillAmount);
+    function fillReserves(
+        address _filler,
+        uint256 _scheduleID,
+        uint256 _fillAmount
+    ) external onlyRole(TREASURER_ROLE) {
+        _fillReserves(_filler, _scheduleID, _fillAmount);
     }
 
     /**
-     * @dev Creates a new VestingSchedule that can be used by Capsules.
+     * @dev Creates a new VestingSchedule that can be used by future Capsules.
      * @param _token The token to be vested.
-     * @param _cliffSeconds The number of seconds after schedule starts and vesting begins.
-     * @param _tokenRatePerSecond The number of tokens to be vested per second.
+     * @param _cliff The number of seconds after schedule starts and vesting begins.
+     * @param _duration The number of seconds until vesting ends.
+     * @param _amount Desired amount of tokens (10^18 denominated) to be vested.
+     * Ex: If the schedule should vest 100 tokens, _amount should be 100000000000000000000
+     * @return The ID of the newly created vesting schedule.
      */
     function createVestingSchedule(
         address _token,
-        uint256 _cliffSeconds,
-        uint256 _durationSeconds,
-        uint256 _tokenRatePerSecond
-    ) external onlyRole(TREASURER_ROLE) {
-        _createSchedule(
-            _token,
-            _cliffSeconds,
-            _durationSeconds,
-            _tokenRatePerSecond
-        );
+        uint256 _cliff,
+        uint256 _duration,
+        uint256 _amount
+    ) external onlyRole(TREASURER_ROLE) returns (uint256) {
+        return _createSchedule(_token, _cliff, _duration, _amount);
     }
 
     function supportsInterface(bytes4 interfaceId)

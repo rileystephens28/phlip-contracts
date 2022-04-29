@@ -266,7 +266,7 @@ contract VestingVault {
      * @param _token The token to be vested.
      * @param _cliff The number of seconds after schedule starts and vesting begins.
      * @param _duration The number of seconds until vesting ends.
-     * @param _amount Desired amount of tokens to be vested (in token units).
+     * @param _amount Desired amount of tokens (10^18 denominated) to be vested.
      * Ex: If the schedule should vest 100 tokens, _amount should be 100000000000000000000
      * @return The ID of the newly created vesting schedule.
      */
@@ -306,9 +306,10 @@ contract VestingVault {
 
     /**
      * @dev Deposits tokens to fill a future capsules for a specified schedule.
-     * Requires that TREASURER approves this contract to spend schedule tokens.
+     * @param _filler Address that holds tokens to be deposited.
+     * Requires that _filler approves caller to spend schedule tokens.
      * @param _scheduleID The ID of the schedule to fill.
-     * @param _fillAmount Amount of tokens transfered from sender to contract.
+     * @param _fillAmount Amount of tokens (10^18 denominated) transfered from sender to contract.
      */
     function _fillReserves(
         address _filler,
