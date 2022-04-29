@@ -802,7 +802,7 @@ contract("PhlipSale", (accounts) => {
         // Failure case
         it("should fail when package ID is not valid", async () => {
             await expectRevert(
-                purchasePackage(1, tokenUnits(1)),
+                purchasePackage(2, tokenUnits(1)),
                 "Package does not exist"
             );
         });
