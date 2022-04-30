@@ -204,17 +204,13 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleOwner(0, capsuleOwner);
 
             // Verify the new capsule was created correctly
-            const newCapsulePackage = await capsuleInstance.getCapsulePackage(
-                0
-            );
-            newCapsulePackage["schedules"][0].should.be.bignumber.equal(
+            const newCapsuleGroup = await capsuleInstance.getCapsuleGroup(0);
+            newCapsuleGroup["schedules"][0].should.be.bignumber.equal(
                 new BN(1)
             );
-            newCapsulePackage["capsules"][0].should.be.bignumber.equal(
-                new BN(0)
-            );
-            newCapsulePackage["schedules"].length.should.be.equal(1);
-            newCapsulePackage["capsules"].length.should.be.equal(1);
+            newCapsuleGroup["capsules"][0].should.be.bignumber.equal(new BN(0));
+            newCapsuleGroup["schedules"].length.should.be.equal(1);
+            newCapsuleGroup["capsules"].length.should.be.equal(1);
         });
         it("should pass when token holds 2 capsules", async () => {
             // Add and set a vesting scheme
@@ -229,23 +225,17 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleOwner(1, capsuleOwner);
 
             // Verify the new capsule was created correctly
-            const newCapsulePackage = await capsuleInstance.getCapsulePackage(
-                0
-            );
-            newCapsulePackage["schedules"][0].should.be.bignumber.equal(
+            const newCapsuleGroup = await capsuleInstance.getCapsuleGroup(0);
+            newCapsuleGroup["schedules"][0].should.be.bignumber.equal(
                 new BN(0)
             );
-            newCapsulePackage["schedules"][1].should.be.bignumber.equal(
+            newCapsuleGroup["schedules"][1].should.be.bignumber.equal(
                 new BN(1)
             );
-            newCapsulePackage["capsules"][0].should.be.bignumber.equal(
-                new BN(0)
-            );
-            newCapsulePackage["capsules"][1].should.be.bignumber.equal(
-                new BN(1)
-            );
-            newCapsulePackage["schedules"].length.should.be.equal(2);
-            newCapsulePackage["capsules"].length.should.be.equal(2);
+            newCapsuleGroup["capsules"][0].should.be.bignumber.equal(new BN(0));
+            newCapsuleGroup["capsules"][1].should.be.bignumber.equal(new BN(1));
+            newCapsuleGroup["schedules"].length.should.be.equal(2);
+            newCapsuleGroup["capsules"].length.should.be.equal(2);
         });
         it("should pass when token holds 4 capsules", async () => {
             // Create an additional vesting schedules for each token
@@ -265,7 +255,7 @@ contract("VestingCapsule", (accounts) => {
             ]);
 
             // Verify the new capsule was created correctly
-            const newPackage = await capsuleInstance.getCapsulePackage(0);
+            const newPackage = await capsuleInstance.getCapsuleGroup(0);
 
             newPackage["schedules"].length.should.be.equal(4);
             newPackage["capsules"].length.should.be.equal(4);
@@ -293,7 +283,7 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleIsActive(1, false);
 
             // Verify the capsule package was deleted correctly
-            const deletedPackage = await capsuleInstance.getCapsulePackage(0);
+            const deletedPackage = await capsuleInstance.getCapsuleGroup(0);
             deletedPackage["schedules"].length.should.be.equal(0);
             deletedPackage["capsules"].length.should.be.equal(0);
         });
@@ -327,7 +317,7 @@ contract("VestingCapsule", (accounts) => {
             await burn();
 
             // Verify the capsule package was deleted correctly
-            const deletedPackage = await capsuleInstance.getCapsulePackage(0);
+            const deletedPackage = await capsuleInstance.getCapsuleGroup(0);
             deletedPackage["schedules"].length.should.be.equal(0);
             deletedPackage["capsules"].length.should.be.equal(0);
         });
@@ -367,7 +357,7 @@ contract("VestingCapsule", (accounts) => {
             await verifyCapsuleIsActive(0, false);
 
             // Verify the capsule package was deleted correctly
-            const deletedPackage = await capsuleInstance.getCapsulePackage(0);
+            const deletedPackage = await capsuleInstance.getCapsuleGroup(0);
             deletedPackage["schedules"].length.should.be.equal(0);
             deletedPackage["capsules"].length.should.be.equal(0);
         });
