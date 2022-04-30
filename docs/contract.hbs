@@ -23,10 +23,10 @@
 |`{{param}}` | {{#lookup ../args.types @index}}{{/lookup}} | {{ description }}{{/natspec.params}}{{/if}}
 {{#if natspec.returns}}
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
 {{#natspec.returns}}
-|`{{param}}`| {{#lookup ../args.types @index}}{{/lookup}} | {{{description}}}{{/natspec.returns}}{{/if}}
+|{{#lookup ../args.types @index}}{{/lookup}} | {{param}} {{{description}}}{{/natspec.returns}}{{/if}}
 {{/ownFunctions}}
 {{#if ownEvents}}
 ## Events
