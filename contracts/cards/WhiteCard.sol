@@ -21,6 +21,14 @@ contract WhiteCard is PhlipCard {
     // Token ID => Card type (text or blank)
     mapping(uint256 => CardType) private _cardTypes;
 
+    /**
+     * @dev Create a new instance of the WhiteCard contract.
+     *
+     * Requirements:
+     *
+     * - `_baseUri` cannot be blank.
+     * - `_maxUriChanges` must be >= 1.
+     */
     constructor(string memory _baseUri, uint256 _maxUriChanges)
         PhlipCard("Phlip White Card", "WPC", _baseUri, _maxUriChanges)
     {}
@@ -28,6 +36,11 @@ contract WhiteCard is PhlipCard {
     /**
      * @dev Accessor function for getting card's URI from ID
      * Override to return empty string if card is blank
+     *
+     * Requirements:
+     *
+     * - `_tokenId` must exist.
+     *
      * @param _tokenId ID of the card to get URI of
      * @return URI of the card
      */
@@ -52,6 +65,16 @@ contract WhiteCard is PhlipCard {
     /**
      * @dev Override PhlipCard.updateMetadata to prevent blank
      * cards from setting their URI.
+     *
+     * Requirements:
+     *
+     * - `_cardID` must exist.
+     * - `_cardID` cannot be a blank card.
+     * - `_uri` cannot be blank.
+     * - `msg.sender` must be owner of `_cardID`
+     * - `msg.sender` must be minter of `_cardID`
+     * - card's `_metadataChangeCount` must be < `MAX_URI_CHANGES`
+     *
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
@@ -69,7 +92,13 @@ contract WhiteCard is PhlipCard {
 
     /**
      * @dev Mint card with ID that has been reserved by the callers voucher
-     * Requires that caller has >=1 remaining card vouchers.
+     *
+     * Requirements:
+     *
+     * - `_uri` cannot be blank when redeeming text cards.
+     * - `msg.sender` has >= 1 `_remainingVouchers`.
+     * - `_paused` must be false.
+     *
      * @param _reservedID ID reserved by the callers voucher
      * @param _uri URI of text card (pass empty string for blank cards)
      */
@@ -93,8 +122,13 @@ contract WhiteCard is PhlipCard {
     /**
      * @dev Override of PhlipCard._setCardType to handle setting
      * card to type TEXT or BLANK.
+     *
+     * Requirements:
+     *
+     * - `_type` must be one of 0 (text) or 1 (blank).
+     *
      * @param _cardID The ID of card whose type to set
-     * @param _type Int type of card (0 - text, 1 - blank)
+     * @param _type Integer corresponding to card type of card (0 or 1)
      */
     function _setCardType(uint256 _cardID, uint256 _type)
         internal
@@ -106,10 +140,10 @@ contract WhiteCard is PhlipCard {
     }
 
     /**
-     * @dev Override of PhlipCard._setCardType to handle accessing
-     * whether card is a TEXT or BLANK card.
-     * @param _cardID The ID of card whose type to set
-     * @return Integer type of card (0 - text, 1 - blank)
+     * @dev Override of PhlipCard._setCardType to handle
+     * TEXT or BLANK card logic.
+     * @param _cardID The ID of card to query
+     * @return Integer corresponding to card type of card (0 or 1)
      */
     function _getCardType(uint256 _cardID)
         internal

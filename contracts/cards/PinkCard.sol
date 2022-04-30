@@ -21,6 +21,14 @@ contract PinkCard is PhlipCard {
     // Token ID => Card type (text or image)
     mapping(uint256 => CardType) private _cardTypes;
 
+    /**
+     * @dev Create a new instance of the PinkCard contract.
+     *
+     * Requirements:
+     *
+     * - `_baseUri` cannot be blank.
+     * - `_maxUriChanges` must be >= 1.
+     */
     constructor(string memory _baseUri, uint256 _maxUriChanges)
         PhlipCard("Phlip Pink Card", "PPC", _baseUri, _maxUriChanges)
     {}
@@ -31,7 +39,13 @@ contract PinkCard is PhlipCard {
 
     /**
      * @dev Mint card with ID that has been reserved by the callers voucher
-     * Requires that caller has >=1 remaining card vouchers.
+     *
+     * Requirements:
+     *
+     * - `_uri` cannot be blank.
+     * - `msg.sender` has >= 1 `_remainingVouchers`.
+     * - `_paused` must be false.
+     *
      * @param _reservedID ID reserved by the callers voucher
      * @param _uri Should be left blank. Only used to match interface function signature.
      */
@@ -52,8 +66,13 @@ contract PinkCard is PhlipCard {
     /**
      * @dev Override of PhlipCard._setCardType to handle setting
      * card to type TEXT or IMAGE.
+     *
+     * Requirements:
+     *
+     * - `_type` must be one of 0 (text) or 1 (image).
+     *
      * @param _cardID The ID of card whose type to set
-     * @param _type Int type of card (0 - text, 1 - image)
+     * @param _type Integer corresponding to card type of card (0 or 1)
      */
     function _setCardType(uint256 _cardID, uint256 _type)
         internal
@@ -65,10 +84,10 @@ contract PinkCard is PhlipCard {
     }
 
     /**
-     * @dev Override of PhlipCard._setCardType to handle accessing
-     * whether card is a TEXT or IMAGE card.
-     * @param _cardID The ID of card whose type to set
-     * @return Integer type of card (0 - text, 1 - image, etc)
+     * @dev Override of PhlipCard._setCardType to handle
+     * TEXT or IMAGE card logic.
+     * @param _cardID The ID of card to query
+     * @return Integer corresponding to card type of card (0 or 1)
      */
     function _getCardType(uint256 _cardID)
         internal

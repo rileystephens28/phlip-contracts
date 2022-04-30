@@ -15,21 +15,23 @@ import "../interfaces/IPhlipCard.sol";
  * @dev This is the parent contract for pink and white Phlip game cards. This
  * contract is responsible for implementing the common functionality of both cards.
  *
- * ## Features ##
+ * ## Features
  *
- * Updatable Metadata - Card minters (must also be owner) are allowed to change their cards URI once
+ * ### Updatable Metadata
+ * Card minters (must also be owner) are allowed to change their cards URI once
  * if their card has been downvoted too many times. Once a cards URI has been updated, the cards stats
  * should be reset to reflect that the card is basically new.
  *
- * Redeemable Vouchers - Grants addresses the ability to mint a specified number of cards directly from the contract
+ * ### Redeemable Vouchers
+ * Grants addresses the ability to mint a specified number of cards directly from the contract
  * rather than requiring a MINTER to do it for them. Vouchers can be granted to certain addresses (SOTM owners)
  * or sold to addresses by MINTER contracts (presale).
  *
- * Vesting Capsule - The Card owner will also be registered as a beneficiary and receive PhlipDAO and PhlipP2E
+ * ### Vesting Capsule
+ * The Card owner will also be registered as a beneficiary and receive PhlipDAO and PhlipP2E
  * tokens on a vesting schedule. When a Card is transferred to another address, the new owner becomes the recipient
  * of the vesting tokens. Once the tokens in a vesting capsule for a Card have run out, all future owners of that
  * Card will stop receiving vested payouts.
- *
  */
 contract PhlipCard is
     AccessControl,
@@ -62,12 +64,28 @@ contract PhlipCard is
     // Token ID => Array of vesting schedule IDs used to mint card when voucher is redeemed
     mapping(uint256 => uint256[]) internal _voucherVestingSchemes;
 
+    /**
+     * @dev Create a new instance of the PhlipCard contract.
+     *
+     * Requirements:
+     *
+     * - `_baseUri` cannot be blank.
+     * - `_maxUriChanges` must be >= 1.
+     *
+     * @param _name Name of the card NFT
+     * @param _symbol Symbol of the card NFT
+     * @param _baseUri IPSF gateway URI for the card
+     * @param _maxUriChanges Number of times minter can change card's URI
+     */
     constructor(
         string memory _name,
         string memory _symbol,
         string memory _baseUri,
         uint256 _maxUriChanges
     ) ERC721(_name, _symbol) {
+        require(bytes(_baseUri).length > 0, "PhlipCard: Base URI is blank");
+        require(_maxUriChanges > 0, "PhlipCard: Max URI changes is 0");
+
         // Grant roles for this contract
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -99,7 +117,7 @@ contract PhlipCard is
      * @dev Accessor function to get type of card.
      * Note - This function will also return the type of a voucher
      * @param _cardID The ID of the card to check
-     * @return 0 if image, 1 if image
+     * @return Integer corresponding to card's type
      */
     function typeOf(uint256 _cardID) public view returns (uint256) {
         return _getCardType(_cardID);
@@ -108,6 +126,11 @@ contract PhlipCard is
     /**
      * @dev Accessor function for getting card's URI from ID
      * Modified implementation of ERC721URIStorage.tokenURI
+     *
+     * Requirements:
+     *
+     * - `_tokenId` must exist.
+     *
      * @param _tokenId ID of the card to get URI of
      * @return URI of the card
      */
@@ -162,6 +185,10 @@ contract PhlipCard is
 
     /**
      * @dev Allow address with PAUSER role to pause card transfers
+     *
+     * Requirements:
+     *
+     * - `msg.sender` must have PAUSER role.
      */
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
@@ -169,6 +196,10 @@ contract PhlipCard is
 
     /**
      * @dev Allow address with PAUSER role to unpause card transfers
+     *
+     * Requirements:
+     *
+     * - `msg.sender` must have PAUSER role.
      */
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
@@ -180,6 +211,14 @@ contract PhlipCard is
 
     /**
      * @dev Allow minter to mint a text card to a given address.
+     *
+     * Requirements:
+     *
+     * - `to` cannot be the zero address.
+     * - `_scheduleIDs` must contain IDs for existing schedules vesting with
+     * reserves containing enough tokens to create vesting capsules from
+     * - `msg.sender` must have MINTER role.
+     *
      * @param _to The address to mint to.
      * @param _uri The IPFS CID referencing the new cards text metadata.
      * @param _type The type of card to mint (text, image, blank, etc)
@@ -202,6 +241,13 @@ contract PhlipCard is
 
     /**
      * @dev Allow minter to issue a text card voucher to a given address.
+     *
+     * Requirements:
+     *
+     * - `_to` cannot be zero address.
+     * - `_scheduleIDs` must contain IDs for existing schedules vesting
+     * - `msg.sender` must have MINTER role.
+     *
      * @param _to The address to issue voucher to.
      * @param _type The type of card to mint (text, image, blank, etc)
      * @param _scheduleIDs Array of vesting schedule IDs to create future card with
@@ -223,7 +269,14 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Allow minter to issue many card vouchers (with same type) to a given address.
+     * @dev Allow minter to issue many card vouchers (with same type)
+     * to a given address.
+     *
+     * Requirements:
+     *
+     * - `_to` cannot be zero address.
+     * - `msg.sender` must have MINTER role.
+     *
      * @param _to The address to mint tokens to.
      * @param _type Integer card type that vouchers can be redeemed for.
      * @param _amount Number of vouchers to issue.
@@ -252,10 +305,18 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Allows owner of a card to update the URI of their card. Requires
-     * that the owner is also the minter of the card and has not already updated
-     * the card's metadata before. If the URI was not set during mint, this function
-     * allows the owner to set it without it counting towards the number of URI changes.
+     * @dev Allows owner of a card to update the URI of their card.
+     * If the URI was not set during mint, this function allows the
+     * owner to set it without it counting towards the number of URI changes.
+     *
+     * Requirements:
+     *
+     * - `_cardID` must exist.
+     * - `_uri` cannot be blank.
+     * - `msg.sender` must be owner of `_cardID`
+     * - `msg.sender` must be minter of `_cardID`
+     * - card's `_metadataChangeCount` must be < `MAX_URI_CHANGES`
+     *
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
@@ -282,6 +343,13 @@ contract PhlipCard is
     /**
      * @dev Mint card with ID that has been reserved by the callers voucher
      * Requires that caller has >=1 remaining card vouchers.
+     *
+     * Requirements:
+     *
+     * - `_reservedID` must correspond with valid voucher.
+     * - `msg.sender` must be holder of `_reservedID` voucher
+     * - `_paused` must be false.
+     *
      * @param _reservedID ID reserved by the callers voucher
      * @param _uri The IPFS CID referencing the new tokens metadata
      */
@@ -307,10 +375,17 @@ contract PhlipCard is
 
     /**
      * @dev Transfer creatorship of a card to a new address.
+     *
+     * Requirements:
+     *
+     * - `_to` cannot be zero address.
+     * - `msg.sender` must be minter of `_cardID`
+     *
      * @param _to The address to transfer creatorship to.
      * @param _cardID ID of the card whose creatorship to transfer
      */
     function transferCreatorship(address _to, uint256 _cardID) external {
+        require(_to != address(0), "PhlipCard: Cannot transfer to 0x0");
         require(msg.sender == _minters[_cardID], "PhlipCard: Must be minter");
         _minters[_cardID] = _to;
     }
@@ -321,9 +396,18 @@ contract PhlipCard is
 
     /**
      * @dev Mints card to the given address.
+     *
+     * Requirements:
+     *
+     * - `_cardID` must not exist.
+     * - `to` cannot be the zero address.
+     * - `_scheduleIDs` must contain IDs for existing schedules vesting with
+     * reserves containing enough tokens to create vesting capsules from
+     *
      * @param _cardID The ID of card being minted
      * @param _to The address to mint card to
      * @param _uri The IPFS CID referencing the new card's metadata
+     * @param _scheduleIDs Array of vesting schedule IDs to create card's vesting capsules from
      */
     function _mintCard(
         uint256 _cardID,
@@ -336,7 +420,7 @@ contract PhlipCard is
         _minters[_cardID] = _to;
 
         _mint(_to, _cardID);
-        _createTokenCapsules(_cardID, _to, block.timestamp, _scheduleIDs);
+        _createCapsuleGroup(_cardID, _to, block.timestamp, _scheduleIDs);
     }
 
     /**
@@ -363,6 +447,15 @@ contract PhlipCard is
     /**
      * @dev Function called before tokens are transferred. Override to
      * make sure that token tranfers have not been paused.
+     *
+     * Requirements:
+     *
+     * - When `from` and `to` are both non-zero, ``from``'s `tokenId` will be
+     * transferred to `to`.
+     * - When `from` is zero, `tokenId` will be minted for `to`.
+     * - When `to` is zero, ``from``'s `tokenId` will be burned.
+     * - `from` and `to` are never both zero.
+     *
      * @param _from The address tokens will be transferred from
      * @param _to The address tokens will be transferred  to
      * @param _tokenId The ID of the token to transfer
@@ -378,6 +471,11 @@ contract PhlipCard is
     /**
      * @dev Function called after tokens are transferred.
      * Override ERC721 and VestingCapsule
+     *
+     * Requirements:
+     * - when `from` and `to` are both non-zero.
+     * - `from` and `to` are never both zero.
+     *
      * @param _from The address tokens were transferred from
      * @param _to The address tokens were transferred  to
      * @param _tokenId The ID of the token transferred
