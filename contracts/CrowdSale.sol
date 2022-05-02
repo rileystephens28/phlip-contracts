@@ -136,6 +136,9 @@ contract PhlipSale is Ownable, ReentrancyGuard {
     constructor(
         address _pcAddress,
         address _wcAddress,
+        uint128 _pcTextSupply,
+        uint128 _pcImageSupply,
+        uint128 _wcTextSupply,
         address _daoToken,
         address _p2eToken,
         address _daoWallet,
@@ -153,6 +156,9 @@ contract PhlipSale is Ownable, ReentrancyGuard {
         require(_proceedsWallet != address(0), "Proceeds wallet cannot be 0x0");
         require(_cliff > 0, "Vesting cliff must be greater than 0");
         require(_duration > 0, "Vesting duration must be greater than 0");
+        require(_pcTextSupply > 0, "Pink text supply must be greater than 0");
+        require(_pcImageSupply > 0, "Pink image supply must be greater than 0");
+        require(_wcTextSupply > 0, "White text supply must be greater than 0");
 
         _daoTokenAddress = _daoToken;
         _p2eTokenAddress = _p2eToken;
@@ -169,19 +175,19 @@ contract PhlipSale is Ownable, ReentrancyGuard {
         ptCard.color = Color.PINK;
         ptCard.varient = Varient.TEXT;
         ptCard.contractAddress = _pcAddress;
-        ptCard.totalSupply = 675;
+        ptCard.totalSupply = _pcTextSupply;
 
         CardInfo storage piCard = _cards[_pinkImageCard];
         piCard.color = Color.PINK;
         piCard.varient = Varient.SPECIAL;
         piCard.contractAddress = _pcAddress;
-        piCard.totalSupply = 675;
+        piCard.totalSupply = _pcImageSupply;
 
         CardInfo storage wtCard = _cards[_whiteTextCard];
         wtCard.color = Color.WHITE;
         wtCard.varient = Varient.TEXT;
         wtCard.contractAddress = _wcAddress;
-        wtCard.totalSupply = 9375;
+        wtCard.totalSupply = _wcTextSupply;
 
         CardInfo storage wbCard = _cards[_whiteBlankCard];
         wbCard.color = Color.WHITE;
@@ -225,9 +231,17 @@ contract PhlipSale is Ownable, ReentrancyGuard {
 
     /**
      * @dev Getter for the price in WEI of a presale package.
+     * @param _cardID ID of the card to query
+     */
+    function getCardPrice(uint128 _cardID) public view returns (uint256) {
+        return _cardSaleInfo[_cardID].price;
+    }
+
+    /**
+     * @dev Getter for the price in WEI of a presale package.
      * @param _packageID ID of the package to query
      */
-    function priceOf(uint256 _packageID) public view returns (uint256) {
+    function getPackagePrice(uint256 _packageID) public view returns (uint256) {
         return _packages[_packageID].price;
     }
 
@@ -242,6 +256,18 @@ contract PhlipSale is Ownable, ReentrancyGuard {
     {
         PresalePackage storage package = _packages[_packageID];
         return package.numForSale - package.numSold;
+    }
+
+    /**
+     * @dev Getter for a card's sale information.
+     * @param _cardID ID of the card to query
+     */
+    function getSaleInfo(uint128 _cardID)
+        public
+        view
+        returns (CardSaleInfo memory)
+    {
+        return _cardSaleInfo[_cardID];
     }
 
     /**
@@ -323,6 +349,7 @@ contract PhlipSale is Ownable, ReentrancyGuard {
             );
         }
 
+        _registeredSaleInfo[_cardID] = true;
         CardSaleInfo storage saleInfo = _cardSaleInfo[_cardID];
         saleInfo.price = _price;
         saleInfo.scheduleIDs = _scheduleIDs;
@@ -470,10 +497,10 @@ contract PhlipSale is Ownable, ReentrancyGuard {
     function purchaseCard(uint128 _cardID, string memory _uri)
         public
         payable
-        onlyPresale
+        onlyGeneralSale
         nonReentrant
     {
-        require(_registeredSaleInfo[_cardID], "Card not available for sale");
+        require(_registeredSaleInfo[_cardID], "Not available for sale");
 
         CardInfo storage card = _cards[_cardID];
         CardSaleInfo storage saleInfo = _cardSaleInfo[_cardID];
