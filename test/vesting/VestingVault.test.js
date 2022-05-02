@@ -44,6 +44,7 @@ contract("VestingVault", (accounts) => {
         amount = baseAmount,
         token = tokenInstance,
         from = deployer,
+        filler = deployer,
         preApprove = true
     ) => {
         if (preApprove) {
@@ -51,9 +52,14 @@ contract("VestingVault", (accounts) => {
                 from: from,
             });
         }
-        return await vaultInstance.fillReserves(scheduleId, new BN(amount), {
-            from: from,
-        });
+        return await vaultInstance.fillReserves(
+            filler,
+            scheduleId,
+            new BN(amount),
+            {
+                from: from,
+            }
+        );
     };
 
     const createSchedule = async (
@@ -315,6 +321,7 @@ contract("VestingVault", (accounts) => {
                     0,
                     tokenUnits(1000),
                     tokenInstance,
+                    deployer,
                     deployer,
                     false
                 ),

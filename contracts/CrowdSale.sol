@@ -55,7 +55,7 @@ contract PhlipSale is Ownable, ReentrancyGuard {
     event PurchaseCard(uint256 indexed cardID, address purchaser);
 
     enum SaleState {
-        NO_SALE,
+        INACTIVE,
         PRESALE_ACTIVE,
         SALE_ACTIVE
     }
@@ -136,9 +136,6 @@ contract PhlipSale is Ownable, ReentrancyGuard {
     constructor(
         address _pcAddress,
         address _wcAddress,
-        uint128 _pcTextSupply,
-        uint128 _pcImageSupply,
-        uint128 _wcTextSupply,
         address _daoToken,
         address _p2eToken,
         address _daoWallet,
@@ -156,9 +153,6 @@ contract PhlipSale is Ownable, ReentrancyGuard {
         require(_proceedsWallet != address(0), "Proceeds wallet cannot be 0x0");
         require(_cliff > 0, "Vesting cliff must be greater than 0");
         require(_duration > 0, "Vesting duration must be greater than 0");
-        require(_pcTextSupply > 0, "Pink text supply must be greater than 0");
-        require(_pcImageSupply > 0, "Pink image supply must be greater than 0");
-        require(_wcTextSupply > 0, "White text supply must be greater than 0");
 
         _daoTokenAddress = _daoToken;
         _p2eTokenAddress = _p2eToken;
@@ -175,25 +169,21 @@ contract PhlipSale is Ownable, ReentrancyGuard {
         ptCard.color = Color.PINK;
         ptCard.varient = Varient.TEXT;
         ptCard.contractAddress = _pcAddress;
-        ptCard.totalSupply = _pcTextSupply;
 
         CardInfo storage piCard = _cards[_pinkImageCard];
         piCard.color = Color.PINK;
         piCard.varient = Varient.SPECIAL;
         piCard.contractAddress = _pcAddress;
-        piCard.totalSupply = _pcImageSupply;
 
         CardInfo storage wtCard = _cards[_whiteTextCard];
         wtCard.color = Color.WHITE;
         wtCard.varient = Varient.TEXT;
         wtCard.contractAddress = _wcAddress;
-        wtCard.totalSupply = _wcTextSupply;
 
         CardInfo storage wbCard = _cards[_whiteBlankCard];
         wbCard.color = Color.WHITE;
         wbCard.varient = Varient.SPECIAL;
         wbCard.contractAddress = _wcAddress;
-        wbCard.totalSupply = 625;
     }
 
     /**
@@ -317,6 +307,32 @@ contract PhlipSale is Ownable, ReentrancyGuard {
     function setSaleStatus(uint8 _state) public onlyOwner {
         require(_state < 3, "Invalid sale status");
         _saleStaus = SaleState(_state);
+    }
+
+    /**
+     * @dev Allows contract owner to set total supply of card.
+     *
+     * Note - This function should be called after contract is deployed
+     *      and before configuring card sale info and card packages.
+     *
+     * Requirements:
+     * - Must be called by the contract owner
+     * - `_cardID` must be 0, 1, 2, or 3
+     * - `_supply` must be greater than 0
+     *
+     * @param _cardID ID of the card to set.
+     * @param _supply New total supply.
+     */
+    function setCardMaxSupply(uint128 _cardID, uint128 _supply)
+        public
+        onlyOwner
+    {
+        require(_saleStaus == SaleState.INACTIVE, "Cannot change during sale");
+        require(_cardID < 4, "Invalid card ID");
+        require(_supply > 0, "Supply must be greater than 0");
+
+        CardInfo storage card = _cards[_cardID];
+        card.totalSupply = _supply;
     }
 
     /**

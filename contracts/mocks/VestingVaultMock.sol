@@ -10,8 +10,12 @@ contract VestingVaultMock is VestingVault {
         didProtectedAction = false;
     }
 
-    function fillReserves(uint256 _scheduleID, uint256 _fillAmount) external {
-        _fillReserves(msg.sender, _scheduleID, _fillAmount);
+    function fillReserves(
+        address _filler,
+        uint256 _scheduleID,
+        uint256 _fillAmount
+    ) external {
+        _fillReserves(_filler, _scheduleID, _fillAmount);
     }
 
     function createVestingSchedule(

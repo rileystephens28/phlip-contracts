@@ -24,10 +24,6 @@ contract("PhlipSale", (accounts) => {
         p2eInstance;
     const [admin, tokenWallet, proceedsWallet, otherAccount] = accounts;
 
-    const pinkTextSupply = 2; // will actualy be 675 cards
-    const pinkImageSupply = 3; // will actualy be 675 cards
-    const whiteTextSupply = 4; // will actualy be 9375 cards
-
     const baseCliff = new BN(100);
     const baseDuration = new BN(1000);
 
@@ -178,6 +174,29 @@ contract("PhlipSale", (accounts) => {
                 gas: gasEstimate,
             }
         );
+    };
+
+    const setCardMaxSupply = async (
+        cardID = 0,
+        supply = new BN(3),
+        from = admin
+    ) => {
+        const gasEstimate = await saleInstance.setCardMaxSupply.estimateGas(
+            cardID,
+            supply,
+            { from: from }
+        );
+        return await saleInstance.setCardMaxSupply(cardID, supply, {
+            from: from,
+            gas: gasEstimate,
+        });
+    };
+
+    const setAllCardDefaultSupplies = async () => {
+        await setCardMaxSupply(0, new BN(2));
+        await setCardMaxSupply(1, new BN(3));
+        await setCardMaxSupply(2, new BN(4));
+        await setCardMaxSupply(3, new BN(5));
     };
 
     const setCardSaleInfo = async (
@@ -399,9 +418,6 @@ contract("PhlipSale", (accounts) => {
         saleInstance = await CrowdSale.new(
             pinkCardInstance.address,
             whiteCardInstance.address,
-            pinkTextSupply,
-            pinkImageSupply,
-            whiteTextSupply,
             daoInstance.address,
             p2eInstance.address,
             tokenWallet,
@@ -465,9 +481,41 @@ contract("PhlipSale", (accounts) => {
         });
     });
 
+    describe("Setting Card Max Supply", async () => {
+        // Failure case
+        it("should fail when caller is not contract owner", async () => {
+            await expectRevert(
+                setCardMaxSupply(0, new BN(2), otherAccount),
+                "Ownable: caller is not the owner"
+            );
+        });
+        it("should fail when supply is 0", async () => {
+            await expectRevert(
+                setCardMaxSupply(0, 0),
+                "Supply must be greater than 0"
+            );
+        });
+        it("should fail when presale is active", async () => {
+            await setPresaleActive();
+            await expectRevert(setCardMaxSupply(), "Cannot change during sale");
+        });
+
+        it("should fail when general sale is active", async () => {
+            await setGeneralSaleActive();
+            await expectRevert(setCardMaxSupply(), "Cannot change during sale");
+        });
+
+        // Passing case
+        it("should pass when caller is contract owner ans supply > 0", async () => {
+            await setCardMaxSupply(0, new BN(5));
+            await verifyCardMaxSupply(0, new BN(5));
+        });
+    });
+
     describe("Setting Card Purchase Info", async () => {
         beforeEach(async () => {
             await createAndFillDefaultSchedules();
+            await setAllCardDefaultSupplies();
         });
 
         // Failure case
@@ -517,6 +565,9 @@ contract("PhlipSale", (accounts) => {
     });
 
     describe("Creating Single Card package", async () => {
+        beforeEach(async () => {
+            await setAllCardDefaultSupplies();
+        });
         // Failure case
         it("should fail when package ID already exists", async () => {
             await createSingleCardPackage();
@@ -815,6 +866,10 @@ contract("PhlipSale", (accounts) => {
     });
 
     describe("Creating Multi Card package", async () => {
+        beforeEach(async () => {
+            await setAllCardDefaultSupplies();
+        });
+
         // Failure case
         it("should fail when package ID already exists", async () => {
             await createMultiCardPackage();
@@ -1031,6 +1086,7 @@ contract("PhlipSale", (accounts) => {
 
     describe("Purchasing Card Packages", async () => {
         beforeEach(async () => {
+            await setAllCardDefaultSupplies();
             await createSingleCardPackage();
             await createMultiCardPackage(1);
             await setPresaleActive();
@@ -1074,7 +1130,6 @@ contract("PhlipSale", (accounts) => {
 
             // Ensure package was marked as sold
             await verifyRemainingForSale(0, baseSaleQty - 1);
-            await verifyCardMaxSupply(0, pinkTextSupply);
             await verifyCardMintedSupply(0, 2);
 
             // Ensure account was credited with correct number & type of cards
@@ -1088,6 +1143,8 @@ contract("PhlipSale", (accounts) => {
         beforeEach(async () => {
             // Create pink card vesting schedules and fill reserves
             await createAndFillDefaultSchedules();
+
+            await setAllCardDefaultSupplies();
 
             // Set sale info for pink text/image and white text cards
             await setCardSaleInfo(0, tokenUnits(1));
