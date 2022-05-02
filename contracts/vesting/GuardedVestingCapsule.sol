@@ -56,6 +56,20 @@ abstract contract GuardedVestingCapsule is
         return _createSchedule(_token, _cliff, _duration, _amount);
     }
 
+    /**
+     * @dev Getter function for checking if specified schedule is registered.
+     * @param _scheduleID The ID of the VestingSchedule to query.
+     * @return True if the schedule is registered, false otherwise.
+     */
+    function scheduleExists(uint256 _scheduleID)
+        public
+        view
+        override(VestingVault, IVestingTreasury)
+        returns (bool)
+    {
+        return super.scheduleExists(_scheduleID);
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view

@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./cards/PinkCard.sol";
 import "./cards/WhiteCard.sol";
 import "./interfaces/IVestingTreasury.sol";
@@ -47,11 +47,20 @@ import "./interfaces/IPhlipCard.sol";
     blueWhale = 11;
 
  */
-contract PhlipSale is Ownable {
+contract PhlipSale is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     event CreatePackage(uint256 id, uint256 price, uint128 numForSale);
     event PurchasePackage(uint256 indexed id, address purchaser);
+    event PurchaseCard(uint256 indexed cardID, address purchaser);
+
+    enum SaleState {
+        NO_SALE,
+        PRESALE_ACTIVE,
+        SALE_ACTIVE
+    }
+
+    SaleState private _saleStaus;
 
     enum Color {
         PINK,
@@ -66,28 +75,18 @@ contract PhlipSale is Ownable {
     struct CardInfo {
         Color color;
         Varient varient;
-        IPhlipCard instance;
+        address contractAddress;
         uint128 totalSupply;
         uint128 mintedSupply;
     }
 
-    struct CardBundle {
-        uint128 cardID;
-        uint128 numCards;
-        uint256[2] scheduleIDs;
-    }
-    struct PresalePackage {
+    // Structures information required to sell and
+    // mint single cards during the sale period.
+    struct CardSaleInfo {
         uint256 price;
-        uint128 numForSale;
         uint128 numSold;
-        CardBundle[] cardBundles;
+        uint256[] scheduleIDs;
     }
-
-    // Each pink card will have at least 1,000,000 dao tokens
-    uint256 private pinkCardDaoTokens = 1000000;
-
-    // Each white card will have at least 125,000 dao tokens
-    uint256 private whiteCardDaoTokens = 125000;
 
     // Card IDs to use in _cards mapping
     uint128 private _pinkTextCard = 0;
@@ -95,15 +94,33 @@ contract PhlipSale is Ownable {
     uint128 private _whiteTextCard = 2;
     uint128 private _whiteBlankCard = 3;
 
+    // Mapping of IDs to card info
     mapping(uint128 => CardInfo) private _cards;
 
-    uint256 private whiteTextCard = 0;
+    // Maps card IDs to respective card sale info
+    mapping(uint128 => CardSaleInfo) private _cardSaleInfo;
+    mapping(uint128 => bool) private _registeredSaleInfo;
 
+    struct CardBundle {
+        uint128 cardID;
+        uint128 numCards;
+        uint256[] scheduleIDs;
+    }
+
+    // Structures information required to sell and
+    // mint several cards at once during the presale period.
+    struct PresalePackage {
+        uint256 price;
+        uint128 numForSale;
+        uint128 numSold;
+        CardBundle[] cardBundles;
+    }
+
+    // Mapping of IDs to presale packages
     mapping(uint256 => PresalePackage) private _packages;
-    mapping(uint256 => bool) private _registeredPackages;
 
-    bool private _presaleActive;
-    bool private _generalSaleActive;
+    // Tracks package IDs that have been created
+    mapping(uint256 => bool) private _registeredPackages;
 
     address _daoTokenAddress;
     address _p2eTokenAddress;
@@ -134,6 +151,8 @@ contract PhlipSale is Ownable {
         require(_daoWallet != address(0), "DAO wallet cannot be 0x0");
         require(_p2eWallet != address(0), "P2E wallet cannot be 0x0");
         require(_proceedsWallet != address(0), "Proceeds wallet cannot be 0x0");
+        require(_cliff > 0, "Vesting cliff must be greater than 0");
+        require(_duration > 0, "Vesting duration must be greater than 0");
 
         _daoTokenAddress = _daoToken;
         _p2eTokenAddress = _p2eToken;
@@ -149,25 +168,25 @@ contract PhlipSale is Ownable {
         CardInfo storage ptCard = _cards[_pinkTextCard];
         ptCard.color = Color.PINK;
         ptCard.varient = Varient.TEXT;
-        ptCard.instance = IPhlipCard(_pcAddress);
+        ptCard.contractAddress = _pcAddress;
         ptCard.totalSupply = 675;
 
         CardInfo storage piCard = _cards[_pinkImageCard];
         piCard.color = Color.PINK;
         piCard.varient = Varient.SPECIAL;
-        piCard.instance = IPhlipCard(_pcAddress);
+        piCard.contractAddress = _pcAddress;
         piCard.totalSupply = 675;
 
         CardInfo storage wtCard = _cards[_whiteTextCard];
         wtCard.color = Color.WHITE;
         wtCard.varient = Varient.TEXT;
-        wtCard.instance = IPhlipCard(_wcAddress);
+        wtCard.contractAddress = _wcAddress;
         wtCard.totalSupply = 9375;
 
         CardInfo storage wbCard = _cards[_whiteBlankCard];
         wbCard.color = Color.WHITE;
         wbCard.varient = Varient.SPECIAL;
-        wbCard.instance = IPhlipCard(_wcAddress);
+        wbCard.contractAddress = _wcAddress;
         wbCard.totalSupply = 625;
     }
 
@@ -175,15 +194,33 @@ contract PhlipSale is Ownable {
      * @dev Ensures the presale is active and reverts if not.
      */
     modifier onlyPresale() {
-        require(_presaleActive, "Presale is not active");
+        require(
+            _saleStaus == SaleState.PRESALE_ACTIVE,
+            "Presale is not active"
+        );
         _;
     }
 
     /**
-     * @dev Getter for presale active state.
+     * @dev Ensures the presale is active and reverts if not.
      */
-    function presaleActive() public view returns (bool) {
-        return _presaleActive;
+    modifier onlyGeneralSale() {
+        require(
+            _saleStaus == SaleState.SALE_ACTIVE,
+            "General sale is not active"
+        );
+        _;
+    }
+
+    /***********************************|
+    |          View Functions           |
+    |__________________________________*/
+
+    /**
+     * @dev Getter for current sale status.
+     */
+    function saleStatus() public view returns (uint8) {
+        return uint8(_saleStaus);
     }
 
     /**
@@ -238,12 +275,57 @@ contract PhlipSale is Ownable {
         return card.mintedSupply;
     }
 
+    /***********************************|
+    |       Only Owner Functions        |
+    |__________________________________*/
+
     /**
      * @dev Allows contract owner to set presale active state.
-     * @param _active New presale active state.
+     *
+     * Requirements:
+     * - Must be called by the contract owner
+     * - `_state` must be 0, 1, or 2
+     *
+     * @param _state New sale state.
      */
-    function setPresaleActive(bool _active) public onlyOwner {
-        _presaleActive = _active;
+    function setSaleStatus(uint8 _state) public onlyOwner {
+        require(_state < 3, "Invalid sale status");
+        _saleStaus = SaleState(_state);
+    }
+
+    /**
+     * @dev Allows contract owner to set presale active state.
+     *
+     * Requirements:
+     * - Must be called by the contract owner
+     * - `_cardID` must be 0, 1, 2, or 3
+     * - `_price` must be greater than 0
+     * - `_scheduleIDs` must contain IDs for existing schedules vesting with
+     * reserves containing enough tokens to create vesting capsules from
+     *
+     * @param _scheduleIDs Array containing vesting schedule IDs.
+     */
+    function setCardSaleInfo(
+        uint128 _cardID,
+        uint256 _price,
+        uint256[] calldata _scheduleIDs
+    ) public onlyOwner {
+        require(_cardID < 4, "Invalid card ID");
+        require(_price > 0, "Price must be greater than 0");
+
+        IVestingTreasury treasury = IVestingTreasury(
+            _cards[_cardID].contractAddress
+        );
+        for (uint256 i = 0; i < _scheduleIDs.length; i++) {
+            require(
+                treasury.scheduleExists(_scheduleIDs[i]),
+                "Vesting schedule ID is invalid"
+            );
+        }
+
+        CardSaleInfo storage saleInfo = _cardSaleInfo[_cardID];
+        saleInfo.price = _price;
+        saleInfo.scheduleIDs = _scheduleIDs;
     }
 
     /**
@@ -276,7 +358,7 @@ contract PhlipSale is Ownable {
 
         // Add vesting info with card info and number of card in package
         package.cardBundles.push(
-            _initCardPackage(
+            _createCardBundle(
                 _cardID,
                 _numCards,
                 _numForSale,
@@ -320,7 +402,7 @@ contract PhlipSale is Ownable {
         for (uint256 i = 0; i < _numCards.length; i++) {
             // Add vesting info with card info and number of card in package
             package.cardBundles.push(
-                _initCardPackage(
+                _createCardBundle(
                     _cardIDs[i],
                     _numCards[i],
                     _numForSale,
@@ -333,12 +415,21 @@ contract PhlipSale is Ownable {
         emit CreatePackage(_packageID, _weiPrice, _numForSale);
     }
 
+    /***********************************|
+    |    External Purchase Functions    |
+    |__________________________________*/
+
     /**
      * @dev Allows caller to purchase a presale package if they
      * have sent the correct amount of ETH to cover the package cost.
      * @param _packageID ID of the package to purchase.
      */
-    function purchasePackage(uint256 _packageID) public payable onlyPresale {
+    function purchasePackage(uint256 _packageID)
+        public
+        payable
+        onlyPresale
+        nonReentrant
+    {
         require(_registeredPackages[_packageID], "Package does not exist");
 
         PresalePackage storage package = _packages[_packageID];
@@ -347,47 +438,83 @@ contract PhlipSale is Ownable {
 
         package.numSold += 1;
 
-        uint256[] memory schedules = new uint256[](2);
         for (uint256 i = 0; i < package.cardBundles.length; i++) {
             CardBundle storage pkgDetails = package.cardBundles[i];
             CardInfo storage card = _cards[pkgDetails.cardID];
             card.mintedSupply += pkgDetails.numCards;
 
             for (uint256 j = 0; j < pkgDetails.numCards; j++) {
-                // Overwrite vetsing schedule IDs
-                schedules[0] = pkgDetails.scheduleIDs[0];
-                schedules[1] = pkgDetails.scheduleIDs[1];
-
                 // Mint card
-                card.instance.mintCard(
+                IPhlipCard(card.contractAddress).mintCard(
                     msg.sender,
                     "",
                     uint256(card.varient),
-                    schedules
+                    pkgDetails.scheduleIDs
                 );
             }
         }
+
+        emit PurchasePackage(_packageID, msg.sender);
 
         uint256 refundAmount = msg.value - package.price;
         if (refundAmount > 0) {
             payable(msg.sender).transfer(refundAmount);
         }
-
-        emit PurchasePackage(_packageID, msg.sender);
     }
+
+    /**
+     * @dev Allows caller to purchase a card if they have
+     * sent the correct amount of ETH to cover the cost.
+     * @param _cardID ID of the card to purchase.
+     */
+    function purchaseCard(uint128 _cardID, string memory _uri)
+        public
+        payable
+        onlyPresale
+        nonReentrant
+    {
+        require(_registeredSaleInfo[_cardID], "Card not available for sale");
+
+        CardInfo storage card = _cards[_cardID];
+        CardSaleInfo storage saleInfo = _cardSaleInfo[_cardID];
+        require(card.mintedSupply < card.totalSupply, "Max supply reached");
+        require(msg.value > saleInfo.price - 1, "Not enough ETH to cover cost");
+
+        card.mintedSupply += 1;
+        saleInfo.numSold += 1;
+
+        // Mint card
+        IPhlipCard(card.contractAddress).mintCard(
+            msg.sender,
+            _uri,
+            uint256(card.varient),
+            saleInfo.scheduleIDs
+        );
+
+        emit PurchaseCard(_cardID, msg.sender);
+
+        uint256 refundAmount = msg.value - saleInfo.price;
+        if (refundAmount > 0) {
+            payable(msg.sender).transfer(refundAmount);
+        }
+    }
+
+    /***********************************|
+    |        Internal Functions         |
+    |__________________________________*/
 
     /**
      * @dev Creates vesting schedules and fills reserves for a card in package
      * @param _cardID ID of the card in the package (can be 0-3)
      * @param _numCards Number of cards in the package
-     * @param _numForSale Number of packages that can be bought
+     * @param _reserveMultiple Multplier used when filling vesting schedule reserves
      * @param _daoAmount The amount of DAO tokens that will vest in card
      * @param _p2eAmount The amount of P2E tokens that will vest in card
      */
-    function _initCardPackage(
+    function _createCardBundle(
         uint128 _cardID,
         uint128 _numCards,
-        uint256 _numForSale,
+        uint256 _reserveMultiple,
         uint256 _daoAmount,
         uint256 _p2eAmount
     ) private returns (CardBundle memory) {
@@ -395,12 +522,8 @@ contract PhlipSale is Ownable {
         require(_daoAmount > 0, "DAO token amount cannot be 0");
         require(_p2eAmount > 0, "P2E token amount cannot be 0");
 
-        CardInfo storage card = _cards[_cardID];
-
-        uint256 totalCards = _numForSale * _numCards;
-
         IVestingTreasury cardTreasury = IVestingTreasury(
-            address(card.instance)
+            _cards[_cardID].contractAddress
         );
 
         uint256 daoSchedule = cardTreasury.createVestingSchedule(
@@ -417,99 +540,28 @@ contract PhlipSale is Ownable {
             _p2eAmount
         );
 
+        uint256 fillMultiple = _reserveMultiple * _numCards;
+
         // Fill reserves for new schedules
         // Note: requires _daoWalletAddress to approve card contract as spender
         cardTreasury.fillReserves(
             _daoWalletAddress,
             daoSchedule,
-            _daoAmount * totalCards
+            _daoAmount * fillMultiple
         );
 
         // Note: requires _p2eWalletAddress to approve card contract as spender
         cardTreasury.fillReserves(
             _p2eWalletAddress,
             p2eSchedule,
-            _p2eAmount * totalCards
+            _p2eAmount * fillMultiple
         );
 
-        return CardBundle(_cardID, _numCards, [daoSchedule, p2eSchedule]);
+        // Create schedule IDs array
+        uint256[] memory schedules = new uint256[](2);
+        schedules[0] = daoSchedule;
+        schedules[1] = p2eSchedule;
+
+        return CardBundle(_cardID, _numCards, schedules);
     }
-
-    // function buyPinkCard(uint256[] calldata _types, string[] calldata _uris)
-    //     external
-    //     payable
-    // {
-    //     require(_types.length > 0, "Must provide types");
-    //     require(
-    //         _types.length == _uris.length,
-    //         "Length of types and uris not equal"
-    //     );
-
-    //     uint256 _totalPrice = PC_SALE_PRICE * _types.length;
-    //     require(msg.value >= _totalPrice, "Not enough ETH sent to purchase");
-
-    //     uint256 i;
-
-    //     // Check that all types are valid
-    //     for (i = 0; i < _types.length; i++) {
-    //         require(_types[i] == 0 || _types[i] == 1, "Invalid type");
-    //     }
-
-    //     for (i = 0; i < _types.length; i++) {
-    //         if (_types[i] == 0) {
-    //             require(
-    //                 _pinkTextCounter.current() <= PC_TEXT_MAX_SUPPLY,
-    //                 "Pink text card supply reached"
-    //             );
-    //             _pinkTextCounter.increment();
-    //             // _pinkCard.mintCard(msg.sender, _uris[i], 0);
-    //         } else {
-    //             require(
-    //                 _pinkImageCounter.current() <= PC_IMAGE_MAX_SUPPLY,
-    //                 "Pink image card supply reached"
-    //             );
-    //             _pinkImageCounter.increment();
-    //             // _pinkCard.mintCard(msg.sender, _uris[i], 1);
-    //         }
-    //     }
-    // }
-
-    // function buyWhiteCard(uint256[] calldata _types, string[] calldata _uris)
-    //     external
-    //     payable
-    // {
-    //     require(_types.length > 0, "Must provide types");
-    //     require(
-    //         _types.length == _uris.length,
-    //         "Length of types and uris not equal"
-    //     );
-
-    //     uint256 _totalPrice = PC_SALE_PRICE * _types.length;
-    //     require(msg.value >= _totalPrice, "Not enough ETH sent to purchase");
-
-    //     uint256 i;
-
-    //     // Check that all types are valid
-    //     for (i = 0; i < _types.length; i++) {
-    //         require(_types[i] == 0 || _types[i] == 1, "Invalid type");
-    //     }
-
-    //     for (i = 0; i < _types.length; i++) {
-    //         if (_types[i] == 0) {
-    //             require(
-    //                 _whiteTextCounter.current() <= WC_TEXT_MAX_SUPPLY,
-    //                 "White text card supply reached"
-    //             );
-    //             _whiteTextCounter.increment();
-    //             // _whiteCard.mintCard(msg.sender, _uris[i], 0, [0, 1]);
-    //         } else {
-    //             require(
-    //                 _whiteBlankCounter.current() <= WC_BLANK_MAX_SUPPLY,
-    //                 "White image card supply reached"
-    //             );
-    //             _whiteBlankCounter.increment();
-    //             // _whiteCard.mintCard(msg.sender, "", 1);
-    //         }
-    //     }
-    // }
 }

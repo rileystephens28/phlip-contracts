@@ -91,7 +91,12 @@ contract VestingVault {
      * @param _scheduleID The ID of the VestingSchedule to query.
      * @return True if the schedule is registered, false otherwise.
      */
-    function scheduleExists(uint256 _scheduleID) public view returns (bool) {
+    function scheduleExists(uint256 _scheduleID)
+        public
+        view
+        virtual
+        returns (bool)
+    {
         return _scheduleExists(_scheduleID);
     }
 

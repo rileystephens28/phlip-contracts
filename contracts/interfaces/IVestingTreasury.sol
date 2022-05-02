@@ -8,6 +8,13 @@ pragma solidity 0.8.13;
  */
 interface IVestingTreasury {
     /**
+     * @dev Getter function for checking if specified schedule is registered.
+     * @param _scheduleID The ID of the VestingSchedule to query.
+     * @return True if the schedule is registered, false otherwise.
+     */
+    function scheduleExists(uint256 _scheduleID) external view returns (bool);
+
+    /**
      * @dev Deposits tokens to schedule reserves for future capsules.
      * @param _filler Address that holds tokens to be deposited.
      * @param _scheduleID The ID of the schedule to fill.

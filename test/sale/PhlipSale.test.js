@@ -128,10 +128,22 @@ contract("PhlipSale", (accounts) => {
         });
     };
 
-    const setPresaleActive = async (bool, from = admin) => {
-        return await saleInstance.setPresaleActive(bool, {
+    const _setSaleStatus = async (val, from = admin) => {
+        return await saleInstance.setSaleStatus(val, {
             from: from,
         });
+    };
+
+    const setSaleInactive = async (from = admin) => {
+        return await _setSaleStatus(0, from);
+    };
+
+    const setPresaleActive = async (from = admin) => {
+        return await _setSaleStatus(1, from);
+    };
+
+    const setGeneralSaleActive = async (from = admin) => {
+        return await _setSaleStatus(2, from);
     };
 
     const setMaxApproval = async (
@@ -796,7 +808,7 @@ contract("PhlipSale", (accounts) => {
         beforeEach(async () => {
             await createSingleCardPackage();
             await createMultiCardPackage(1);
-            await setPresaleActive(true);
+            await setPresaleActive();
         });
 
         // Failure case
@@ -807,7 +819,7 @@ contract("PhlipSale", (accounts) => {
             );
         });
         it("should fail when presale is not active", async () => {
-            await setPresaleActive(false);
+            await setSaleInactive();
             await expectRevert(purchasePackage(), "Presale is not active");
         });
         it("should fail when package sold out", async () => {
