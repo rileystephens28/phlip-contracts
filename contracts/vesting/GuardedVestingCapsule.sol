@@ -39,6 +39,29 @@ abstract contract GuardedVestingCapsule is
     }
 
     /**
+     * @dev Withdraw tokens from available reserves.
+     *
+     * Note - Available reserves refer to the amount of tokens that are not
+     * being used by vesting capsules. The funds currently used by vesting
+     * capsules WILL NOT be able to be withdrawn by anyone except capsule owners.
+     *
+     * Requirements:
+     *
+     * - `_scheduleID` must exist.
+     * - `_to` cannot be zero address.
+     * - available reserves of `_scheduleID` must be > 0.
+     *
+     * @param _to Address to withdraw tokens to.
+     * @param _scheduleID ID of the schedule to withdraw from.
+     */
+    function withdrawAvailableReserves(address _to, uint256 _scheduleID)
+        external
+        onlyRole(TREASURER_ROLE)
+    {
+        _withdrawAvailableReserves(_to, _scheduleID);
+    }
+
+    /**
      * @dev Creates a new VestingSchedule that can be used by future Capsules.
      * @param _token The token to be vested.
      * @param _cliff The number of seconds after schedule starts and vesting begins.

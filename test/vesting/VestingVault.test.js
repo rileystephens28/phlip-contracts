@@ -62,6 +62,16 @@ contract("VestingVault", (accounts) => {
         );
     };
 
+    const withdrawAvailableReserves = async (
+        to = deployer,
+        scheduleId = 0,
+        from = deployer
+    ) => {
+        return await vaultInstance.withdrawAvailableReserves(to, scheduleId, {
+            from: from,
+        });
+    };
+
     const createSchedule = async (
         token = tokenInstance.address,
         cliff = baseCliff,
@@ -343,6 +353,46 @@ contract("VestingVault", (accounts) => {
 
             // Available reserves should now have 2000 tokens
             await verifyAvailableReserves(0, tokenUnits(1000).mul(new BN(2)));
+        });
+    });
+
+    describe("Withdrawing Available Schedule Reserves", async () => {
+        // Failure cases
+        it("should fail when schedule ID is invalid", async () => {
+            await expectRevert(
+                withdrawAvailableReserves(deployer, 2),
+                "VestingVault: Schedule does not exist"
+            );
+        });
+        it("should fail when withdrawing to zero address", async () => {
+            await expectRevert(
+                withdrawAvailableReserves(constants.ZERO_ADDRESS, 0),
+                "VestingVault: Cannot withdraw to 0x0"
+            );
+        });
+        it("should fail when available reserves are empty", async () => {
+            // Withdraw all available reserves
+            await withdrawAvailableReserves();
+            await expectRevert(
+                withdrawAvailableReserves(),
+                "VestingVault: No available reserves"
+            );
+        });
+        // Passing cases
+        it("should pass when params are valid and reserves are not empty", async () => {
+            // Should have 1000 tokens in total
+            await verifyTotalReserves(0, tokenUnits(1000));
+
+            // Should have 1000 tokens available for capsules
+            await verifyAvailableReserves(0, tokenUnits(1000));
+
+            await withdrawAvailableReserves();
+
+            // Total reserves should be empty
+            await verifyTotalReserves(0, 0);
+
+            // Available reserves should be empty
+            await verifyAvailableReserves(0, 0);
         });
     });
 

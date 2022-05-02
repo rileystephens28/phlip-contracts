@@ -348,7 +348,7 @@ contract VestingVault {
     }
 
     /***********************************|
-    |     Reserve Filling Functions     |
+    |   Reserve Management Functions    |
     |__________________________________*/
 
     /**
@@ -390,6 +390,51 @@ contract VestingVault {
             _filler,
             address(this),
             _fillAmount
+        );
+    }
+
+    /**
+     * @dev Withdraw tokens from available reserves.
+     *
+     * Note - Available reserves refer to the amount of tokens that are not
+     * being used by vesting capsules. The funds currently used by vesting
+     * capsules WILL NOT be able to be withdrawn by anyone except capsule owners.
+     *
+     * Requirements:
+     *
+     * - `_scheduleID` must exist.
+     * - `_to` cannot be zero address.
+     * - available reserves of `_scheduleID` must be > 0.
+     *
+     * @param _to Address to withdraw tokens to.
+     * @param _scheduleID ID of the schedule to withdraw from.
+     */
+    function _withdrawAvailableReserves(address _to, uint256 _scheduleID)
+        internal
+        virtual
+    {
+        require(_to != address(0), "VestingVault: Cannot withdraw to 0x0");
+        require(
+            _scheduleID < _scheduleIDCounter.current(),
+            "VestingVault: Schedule does not exist"
+        );
+        require(
+            _availableScheduleReserves[_scheduleID] > 0,
+            "VestingVault: No available reserves"
+        );
+
+        // Reduce total reserves and set available reserves to 0
+        _totalScheduleReserves[_scheduleID] -= _availableScheduleReserves[
+            _scheduleID
+        ];
+        _availableScheduleReserves[_scheduleID] = 0;
+
+        // Transfer tokens from this contract to another address.
+        VestingSchedule storage schedule = _vestingSchedules[_scheduleID];
+        IERC20(schedule.token).safeTransferFrom(
+            address(this),
+            _to,
+            _availableScheduleReserves[_scheduleID]
         );
     }
 

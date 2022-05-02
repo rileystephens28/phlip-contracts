@@ -18,6 +18,12 @@ contract VestingVaultMock is VestingVault {
         _fillReserves(_filler, _scheduleID, _fillAmount);
     }
 
+    function withdrawAvailableReserves(address _to, uint256 _scheduleID)
+        external
+    {
+        _withdrawAvailableReserves(_to, _scheduleID);
+    }
+
     function createVestingSchedule(
         address _token,
         uint256 _cliffSeconds,
