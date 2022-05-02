@@ -19,9 +19,9 @@ Accessor to check if a token is locked
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| uint256 | or not the token is locked
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Whether or not the token is locked
 ### hasLockOperator
 ```solidity
   function hasLockOperator(
@@ -38,9 +38,9 @@ Note - Lock operator is still considered approved if they have requested to resi
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| uint256 | or not token has an approved lock operator
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Whether or not token has an approved lock operator
 ### lockOperatorOf
 ```solidity
   function lockOperatorOf(
@@ -56,9 +56,9 @@ Accessor to get agreement operator address
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Address`| uint256 | of tokens lock operator
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Address of tokens lock operator
 ### agreementStatusOf
 ```solidity
   function agreementStatusOf(
@@ -74,9 +74,9 @@ Accessor to get agreement status
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Uint`| uint256 | representing the status of the agreement:
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Uint representing the status of the agreement:
  0 -> UNSET
  1 -> APPROVAL_PENDING
  2 -> APPROVED
@@ -204,9 +204,9 @@ Valid lock operator conditions:
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| uint256 | or not token has an approved lock operator
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Whether or not token has an approved lock operator
 ### _agreementHasExpired
 ```solidity
   function _agreementHasExpired(
@@ -222,9 +222,9 @@ Accessor to check if lock operator agreement has expired
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| uint256 | or not lock operator agreement has expired
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Whether or not lock operator agreement has expired
 ### _setLock
 ```solidity
   function _setLock(

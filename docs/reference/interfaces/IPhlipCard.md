@@ -1,117 +1,130 @@
 
-The IVoucherIssuer interface is used to define the functions that a
-voucher issuing contract must implement. Inheriting contracts should practice
-access-control for managing the issuance and redemption of vouchers.
-
+Functionality required to be considered a basic Phlip card.
 
 ## Functions
-### hasVoucher
+### minterOf
 ```solidity
-  function hasVoucher(
-    address _address
-  ) external returns (bool)
-```
-
-Accessor function to see if an address has any vouchers.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_address` | address | The address to check.
-
-#### Return Values:
-| Type          | Description                                                                  |
-| :------------ | :--------------------------------------------------------------------------- |
-|address | Whether or not the address has >= 1 vouchers
-### voucherHolderOf
-```solidity
-  function voucherHolderOf(
-    uint256 _id
+  function minterOf(
+    uint256 _cardID
   ) external returns (address)
 ```
 
-Accessor function for address of voucher holder
+Accessor function to get address of card minter
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_id` | uint256 | ID associated with voucher.
+|`_cardID` | uint256 | The ID of the card to check
 
 #### Return Values:
 | Type          | Description                                                                  |
 | :------------ | :--------------------------------------------------------------------------- |
-|uint256 | Address of voucher holder.
-### remainingVouchers
+|uint256 | Address that minted the card
+### typeOf
 ```solidity
-  function remainingVouchers(
-    address _for
+  function typeOf(
+    uint256 _cardID
   ) external returns (uint256)
 ```
 
-Helper to get vouchers of claims for an address.
+Accessor function to get type of card
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_for` | address | Address of check for remaing vouchers.
+|`_cardID` | uint256 | The ID of the card to check
 
 #### Return Values:
 | Type          | Description                                                                  |
 | :------------ | :--------------------------------------------------------------------------- |
-|address | Number of vouchers for an address.
-### issueVoucher
+|uint256 | Int corresponding to the type of card
+Example: 0 if text, 1 if image
+### tokenURI
 ```solidity
-  function issueVoucher(
-    address _to
-  ) external
+  function tokenURI(
+    uint256 _tokenId
+  ) external returns (string)
 ```
 
-Issue a voucher to an address.
+Accessor function for getting card's URI from ID
+Modified implementation of ERC721URIStorage.tokenURI
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to check.
+|`_tokenId` | uint256 | ID of the card to get URI of
 
-### issueVouchers
+#### Return Values:
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | URI of the card
+### transferCreatorship
 ```solidity
-  function issueVouchers(
-    address _to
+  function transferCreatorship(
+    address _to,
+    uint256 _cardID
   ) external
 ```
 
-Issue many vouchers to an address.
+Transfer creatorship of a card to a new address.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to check.
+|`_to` | address | The address to transfer creatorship to.
+|`_cardID` | uint256 | ID of the card whose creatorship to transfer
 
-### redeemVoucher
+### updateMetadata
 ```solidity
-  function redeemVoucher(
-    uint256 _id
+  function updateMetadata(
+    uint256 _cardID,
+    string _uri
   ) external
 ```
 
-Redeem a voucher.
+Allows owner of a card to update the URI of their card.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_id` | uint256 | ID associated with the voucher to redeem.
+|`_cardID` | uint256 | The ID of the card to update
+|`_uri` | string | The IPFS CID referencing the updated metadata
 
-### redeemVouchers
+### issueCardVoucher
 ```solidity
-  function redeemVouchers(
-    uint256[] _ids
+  function issueCardVoucher(
+    address _to,
+    uint256 _type,
+    uint256[] _scheduleIDs
   ) external
 ```
 
-Redeem many vouchers.
+Issue a card voucher to a given address.
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_ids` | uint256[] | Array of IDs associated with the vouchers to redeem.
+|`_to` | address | The address to issue voucher to.
+|`_type` | uint256 | The type of card voucher can be redeemed for (text, image, blank, etc)
+|`_scheduleIDs` | uint256[] | Array of vesting schedule IDs to create future card with
+
+### mintCard
+```solidity
+  function mintCard(
+    address _to,
+    string _uri,
+    uint256 _type,
+    uint256[] _scheduleIDs
+  ) external
+```
+
+Mint a card to a given address.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_to` | address | The address to mint to.
+|`_uri` | string | The IPFS CID referencing the new cards text metadata.
+|`_type` | uint256 | Int type of card to mint (text, image, blank, etc)
+|`_scheduleIDs` | uint256[] | Array of vesting schedule IDs to create card's vesting capsules from
 

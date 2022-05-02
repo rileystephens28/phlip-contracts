@@ -18,9 +18,9 @@ Accessor function for available reserves of specified schedule.
 |`_scheduleID` | uint256 | The ID of the schedule to be queried.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | amount of schedule denominated tokens available to create capsules with
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The amount of schedule denominated tokens available to create capsules with
 ### lockedReservesOf
 ```solidity
   function lockedReservesOf(
@@ -36,9 +36,9 @@ Calculates amount of schedule reserves locked in capsules
 |`_scheduleID` | uint256 | The ID of the schedule to be queried.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | amount of schedule denominated tokens locked in capsules
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The amount of schedule denominated tokens locked in capsules
 ### leftoverReservesOf
 ```solidity
   function leftoverReservesOf(
@@ -54,9 +54,9 @@ Accessor function for leftover reserves of specified token.
 |`_token` | address | The address of the token to be queried.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| address | amount of specified tokens waiting to be withdrawn (no longer in capsules)
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | The amount of specified tokens waiting to be withdrawn (no longer in capsules)
 ### isCapsuleActive
 ```solidity
   function isCapsuleActive(
@@ -73,9 +73,9 @@ Note - capsules that do not actually exist are also considered inactive.
 |`_capsuleID` | uint256 | The ID of the Capsule to be queried.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`True`| uint256 | if capsule exists and has not been fully claimed, False otherwise.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | True if capsule exists and has not been fully claimed, False otherwise.
 ### capsuleOwnerOf
 ```solidity
   function capsuleOwnerOf(
@@ -91,9 +91,9 @@ Accessor function for specified Capsule owner.
 |`_capsuleID` | uint256 | The ID of the Capsule to be queried.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | address of the capsule owner
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The address of the capsule owner
 ### vestedBalanceOf
 ```solidity
   function vestedBalanceOf(
@@ -109,9 +109,9 @@ Accessor function for amount of tokens that have vested for a given capsule.
 |`_capsuleID` | uint256 | The ID of the capsule to be queried
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | amount of claimable tokens in a capsule
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The amount of claimable tokens in a capsule
 ### leftoverBalanceOf
 ```solidity
   function leftoverBalanceOf(
@@ -129,9 +129,9 @@ Accessor function for previous capsule owners leftover balance of given token.
 |`_token` | address | The address of a token to query
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| address | amount of specified tokens leftover after capsule transfer
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | The amount of specified tokens leftover after capsule transfer
 ### fillReserves
 ```solidity
   function fillReserves(

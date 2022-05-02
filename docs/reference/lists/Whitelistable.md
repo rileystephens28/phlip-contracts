@@ -18,9 +18,9 @@ it is recommended to use the 'Claimable' extension.
 |`_address` | address | The address to check.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| address | or not the address is whitelisted.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | Whether or not the address is whitelisted.
 ### _addToWhitelist
 ```solidity
   function _addToWhitelist(
@@ -48,4 +48,21 @@ Set address to false the whitelist mapping
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
 |`_address` | address | The address to remove from the whitelist
+
+## Events
+### AddToWhitelist
+```solidity
+  event AddToWhitelist(
+  )
+```
+
+
+
+### RemoveFromWhitelist
+```solidity
+  event RemoveFromWhitelist(
+  )
+```
+
+
 

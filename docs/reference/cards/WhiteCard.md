@@ -8,27 +8,14 @@ Implementation of a PhlipCard that supports text and blank cards.
   ) public
 ```
 
+Create a new instance of the WhiteCard contract.
+
+Requirements:
+
+- `_baseUri` cannot be blank.
+- `_maxUriChanges` must be >= 1.
 
 
-
-### typeOf
-```solidity
-  function typeOf(
-    uint256 _cardID
-  ) public returns (uint256)
-```
-
-Accessor function to get type of card
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_cardID` | uint256 | The ID of the card to check
-
-#### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`0`| uint256 | if blank, 1 if blank
 ### tokenURI
 ```solidity
   function tokenURI(
@@ -39,59 +26,20 @@ Accessor function to get type of card
 Accessor function for getting card's URI from ID
 Override to return empty string if card is blank
 
+Requirements:
+
+- `_tokenId` must exist.
+
+
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
 |`_tokenId` | uint256 | ID of the card to get URI of
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`URI`| uint256 | of the card
-### mintBlankCard
-```solidity
-  function mintBlankCard(
-    address _to
-  ) external
-```
-
-Allow minter to mint a blank card to a given address.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to mint to.
-
-### issueBlankCardVoucher
-```solidity
-  function issueBlankCardVoucher(
-    address _to
-  ) external
-```
-
-Allow minter to issue a blank card voucher to a given address.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to issue voucher to.
-
-### batchIssueBlankCardVouchers
-```solidity
-  function batchIssueBlankCardVouchers(
-    address _to,
-    uint256 _amount
-  ) external
-```
-
-Allow minter to issue many blank card vouchers to a given address.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to mint tokens to.
-|`_amount` | uint256 | The number of card vouchers to issue.
-
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | URI of the card
 ### updateMetadata
 ```solidity
   function updateMetadata(
@@ -102,6 +50,16 @@ Allow minter to issue many blank card vouchers to a given address.
 
 Override PhlipCard.updateMetadata to prevent blank
 cards from setting their URI.
+
+Requirements:
+
+- `_cardID` must exist.
+- `_cardID` cannot be a blank card.
+- `_uri` cannot be blank.
+- `msg.sender` must be owner of `_cardID`
+- `msg.sender` must be minter of `_cardID`
+- card's `_metadataChangeCount` must be < `MAX_URI_CHANGES`
+
 
 #### Parameters:
 | Name | Type | Description                                                          |
@@ -118,11 +76,58 @@ cards from setting their URI.
 ```
 
 Mint card with ID that has been reserved by the callers voucher
-Requires that caller has >=1 remaining card vouchers.
+
+Requirements:
+
+- `_uri` cannot be blank when redeeming text cards.
+- `msg.sender` has >= 1 `_remainingVouchers`.
+- `_paused` must be false.
+
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
 |`_reservedID` | uint256 | ID reserved by the callers voucher
-|`_uri` | string | Should be left blank. Only used to match super function signature.
+|`_uri` | string | URI of text card (pass empty string for blank cards)
 
+### _setCardType
+```solidity
+  function _setCardType(
+    uint256 _cardID,
+    uint256 _type
+  ) internal
+```
+
+Override of PhlipCard._setCardType to handle setting
+card to type TEXT or BLANK.
+
+Requirements:
+
+- `_type` must be one of 0 (text) or 1 (blank).
+
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_cardID` | uint256 | The ID of card whose type to set
+|`_type` | uint256 | Integer corresponding to card type of card (0 or 1)
+
+### _getCardType
+```solidity
+  function _getCardType(
+    uint256 _cardID
+  ) internal returns (uint256)
+```
+
+Override of PhlipCard._setCardType to handle
+TEXT or BLANK card logic.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_cardID` | uint256 | The ID of card to query
+
+#### Return Values:
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Integer corresponding to card type of card (0 or 1)

@@ -15,12 +15,10 @@
     * [GameRecord](reference/gameRecords/GameRecord.md)
   * interfaces
     * [IAffiliateCampaign](reference/interfaces/IAffiliateCampaign.md)
-    * [IBaseCard](reference/interfaces/IBaseCard.md)
-    * [IBlankCard](reference/interfaces/IBlankCard.md)
-    * [IImageCard](reference/interfaces/IImageCard.md)
     * [ILockOperator](reference/interfaces/ILockOperator.md)
-    * [IPhlipProfile](reference/interfaces/IPhlipProfile.md)
-    * [ITextCard](reference/interfaces/ITextCard.md)
+    * [IPhlipCard](reference/interfaces/IPhlipCard.md)
+    * [ISocialProfile](reference/interfaces/ISocialProfile.md)
+    * [IVestingTreasury](reference/interfaces/IVestingTreasury.md)
     * [IVestingVault](reference/interfaces/IVestingVault.md)
     * [IVoucherIssuer](reference/interfaces/IVoucherIssuer.md)
     * [IWeightedBallot](reference/interfaces/IWeightedBallot.md)
@@ -30,19 +28,8 @@
     * [Whitelistable](reference/lists/Whitelistable.md)
   * lockable
     * [ERC721Lockable](reference/lockable/ERC721Lockable.md)
-  * mocks
-    * [AdminGameRecordMock](reference/mocks/AdminGameRecordMock.md)
-    * [BlacklistMock](reference/mocks/BlacklistMock.md)
-    * [ERC20Mock](reference/mocks/ERC20Mock.md)
-    * [ERC721LockableMock](reference/mocks/ERC721LockableMock.md)
-    * [GameRecordMock](reference/mocks/GameRecordMock.md)
-    * [VestingCapsuleMock](reference/mocks/VestingCapsuleMock.md)
-    * [VestingVaultMock](reference/mocks/VestingVaultMock.md)
-    * [VoucherRegistryMock](reference/mocks/VoucherRegistryMock.md)
-    * [WeightedBallotMock](reference/mocks/WeightedBallotMock.md)
-    * [WhitelistMock](reference/mocks/WhitelistMock.md)
   * profiles
-    * [PhlipProfile](reference/profiles/PhlipProfile.md)
+    * [SocialProfile](reference/profiles/SocialProfile.md)
   * utils
     * [BlackholePrevention](reference/utils/BlackholePrevention.md)
   * vesting

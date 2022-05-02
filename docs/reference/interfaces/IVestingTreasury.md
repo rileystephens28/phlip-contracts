@@ -1,8 +1,5 @@
 
-The GuardedVestingCapsule is an implementation of a VestingCapsule that supports
-treasury management of vesting shedules and their respective reserves.
-
-NOTE - This contract is intended to hold ERC20 tokens on behalf of capsule owners.
+Describes the functions required to implement a vesting treasury.
 
 ## Functions
 ### fillReserves
@@ -21,7 +18,7 @@ Deposits tokens to schedule reserves for future capsules.
 | :--- | :--- | :------------------------------------------------------------------- |
 |`_filler` | address | Address that holds tokens to be deposited.
 |`_scheduleID` | uint256 | The ID of the schedule to fill.
-|`_fillAmount` | uint256 | Amount of tokens that will be deposited from treasurer.
+|`_fillAmount` | uint256 | Amount of tokens (10^18 denominated) that will be deposited from treasurer.
 
 ### createVestingSchedule
 ```solidity
@@ -48,12 +45,3 @@ Ex: If the schedule should vest 100 tokens, _amount should be 100000000000000000
 | Type          | Description                                                                  |
 | :------------ | :--------------------------------------------------------------------------- |
 |address | The ID of the newly created vesting schedule.
-### supportsInterface
-```solidity
-  function supportsInterface(
-  ) public returns (bool)
-```
-
-
-
-

@@ -3,6 +3,11 @@ Provides the ability to manage a affiliates and attibute actions taken
 to them. Each affilate agreement can be customized to allow for different actions
 and rewards. Affiliates can be associated with an abitrary number of agreements.
 
+New Design
+Rewards will be a % of total "sales" rather than a fixed amount per action.
+Anyone can become an affiliate of the campaign for a fixed 2% of their sales.
+A priveleged account can add affiliates to the campaign with a custom % agreement.
+
 ## Functions
 ### _createCampaign
 ```solidity

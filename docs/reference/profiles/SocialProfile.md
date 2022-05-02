@@ -34,9 +34,9 @@ Accessor function for getting a profiles current team.
 |`_profileID` | uint256 | ID of the profile to query.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`ID`| uint256 | of the profiles current team ID (0 if no team).
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | ID of the profiles current team ID (0 if no team).
 ### friendCountOf
 ```solidity
   function friendCountOf(
@@ -52,14 +52,38 @@ Accessor function for getting a profiles number of friends.
 |`_profileID` | uint256 | ID of the profile to query.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Number`| uint256 | of approved friends the profile has.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Number of approved friends the profile has.
+### getFriendshipStatus
+```solidity
+  function getFriendshipStatus(
+    uint256 _baseProfile,
+    uint256 _queryProfile
+  ) public returns (uint256)
+```
+
+Accessor function for getting relation status of friends.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_baseProfile` | uint256 | ID of the profile whose friends to check.
+|`_queryProfile` | uint256 | ID of the profile to check.
+
+#### Return Values:
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Integer representing the friendship status of _queryProfile in relation to _baseProfile.
+
+0 = STRANGER
+1 = PENDING
+2 = APPROVED
 ### getTeamInfo
 ```solidity
   function getTeamInfo(
     uint256 _teamID
-  ) public returns (struct PhlipProfile.Team)
+  ) public returns (struct SocialProfile.Team)
 ```
 
 Accessor method to get the details of a team.
@@ -70,9 +94,9 @@ Accessor method to get the details of a team.
 |`_teamID` | uint256 | ID of the team to query.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | profile struct data for the given profile ID.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The profile struct data for the given profile ID.
 ### tokenURI
 ```solidity
   function tokenURI(
@@ -89,9 +113,9 @@ Modified implementation of ERC721URIStorage.tokenURI
 |`_tokenId` | uint256 | ID of the card to get URI of
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`URI`| uint256 | of the card
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | URI of the card
 ### supportsInterface
 ```solidity
   function supportsInterface(

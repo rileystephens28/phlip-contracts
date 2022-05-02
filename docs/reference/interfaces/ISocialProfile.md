@@ -17,9 +17,9 @@ Accessor function for getting a profiles current team.
 |`_profileID` | uint256 | ID of the profile to query.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`ID`| uint256 | of the profiles current team ID (0 if no team).
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | ID of the profiles current team ID (0 if no team).
 ### friendCountOf
 ```solidity
   function friendCountOf(
@@ -35,9 +35,9 @@ Accessor function for getting a profiles number of friends.
 |`_profileID` | uint256 | ID of the profile to query.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Number`| uint256 | of approved friends the profile has.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Number of approved friends the profile has.
 ### createProfile
 ```solidity
   function createProfile(

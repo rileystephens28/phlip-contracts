@@ -83,6 +83,6 @@ const args = [
 const result = spawnSync("node", args, {
     stdio: ["inherit", "inherit", "pipe"],
 });
-// if (result.stderr.length > 0) throw new Error(result.stderr);
+if (result.stderr.length > 0) throw new Error(result.stderr);
 
 // fix(OUTPUT_DIR);

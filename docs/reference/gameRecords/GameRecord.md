@@ -18,9 +18,9 @@ Accessor function for checking if a game record has been registered.
 |`_recordID` | uint256 | The ID of a game record to check.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`True`| uint256 | if the game record has been registered, false if not.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | True if the game record has been registered, false if not.
 ### winsFor
 ```solidity
   function winsFor(
@@ -36,9 +36,9 @@ Accessor function for getting a game records win count.
 |`_recordID` | uint256 | The ID of a game record
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | number of wins on a game record.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The number of wins on a game record.
 ### lossesFor
 ```solidity
   function lossesFor(
@@ -54,9 +54,9 @@ Accessor function for getting a game records loss count.
 |`_recordID` | uint256 | The ID of a game record
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | number of losses on a game record.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The number of losses on a game record.
 ### getTokenWinnings
 ```solidity
   function getTokenWinnings(
@@ -74,9 +74,9 @@ Accessor function for getting amount of winnings for specified token.
 |`_token` | address | The address of reward token to query
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | total amount of specified tokens won.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The total amount of specified tokens won.
 ### getEthWinnings
 ```solidity
   function getEthWinnings(
@@ -92,9 +92,9 @@ Accessor function for getting amount of ETH won.
 |`_recordID` | uint256 | The ID of a game record to query
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | total amount of ETH won.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The total amount of ETH won.
 ### _createGameRecord
 ```solidity
   function _createGameRecord(

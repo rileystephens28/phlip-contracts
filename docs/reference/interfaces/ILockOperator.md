@@ -18,9 +18,9 @@ Accessor to check if a token is locked
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| uint256 | or not the token is locked
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Whether or not the token is locked
 ### hasLockOperator
 ```solidity
   function hasLockOperator(
@@ -37,9 +37,9 @@ Note - Lock operator is still considered approved if they have requested to resi
 |`_tokenID` | uint256 | The ID of the token to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| uint256 | or not token has an approved lock operator
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Whether or not token has an approved lock operator
 ### lock
 ```solidity
   function lock(
@@ -128,4 +128,45 @@ Token will no longer be lockable until a new lock operator is approved.
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
 |`_tokenID` | uint256 | The ID of the token to approve operator for
+
+## Events
+### InitiateAgreement
+```solidity
+  event InitiateAgreement(
+  )
+```
+
+
+
+### FinalizeAgreement
+```solidity
+  event FinalizeAgreement(
+  )
+```
+
+
+
+### TerminateAgreement
+```solidity
+  event TerminateAgreement(
+  )
+```
+
+
+
+### Lock
+```solidity
+  event Lock(
+  )
+```
+
+
+
+### Unlock
+```solidity
+  event Unlock(
+  )
+```
+
+
 

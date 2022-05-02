@@ -16,9 +16,9 @@ Provides contract with the ability to manage a blacklist of addresses.
 |`_address` | address | The address to check.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| address | or not the address is blacklisted.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | Whether or not the address is blacklisted.
 ### _addToBlacklist
 ```solidity
   function _addToBlacklist(
@@ -46,4 +46,21 @@ Set address to false the blacklist mapping
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
 |`_address` | address | The address to remove from the blacklist
+
+## Events
+### AddToBlacklist
+```solidity
+  event AddToBlacklist(
+  )
+```
+
+
+
+### RemoveFromBlacklist
+```solidity
+  event RemoveFromBlacklist(
+  )
+```
+
+
 

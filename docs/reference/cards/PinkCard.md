@@ -8,70 +8,75 @@ Implementation of a PhlipCard that supports text and image cards.
   ) public
 ```
 
+Create a new instance of the PinkCard contract.
+
+Requirements:
+
+- `_baseUri` cannot be blank.
+- `_maxUriChanges` must be >= 1.
 
 
-
-### typeOf
+### redeemVoucher
 ```solidity
-  function typeOf(
-    uint256 _cardID
-  ) public returns (uint256)
+  function redeemVoucher(
+    uint256 _reservedID,
+    string _uri
+  ) public
 ```
 
-Accessor function to get type of card
+Mint card with ID that has been reserved by the callers voucher
+
+Requirements:
+
+- `_uri` cannot be blank.
+- `msg.sender` has >= 1 `_remainingVouchers`.
+- `_paused` must be false.
+
 
 #### Parameters:
 | Name | Type | Description                                                          |
 | :--- | :--- | :------------------------------------------------------------------- |
-|`_cardID` | uint256 | The ID of the card to check
+|`_reservedID` | uint256 | ID reserved by the callers voucher
+|`_uri` | string | Should be left blank. Only used to match interface function signature.
+
+### _setCardType
+```solidity
+  function _setCardType(
+    uint256 _cardID,
+    uint256 _type
+  ) internal
+```
+
+Override of PhlipCard._setCardType to handle setting
+card to type TEXT or IMAGE.
+
+Requirements:
+
+- `_type` must be one of 0 (text) or 1 (image).
+
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_cardID` | uint256 | The ID of card whose type to set
+|`_type` | uint256 | Integer corresponding to card type of card (0 or 1)
+
+### _getCardType
+```solidity
+  function _getCardType(
+    uint256 _cardID
+  ) internal returns (uint256)
+```
+
+Override of PhlipCard._setCardType to handle
+TEXT or IMAGE card logic.
+
+#### Parameters:
+| Name | Type | Description                                                          |
+| :--- | :--- | :------------------------------------------------------------------- |
+|`_cardID` | uint256 | The ID of card to query
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`0`| uint256 | if image, 1 if image
-### mintImageCard
-```solidity
-  function mintImageCard(
-    address _to,
-    string _uri
-  ) external
-```
-
-Allow minter to mint a image card to a given address.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to mint to.
-|`_uri` | string | The IPFS CID referencing the new cards image metadata.
-
-### issueImageCardVoucher
-```solidity
-  function issueImageCardVoucher(
-    address _to
-  ) external
-```
-
-Allow minter to issue a image card voucher to a given address.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to issue voucher to.
-
-### batchIssueImageCardVouchers
-```solidity
-  function batchIssueImageCardVouchers(
-    address _to,
-    uint256 _amount
-  ) external
-```
-
-Allow minter to issue many image card vouchers to a given address.
-
-#### Parameters:
-| Name | Type | Description                                                          |
-| :--- | :--- | :------------------------------------------------------------------- |
-|`_to` | address | The address to mint tokens to.
-|`_amount` | uint256 | The number of card vouchers to issue.
-
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Integer corresponding to card type of card (0 or 1)

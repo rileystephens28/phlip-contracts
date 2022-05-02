@@ -18,9 +18,9 @@ Accessor function to see if an address has any vouchers.
 |`_address` | address | The address to check.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Whether`| address | or not the address has >= 1 vouchers
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | Whether or not the address has >= 1 vouchers
 ### voucherHolderOf
 ```solidity
   function voucherHolderOf(
@@ -36,9 +36,9 @@ Accessor function for address of voucher holder
 |`_reservedTokenID` | uint256 | ID of reserved token.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Address`| uint256 | of voucher holder.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | Address of voucher holder.
 ### remainingVouchers
 ```solidity
   function remainingVouchers(
@@ -54,9 +54,9 @@ Helper to get vouchers of claims for an address.
 |`_address` | address | Address of check.
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`Number`| address | of vouchers for an address.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | Number of vouchers for an address.
 ### _issueVoucher
 ```solidity
   function _issueVoucher(

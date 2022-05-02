@@ -36,7 +36,7 @@ contract VestingCapsuleMock is VestingCapsule {
         uint256 id = tokenIds.current();
         tokenIds.increment();
         _mint(_to, id);
-        _createTokenCapsules(id, _to, _startTime, _scheduleIDs);
+        _createCapsuleGroup(id, _to, _startTime, _scheduleIDs);
     }
 
     function burn(uint256 _id) external {

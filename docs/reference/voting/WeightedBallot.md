@@ -35,9 +35,9 @@ Accessor function for getting a ballots upVoteVal.
 |`_ballotID` | uint256 | The ID of a ballot
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | number of up votes cast on a given ballot.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The number of up votes cast on a given ballot.
 ### downVoteValueOf
 ```solidity
   function downVoteValueOf(
@@ -53,9 +53,9 @@ Accessor function for getting a ballots downVoteVal.
 |`_ballotID` | uint256 | The ID of a ballot
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | number of down votes cast on a given ballot.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The number of down votes cast on a given ballot.
 ### upVoteWeightOf
 ```solidity
   function upVoteWeightOf(
@@ -71,9 +71,9 @@ Accessor function for up vote weight of address.
 |`_voter` | address | Address of voter to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| address | up vote weight of a voter.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | The up vote weight of a voter.
 ### downVoteWeightOf
 ```solidity
   function downVoteWeightOf(
@@ -89,9 +89,9 @@ Accessor function for down vote weight of address.
 |`_voter` | address | Address of voter to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| address | down vote weight of a voter.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | The down vote weight of a voter.
 ### hasUpVoted
 ```solidity
   function hasUpVoted(
@@ -109,9 +109,9 @@ Accessor function for seeing if voter has up voted
 |`_voter` | address | Address of voter to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`True`| uint256 | if voter has up voted on ballot, false otherwise.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | True if voter has up voted on ballot, false otherwise.
 ### hasDownVoted
 ```solidity
   function hasDownVoted(
@@ -129,9 +129,9 @@ Accessor function for seeing if voter has down voted
 |`_voter` | address | Address of voter to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`True`| uint256 | if voter has down voted on ballot, false otherwise.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | True if voter has down voted on ballot, false otherwise.
 ### _voterUpWeight
 ```solidity
   function _voterUpWeight(
@@ -147,9 +147,9 @@ Accessor function for up vote weight of address.
 |`_voter` | address | Address of voter to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| address | up vote weight of a voter.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | The up vote weight of a voter.
 ### _voterDownWeight
 ```solidity
   function _voterDownWeight(
@@ -165,9 +165,9 @@ Accessor function for down vote weight of address.
 |`_voter` | address | Address of voter to check
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| address | down vote weight of a voter.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|address | The down vote weight of a voter.
 ### _castUpVote
 ```solidity
   function _castUpVote(
@@ -222,6 +222,6 @@ If the voter has not voted, the value is equal to the precision.
 |`_precision` | uint256 | The precision of the vote (default is 10000).
 
 #### Return Values:
-| Name                           | Type          | Description                                                                  |
-| :----------------------------- | :------------ | :--------------------------------------------------------------------------- |
-|`The`| uint256 | weighted value of the vote.
+| Type          | Description                                                                  |
+| :------------ | :--------------------------------------------------------------------------- |
+|uint256 | The weighted value of the vote.
