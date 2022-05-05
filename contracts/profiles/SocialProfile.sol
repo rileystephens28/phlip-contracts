@@ -58,6 +58,8 @@ contract SocialProfile is ERC721, AccessControl, ISocialProfile {
         string memory _symbol,
         string memory _baseUri
     ) ERC721(_name, _symbol) {
+        require(bytes(_baseUri).length > 0, "SocialProfile: Base URI is blank");
+
         // team ID counter should start at 1 because 0 is reserved for the default no team
         _teamIdCounter.increment();
         BASE_URI = _baseUri;
