@@ -140,18 +140,28 @@ contract("PhlipCard", (accounts) => {
     const transfer = async (
         from = cardOwner,
         to = recipient,
-        tokeneId = 0,
+        tokenId = 0,
         caller
     ) => {
         const estimatedGas = await cardInstance.transferFrom.estimateGas(
             from,
             to,
-            tokeneId,
+            tokenId,
             { from: caller || from }
         );
-        return await cardInstance.transferFrom(from, to, tokeneId, {
+        return await cardInstance.transferFrom(from, to, tokenId, {
             from: from,
             gas: estimatedGas,
+        });
+    };
+
+    const transferCreatorship = async (
+        to = otherAccount,
+        tokenId = 0,
+        from = cardOwner
+    ) => {
+        return await cardInstance.transferCreatorship(to, tokenId, {
+            from: from,
         });
     };
 
@@ -506,6 +516,33 @@ contract("PhlipCard", (accounts) => {
             await verifyCapsuleIsActive(1, true);
             await verifyCapsuleOwner(0, recipient);
             await verifyCapsuleOwner(1, recipient);
+        });
+    });
+
+    describe("Transfering Card Creatorship", () => {
+        beforeEach(async () => {
+            await mintCard();
+        });
+        // Failing cases
+        it("should fail when from caller is not card minter", async () => {
+            await expectRevert(
+                transferCreatorship(otherAccount, 0, recipient),
+                "PhlipCard: Must be minter"
+            );
+        });
+        it("should fail when to address is 0x0", async () => {
+            await expectRevert(
+                transferCreatorship(constants.ZERO_ADDRESS),
+                "PhlipCard: Cannot transfer to 0x0"
+            );
+        });
+        // Passing cases
+        it("should pass when params are valid and caller is minter", async () => {
+            // Transfer cardOwner => recipient
+            await transferCreatorship();
+
+            // Verify card owner is now recipient
+            await verifyCardMinter(0, otherAccount);
         });
     });
 
