@@ -280,6 +280,25 @@ contract("PhlipCard", (accounts) => {
         await this.snapshot.restore();
     });
 
+    describe("Initializing", () => {
+        it("should fail when base URI is blank", async function () {
+            await expectRevert(
+                PhlipCard.new("Phlip Base Card", "BPC", "", baseMaxUriChanges, {
+                    from: admin,
+                }),
+                "PhlipCard: Base URI is blank"
+            );
+        });
+        it("should fail when max URI changes is 0", async function () {
+            await expectRevert(
+                PhlipCard.new("Phlip Base Card", "BPC", baseUri, 0, {
+                    from: admin,
+                }),
+                "PhlipCard: Max URI changes is 0"
+            );
+        });
+    });
+
     describe("Token Attributes", () => {
         it("has the correct name", async function () {
             const name = await cardInstance.name();

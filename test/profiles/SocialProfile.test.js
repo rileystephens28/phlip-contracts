@@ -133,6 +133,17 @@ contract("SocialProfile", (accounts) => {
         await beforeEachSnapshot.restore();
     });
 
+    describe("Initializing", () => {
+        it("should fail when base URI is blank", async function () {
+            await expectRevert(
+                SocialProfile.new("Phlip Profile", "PFP", "", {
+                    from: admin,
+                }),
+                "SocialProfile: Base URI is blank"
+            );
+        });
+    });
+
     describe("Minting Profiles", async () => {
         // Failure cases
         it("should fail when URI is blank", async () => {
