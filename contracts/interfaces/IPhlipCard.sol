@@ -42,7 +42,9 @@ interface IPhlipCard {
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
-    function updateMetadata(uint256 _cardID, string memory _uri) external;
+    function updateMetadata(uint256 _cardID, string memory _uri)
+        external
+        payable;
 
     /**
      * @dev Issue a card voucher to a given address.

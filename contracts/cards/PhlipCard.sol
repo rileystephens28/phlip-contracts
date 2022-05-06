@@ -43,20 +43,29 @@ contract PhlipCard is
 {
     using Counters for Counters.Counter;
 
-    string public BASE_URI;
-    uint256 public MAX_URI_CHANGES;
-
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant SETTINGS_ROLE = keccak256("SETTINGS_ROLE");
 
+    string public BASE_URI;
+    uint64 public FREE_URI_CHANGES;
+    uint256 public URI_CHANGE_FEE;
+
+    address public developmentWallet;
+
     Counters.Counter internal _tokenIds;
+
+    struct MetadataChanges {
+        uint64 free;
+        uint64 paid;
+        uint128 lastChangeTS;
+    }
 
     // Token ID => URI string
     mapping(uint256 => string) internal _tokenURIs;
 
     // Token ID => Number of times URI has been updated
-    mapping(uint256 => uint256) internal _metadataChangeCounts;
+    mapping(uint256 => MetadataChanges) internal _metadataChanges;
 
     // Token ID => Address of token minter
     mapping(uint256 => address) internal _minters;
@@ -70,21 +79,28 @@ contract PhlipCard is
      * Requirements:
      *
      * - `_baseUri` cannot be blank.
-     * - `_maxUriChanges` must be >= 1.
+     * - `_freeUriChanges` must be >= 1.
+     * - `_devWallet` cannot be zero address.
      *
      * @param _name Name of the card NFT
      * @param _symbol Symbol of the card NFT
      * @param _baseUri IPSF gateway URI for the card
-     * @param _maxUriChanges Number of times minter can change card's URI
+     * @param _devWallet Address of the developer wallet to collect fees
+     * @param _freeUriChanges Number of times minter can change card's URI before paying fee
      */
     constructor(
         string memory _name,
         string memory _symbol,
         string memory _baseUri,
-        uint256 _maxUriChanges
+        address _devWallet,
+        uint64 _freeUriChanges
     ) ERC721(_name, _symbol) {
         require(bytes(_baseUri).length > 0, "PhlipCard: Base URI is blank");
-        require(_maxUriChanges > 0, "PhlipCard: Max URI changes is 0");
+        require(_freeUriChanges > 0, "PhlipCard: Free URI changes is 0");
+        require(
+            _devWallet != address(0),
+            "PhlipCard: Dev wallet is zero address"
+        );
 
         // Grant roles for this contract
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -96,8 +112,10 @@ contract PhlipCard is
         _grantRole(TREASURER_ROLE, msg.sender);
 
         // Set globals
-        setBaseURI(_baseUri);
-        setMaxUriChanges(_maxUriChanges);
+        BASE_URI = _baseUri;
+        FREE_URI_CHANGES = _freeUriChanges;
+
+        developmentWallet = payable(_devWallet);
     }
 
     /***********************************|
@@ -162,21 +180,72 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Allows MINTER to set the base URI for
+     * @dev Allows Settings Admin to set the base URI for
      * all tokens created by this contract
+     *
+     * Requirements:
+     *
+     * - `msg.sender` must have Settings Admin role
+     *
      * @param _newURI New base URI
      */
-    function setBaseURI(string memory _newURI) public onlyRole(SETTINGS_ROLE) {
+    function setBaseURI(string memory _newURI)
+        external
+        onlyRole(SETTINGS_ROLE)
+    {
         BASE_URI = _newURI;
     }
 
     /**
-     * @dev Allows Settings Admin to set max number
-     * of times minter can change the URI of a card.
-     * @param _newMax New max changes allowed
+     * @dev Allows Settings Admin to set number of times
+     * minter can change the URI of a card for free.
+     *
+     * Requirements:
+     *
+     * - `msg.sender` must have Settings Admin role
+     *
+     * @param _newMax New free changes allowed
      */
-    function setMaxUriChanges(uint256 _newMax) public onlyRole(SETTINGS_ROLE) {
-        MAX_URI_CHANGES = _newMax;
+    function setFreeUriChanges(uint64 _newMax)
+        external
+        onlyRole(SETTINGS_ROLE)
+    {
+        FREE_URI_CHANGES = _newMax;
+    }
+
+    /**
+     * @dev Allows Settings Admin to set the cost
+     * of changing a card's URI once.
+     *
+     * Requirements:
+     *
+     * - `msg.sender` must have Settings Admin role
+     *
+     * @param _fee The fee (in wei) to charge for changing card URI
+     */
+    function setUriChangeFee(uint256 _fee) external onlyRole(SETTINGS_ROLE) {
+        URI_CHANGE_FEE = _fee;
+    }
+
+    /**
+     * @dev Allows Settings Admin to set address of development wallet
+     *
+     * Requirements:
+     *
+     * - `_wallet` cannot be zero address.
+     * - `msg.sender` must have Settings Admin role
+     *
+     * @param _wallet Address of new developer wallet
+     */
+    function setDevWalletAddress(address _wallet)
+        external
+        onlyRole(SETTINGS_ROLE)
+    {
+        require(
+            _wallet != address(0),
+            "PhlipCard: Dev wallet can be zero address"
+        );
+        developmentWallet = _wallet;
     }
 
     /***********************************|
@@ -184,22 +253,22 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Allow address with PAUSER role to pause card transfers
+     * @dev Pause card transfers
      *
      * Requirements:
      *
-     * - `msg.sender` must have PAUSER role.
+     * - `msg.sender` must have Pauser role.
      */
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
     /**
-     * @dev Allow address with PAUSER role to unpause card transfers
+     * @dev Unpause card transfers
      *
      * Requirements:
      *
-     * - `msg.sender` must have PAUSER role.
+     * - `msg.sender` must have Pauser role.
      */
     function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
@@ -217,7 +286,7 @@ contract PhlipCard is
      * - `to` cannot be the zero address.
      * - `_scheduleIDs` must contain IDs for existing schedules vesting with
      * reserves containing enough tokens to create vesting capsules from
-     * - `msg.sender` must have MINTER role.
+     * - `msg.sender` must have Minter role.
      *
      * @param _to The address to mint to.
      * @param _uri The IPFS CID referencing the new cards text metadata.
@@ -240,13 +309,13 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Allow minter to issue a text card voucher to a given address.
+     * @dev Issue a text card voucher to a given address.
      *
      * Requirements:
      *
      * - `_to` cannot be zero address.
      * - `_scheduleIDs` must contain IDs for existing schedules vesting
-     * - `msg.sender` must have MINTER role.
+     * - `msg.sender` must have Minter role.
      *
      * @param _to The address to issue voucher to.
      * @param _type The type of card to mint (text, image, blank, etc)
@@ -269,7 +338,7 @@ contract PhlipCard is
     }
 
     /**
-     * @dev Allow minter to issue many card vouchers (with same type)
+     * @dev Issue many card vouchers (with same type)
      * to a given address.
      *
      * Requirements:
@@ -305,7 +374,8 @@ contract PhlipCard is
     |__________________________________*/
 
     /**
-     * @dev Allows owner of a card to update the URI of their card.
+     * @dev Update the URI of a card.
+     *
      * If the URI was not set during mint, this function allows the
      * owner to set it without it counting towards the number of URI changes.
      *
@@ -315,27 +385,43 @@ contract PhlipCard is
      * - `_uri` cannot be blank.
      * - `msg.sender` must be owner of `_cardID`
      * - `msg.sender` must be minter of `_cardID`
-     * - card's `_metadataChangeCount` must be < `MAX_URI_CHANGES`
+     * - number of times metadata was updated for free must be < `FREE_URI_CHANGES`
      *
      * @param _cardID The ID of the card to update
      * @param _uri The IPFS CID referencing the updated metadata
      */
     function updateMetadata(uint256 _cardID, string memory _uri)
         public
+        payable
         virtual
     {
         require(_exists(_cardID), "PhlipCard: Card does not exist");
         require(bytes(_uri).length > 0, "PhlipCard: URI cannot be empty");
         require(msg.sender == ownerOf(_cardID), "PhlipCard: Must be owner");
         require(msg.sender == _minters[_cardID], "PhlipCard: Must be minter");
-        require(
-            _metadataChangeCounts[_cardID] < MAX_URI_CHANGES,
-            "PhlipCard: Exceeded max URI changes"
-        );
+
+        MetadataChanges storage metadataChanges = _metadataChanges[_cardID];
 
         if (bytes(_tokenURIs[_cardID]).length > 0) {
             // Card has set URI at least once, increment URI change count
-            _metadataChangeCounts[_cardID] += 1;
+            metadataChanges.lastChangeTS = uint128(block.timestamp);
+            if (metadataChanges.free < FREE_URI_CHANGES) {
+                metadataChanges.free += 1;
+            } else {
+                // Ran out of free URI changes, must pay fee
+                require(URI_CHANGE_FEE > 0, "PhlipCard: Change fee not set");
+                require(
+                    msg.value >= URI_CHANGE_FEE,
+                    "PhlipCard: Insufficient change fee payment"
+                );
+                metadataChanges.paid += 1;
+
+                // If user overpaid, refund them the difference
+                uint256 refundAmount = msg.value - URI_CHANGE_FEE;
+                if (refundAmount > 0) {
+                    payable(msg.sender).transfer(refundAmount);
+                }
+            }
         }
         _tokenURIs[_cardID] = _uri;
     }
@@ -358,8 +444,6 @@ contract PhlipCard is
         virtual
         whenNotPaused
     {
-        // Checks that caller holds voucher for reserved ID
-        // Deletes voucher record from the registry
         _redeemVoucher(msg.sender, _reservedID);
 
         // Mints card with reserved ID to caller

@@ -29,8 +29,18 @@ contract WhiteCard is PhlipCard {
      * - `_baseUri` cannot be blank.
      * - `_maxUriChanges` must be >= 1.
      */
-    constructor(string memory _baseUri, uint256 _maxUriChanges)
-        PhlipCard("Phlip White Card", "WPC", _baseUri, _maxUriChanges)
+    constructor(
+        string memory _baseUri,
+        address _devWallet,
+        uint64 _freeUriChanges
+    )
+        PhlipCard(
+            "Phlip White Card",
+            "WPC",
+            _baseUri,
+            _devWallet,
+            _freeUriChanges
+        )
     {}
 
     /**
@@ -80,6 +90,7 @@ contract WhiteCard is PhlipCard {
      */
     function updateMetadata(uint256 _cardID, string memory _uri)
         public
+        payable
         virtual
         override
     {

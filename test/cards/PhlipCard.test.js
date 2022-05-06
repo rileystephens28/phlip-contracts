@@ -5,8 +5,11 @@ const {
     snapshot,
     expectRevert,
     constants,
+    balance,
 } = require("@openzeppelin/test-helpers");
 require("chai").should();
+
+const { tokenUnits } = require("../helpers");
 
 const MINTER = web3.utils.soliditySha3("MINTER_ROLE");
 const PAUSER = web3.utils.soliditySha3("PAUSER_ROLE");
@@ -24,10 +27,13 @@ contract("PhlipCard", (accounts) => {
     const baseDuration = new BN(1000);
 
     // 1 token unit per second
-    const baseRate = new BN(1);
+    const baseVestingAmount = tokenUnits(1000);
 
     const baseUri = "https.ipfs.moralis.io/ipfs/";
-    const baseMaxUriChanges = new BN(1);
+    const baseFreeUriChanges = new BN(1);
+    const baseUriChangeFee = tokenUnits(1);
+    const baseDevWallet = accounts[8];
+
     const baseCid = "base123";
     const testCid = "test123";
 
@@ -57,14 +63,14 @@ contract("PhlipCard", (accounts) => {
         token = tokenInstance1.address,
         cliff = baseCliff,
         duration = baseDuration,
-        rate = baseRate,
+        amount = baseVestingAmount,
         from = admin
     ) => {
         return await cardInstance.createVestingSchedule(
             token,
             new BN(cliff),
             new BN(duration),
-            new BN(rate),
+            new BN(amount),
             { from: from }
         );
     };
@@ -170,18 +176,26 @@ contract("PhlipCard", (accounts) => {
         uri = testCid,
         from = voucherHolder
     ) => {
+        const estimatedGas = await cardInstance.redeemVoucher.estimateGas(
+            reservedID,
+            uri,
+            { from: from }
+        );
         return await cardInstance.redeemVoucher(reservedID, uri, {
             from: from,
+            gas: estimatedGas,
         });
     };
 
     const updateMetadata = async (
         cardID = 0,
         uri = testCid,
+        feePayment = 0,
         from = cardOwner
     ) => {
         return await cardInstance.updateMetadata(cardID, uri, {
             from: from,
+            value: feePayment,
         });
     };
 
@@ -190,9 +204,19 @@ contract("PhlipCard", (accounts) => {
         baseUri.should.be.equal(val);
     };
 
-    const verifyMaxUriChanges = async (val) => {
-        const maxUriChanges = await cardInstance.MAX_URI_CHANGES();
-        maxUriChanges.should.be.bignumber.equal(val);
+    const verifyDevWallet = async (address) => {
+        const wallet = await cardInstance.developmentWallet();
+        wallet.should.be.equal(address);
+    };
+
+    const verifyFreeUriChanges = async (val) => {
+        const maxUriChanges = await cardInstance.FREE_URI_CHANGES();
+        maxUriChanges.should.be.bignumber.equal(new BN(val));
+    };
+
+    const verifyUriChangeFee = async (val) => {
+        const fee = await cardInstance.URI_CHANGE_FEE();
+        fee.should.be.bignumber.equal(new BN(val));
     };
 
     const verifyPause = async (bool) => {
@@ -256,13 +280,23 @@ contract("PhlipCard", (accounts) => {
 
     before(async () => {
         // Initialize contract state
+
+        const deployGas = await PhlipCard.new.estimateGas(
+            "Phlip Base Card",
+            "BPC",
+            baseUri,
+            baseDevWallet,
+            baseFreeUriChanges
+        );
         cardInstance = await PhlipCard.new(
             "Phlip Base Card",
             "BPC",
             baseUri,
-            baseMaxUriChanges,
+            baseDevWallet,
+            baseFreeUriChanges,
             {
                 from: admin,
+                gas: deployGas,
             }
         );
 
@@ -270,16 +304,16 @@ contract("PhlipCard", (accounts) => {
         tokenInstance2 = await ERC20Mock.new({ from: admin });
 
         // fund the deployer account with 10,000 of tokens 1 & 2
-        await tokenInstance1.mint(admin, 10000, { from: admin });
-        await tokenInstance2.mint(admin, 10000, { from: admin });
+        await tokenInstance1.mint(admin, tokenUnits(10000), { from: admin });
+        await tokenInstance2.mint(admin, tokenUnits(10000), { from: admin });
 
         // Create vesting schedules
         await createSchedule(tokenInstance1.address);
         await createSchedule(tokenInstance2.address);
 
         // Fill schedule reserves with tokens 1 & 2
-        await fillReserves(0, 5000, tokenInstance1);
-        await fillReserves(1, 5000, tokenInstance2);
+        await fillReserves(0, tokenUnits(5000), tokenInstance1);
+        await fillReserves(1, tokenUnits(5000), tokenInstance2);
     });
 
     beforeEach(async () => {
@@ -293,18 +327,32 @@ contract("PhlipCard", (accounts) => {
     describe("Initializing", () => {
         it("should fail when base URI is blank", async function () {
             await expectRevert(
-                PhlipCard.new("Phlip Base Card", "BPC", "", baseMaxUriChanges, {
-                    from: admin,
-                }),
+                PhlipCard.new(
+                    "Phlip Base Card",
+                    "BPC",
+                    "",
+                    baseDevWallet,
+                    baseFreeUriChanges,
+                    {
+                        from: admin,
+                    }
+                ),
                 "PhlipCard: Base URI is blank"
             );
         });
-        it("should fail when max URI changes is 0", async function () {
+        it("should fail when free URI changes is 0", async function () {
             await expectRevert(
-                PhlipCard.new("Phlip Base Card", "BPC", baseUri, 0, {
-                    from: admin,
-                }),
-                "PhlipCard: Max URI changes is 0"
+                PhlipCard.new(
+                    "Phlip Base Card",
+                    "BPC",
+                    baseUri,
+                    baseDevWallet,
+                    0,
+                    {
+                        from: admin,
+                    }
+                ),
+                "PhlipCard: Free URI changes is 0"
             );
         });
     });
@@ -321,14 +369,16 @@ contract("PhlipCard", (accounts) => {
         it("has the correct base URI", async () => {
             await verifyBaseUri(baseUri);
         });
-        it("has the correct max allowed URI changes", async () => {
-            await verifyMaxUriChanges(baseMaxUriChanges);
+        it("has the correct free allowed URI changes", async () => {
+            await verifyFreeUriChanges(baseFreeUriChanges);
         });
     });
 
     describe("Setter Functions", () => {
         const newBaseUri = "https://test.com/";
-        const newMaxUriChanges = new BN(10);
+        const newFreeUriChanges = new BN(10);
+        const newUriChangeFee = tokenUnits(1.5);
+        const newDevWallet = accounts[9];
         const revertReason = getRoleRevertReason(otherAccount, SETTINGS_ADMIN);
 
         // Failing cases
@@ -344,17 +394,35 @@ contract("PhlipCard", (accounts) => {
             // URI should still equal initial base URI
             await verifyBaseUri(baseUri);
         });
-
-        it("should fail to set max number of allowed URI changes when caller is not settings adminr", async () => {
-            // Set max uri changes
+        it("should fail to set number of free URI changes when caller is not settings admin", async () => {
             await expectRevert(
-                cardInstance.setMaxUriChanges(newMaxUriChanges, {
+                cardInstance.setFreeUriChanges(newFreeUriChanges, {
                     from: otherAccount,
                 }),
                 revertReason
             );
-            // Max uri changes should still equal initial max uri changes
-            await verifyMaxUriChanges(baseMaxUriChanges);
+            // Free uri changes should still equal initial free uri changes
+            await verifyFreeUriChanges(baseFreeUriChanges);
+        });
+        it("should fail to set URI change fee when caller is not settings admin", async () => {
+            await expectRevert(
+                cardInstance.setUriChangeFee(newUriChangeFee, {
+                    from: otherAccount,
+                }),
+                revertReason
+            );
+            // Uri change fee should still equal initial fee
+            await verifyUriChangeFee(0);
+        });
+        it("should fail to set development wallet address when caller is not settings admin", async () => {
+            await expectRevert(
+                cardInstance.setDevWalletAddress(newDevWallet, {
+                    from: otherAccount,
+                }),
+                revertReason
+            );
+            // Dev wallet address should still equal initial address
+            await verifyDevWallet(baseDevWallet);
         });
 
         // Passing cases
@@ -366,14 +434,32 @@ contract("PhlipCard", (accounts) => {
             await verifyBaseUri(newBaseUri);
         });
 
-        it("should set max number of allowed URI changes when caller is not settings admin", async () => {
-            // Set max uri changes
-            await cardInstance.setMaxUriChanges(newMaxUriChanges, {
+        it("should set number of free URI changes when caller is not settings admin", async () => {
+            // Set free uri changes
+            await cardInstance.setFreeUriChanges(newFreeUriChanges, {
                 from: admin,
             });
 
-            // Max should equal new max
-            await verifyMaxUriChanges(newMaxUriChanges);
+            // Num free changes should equal new max
+            await verifyFreeUriChanges(newFreeUriChanges);
+        });
+        it("should set URI change fee when caller is settings admin", async () => {
+            // Set uri change fee
+            await cardInstance.setUriChangeFee(newUriChangeFee, {
+                from: admin,
+            });
+
+            // Fee should equal new fee
+            await verifyUriChangeFee(newUriChangeFee);
+        });
+        it("should set development wallet address when caller is settings admin", async () => {
+            // Set dev wallet address
+            await cardInstance.setDevWalletAddress(newDevWallet, {
+                from: admin,
+            });
+
+            // Address should equal new address
+            await verifyDevWallet(newDevWallet);
         });
     });
 
@@ -567,12 +653,11 @@ contract("PhlipCard", (accounts) => {
         });
         it("should fail when caller is not card owner", async () => {
             await expectRevert(
-                updateMetadata(0, testCid, otherAccount),
+                updateMetadata(0, testCid, 0, otherAccount),
                 "PhlipCard: Must be owner"
             );
             await verifyCardURI(0, baseUri + baseCid);
         });
-
         it("should fail when caller is not card minter", async () => {
             // Tranfer card to new owner
             await transfer();
@@ -580,22 +665,95 @@ contract("PhlipCard", (accounts) => {
             await verifyCardOwner(0, recipient);
 
             await expectRevert(
-                updateMetadata(0, testCid, recipient),
+                updateMetadata(0, testCid, 0, recipient),
                 "PhlipCard: Must be minter"
             );
             await verifyCardURI(0, baseUri + baseCid);
         });
-        it("should fail when metadata has been updated max number of times", async () => {
+        it("should fail when all free updates have been used and change fee not set", async () => {
             await updateMetadata();
             await expectRevert(
                 updateMetadata(),
-                "PhlipCard: Exceeded max URI changes"
+                "PhlipCard: Change fee not set"
+            );
+        });
+        it("should fail when all free updates have been used and change fee is not paid", async () => {
+            // Set uri change fee
+            await cardInstance.setUriChangeFee(baseUriChangeFee, {
+                from: admin,
+            });
+
+            await updateMetadata();
+            await expectRevert(
+                updateMetadata(),
+                "PhlipCard: Insufficient change fee payment"
             );
         });
 
         // Passing cases
-        it("should pass when caller is card owner/minter and metadata is eligible for update", async () => {
+        it("should pass when card has free updates remaining", async () => {
             await updateMetadata();
+            await verifyCardURI(0, baseUri + testCid);
+        });
+        it("should pass when no free changes left and payment = change fee", async () => {
+            // Set uri change fee
+            await cardInstance.setUriChangeFee(baseUriChangeFee, {
+                from: admin,
+            });
+            // Use free update
+            await updateMetadata();
+
+            const initialBalance = await balance.current(cardOwner);
+
+            // Obtain gas used for the tx
+            const receipt = await updateMetadata(0, testCid, baseUriChangeFee);
+            const gasUsed = new BN(receipt.receipt.gasUsed);
+
+            // Obtain gasPrice from the tx
+            const tx = await web3.eth.getTransaction(receipt.tx);
+            const gasPrice = new BN(tx.gasPrice);
+
+            const postTxBalace = await balance.current(cardOwner);
+
+            // Calculate the expected balance
+            const balanceCalc = initialBalance
+                .sub(baseUriChangeFee)
+                .sub(gasPrice.mul(gasUsed));
+
+            // Verify the balance
+            postTxBalace.should.be.bignumber.equal(balanceCalc);
+
+            await verifyCardURI(0, baseUri + testCid);
+        });
+        it("should pass when no free changes left and payment > change fee", async () => {
+            // Set uri change fee
+            await cardInstance.setUriChangeFee(baseUriChangeFee, {
+                from: admin,
+            });
+
+            // Use free update
+            await updateMetadata();
+
+            const initialBalance = await balance.current(cardOwner);
+
+            // Obtain gas used for the tx
+            const receipt = await updateMetadata(0, testCid, tokenUnits(5));
+            const gasUsed = new BN(receipt.receipt.gasUsed);
+
+            // Obtain gasPrice from the tx
+            const tx = await web3.eth.getTransaction(receipt.tx);
+            const gasPrice = new BN(tx.gasPrice);
+
+            const postTxBalace = await balance.current(cardOwner);
+
+            // Calculate the expected balance
+            const balanceCalc = initialBalance
+                .sub(baseUriChangeFee)
+                .sub(gasPrice.mul(gasUsed));
+
+            // Verify overpayment was returned
+            postTxBalace.should.be.bignumber.equal(balanceCalc);
+
             await verifyCardURI(0, baseUri + testCid);
         });
     });

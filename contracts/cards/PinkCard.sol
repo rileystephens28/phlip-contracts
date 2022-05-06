@@ -29,8 +29,18 @@ contract PinkCard is PhlipCard {
      * - `_baseUri` cannot be blank.
      * - `_maxUriChanges` must be >= 1.
      */
-    constructor(string memory _baseUri, uint256 _maxUriChanges)
-        PhlipCard("Phlip Pink Card", "PPC", _baseUri, _maxUriChanges)
+    constructor(
+        string memory _baseUri,
+        address _devWallet,
+        uint64 _freeUriChanges
+    )
+        PhlipCard(
+            "Phlip Pink Card",
+            "PPC",
+            _baseUri,
+            _devWallet,
+            _freeUriChanges
+        )
     {}
 
     /***********************************|
