@@ -1,1 +1,9 @@
-
+Work backwards on development. IE Winning token distribution -> Game setup
+Contract break down:
+Game setup - Variables, # of Players, player ID's, who is the card king
+Game Play - Variables, Prompt card ID dealt, Response card ID's Dealt, Response cards dealt to which player ID, Gameplay style
+Game play style - Variables, P2E, P2G, Custom pool
+  P2G - Variables, pool size / (mode)
+  Custom pool - Variables, Token being put in, Token being output, pool size (this could be combined with P2G potentially and P2E could be in and P2G out)
+Game log - Variables, Pink card ID, White cards played ID's, Player ID's, Winning Player ID
+Game winning token distribution - Variables, creator tip address, Token Farming rewards address, DAO product and marketing fund address, Pink card minter address, Pink card owner address, White Card Minter address, White Card Owner Address  
