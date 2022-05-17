@@ -24,6 +24,8 @@ contract("PhlipSale", (accounts) => {
         p2eInstance;
     const [admin, tokenWallet, proceedsWallet, otherAccount] = accounts;
 
+    const baseDevWallet = accounts[8];
+
     const baseCliff = new BN(100);
     const baseDuration = new BN(1000);
 
@@ -102,7 +104,7 @@ contract("PhlipSale", (accounts) => {
 
     const createSingleCardPackage = async (
         packageID = 0,
-        weiPrice = tokenUnits(1),
+        weiPrice = tokenUnits(2),
         numForSale = baseSaleQty,
         numCards = baseCardQty,
         cardID = 0,
@@ -140,7 +142,7 @@ contract("PhlipSale", (accounts) => {
 
     const createMultiCardPackage = async (
         packageID = 0,
-        weiPrice = tokenUnits(1),
+        weiPrice = tokenUnits(2),
         numForSale = baseSaleQty,
         cardIDs = [new BN(0), new BN(1)],
         numCards = [new BN(1), new BN(2)],
@@ -201,7 +203,7 @@ contract("PhlipSale", (accounts) => {
 
     const setCardSaleInfo = async (
         cardID = 0,
-        weiPrice = tokenUnits(1),
+        weiPrice = tokenUnits(2),
         scheduleIds = [new BN(0), new BN(1)],
         from = admin
     ) => {
@@ -224,7 +226,7 @@ contract("PhlipSale", (accounts) => {
 
     const purchaseCard = async (
         cardID = 0,
-        weiPrice = tokenUnits(1),
+        weiPrice = tokenUnits(2),
         uri = baseUri,
         from = otherAccount
     ) => {
@@ -242,7 +244,7 @@ contract("PhlipSale", (accounts) => {
 
     const purchasePackage = async (
         packageID = 0,
-        weiPrice = tokenUnits(1),
+        weiPrice = tokenUnits(2),
         from = otherAccount
     ) => {
         const gasEstimate = await saleInstance.purchasePackage.estimateGas(
@@ -316,7 +318,6 @@ contract("PhlipSale", (accounts) => {
 
     const validateCardSaleInfo = async (
         id,
-        cardInstance,
         price = tokenUnits(1),
         scheduleIds = [new BN(0), new BN(1)]
     ) => {
@@ -402,12 +403,22 @@ contract("PhlipSale", (accounts) => {
     };
 
     beforeEach(async () => {
-        pinkCardInstance = await PinkCard.new(baseUri, baseMaxUriChanges, {
-            from: admin,
-        });
-        whiteCardInstance = await WhiteCard.new(baseUri, baseMaxUriChanges, {
-            from: admin,
-        });
+        pinkCardInstance = await PinkCard.new(
+            baseUri,
+            baseDevWallet,
+            baseMaxUriChanges,
+            {
+                from: admin,
+            }
+        );
+        whiteCardInstance = await WhiteCard.new(
+            baseUri,
+            baseDevWallet,
+            baseMaxUriChanges,
+            {
+                from: admin,
+            }
+        );
         daoInstance = await DaoToken.new("Phlip DAO", "PDAO", {
             from: tokenWallet,
         });
@@ -553,13 +564,13 @@ contract("PhlipSale", (accounts) => {
             await validateCardSaleInfo(0, price);
         });
         it("should pass when params are valid for pink image card", async () => {
-            const price = tokenUnits(1.5);
-            await setCardSaleInfo(1);
+            const price = tokenUnits(2);
+            await setCardSaleInfo(1, price);
             await validateCardSaleInfo(1, price);
         });
         it("should pass when params are valid for white text card", async () => {
-            const price = tokenUnits(0.5);
-            await setCardSaleInfo(2);
+            const price = tokenUnits(3);
+            await setCardSaleInfo(2, price);
             await validateCardSaleInfo(2, price);
         });
     });
@@ -627,7 +638,7 @@ contract("PhlipSale", (accounts) => {
             const receipt = await createSingleCardPackage();
             expectEvent(receipt, "CreatePackage", {
                 id: new BN(0),
-                price: tokenUnits(1),
+                price: tokenUnits(2),
                 numForSale: baseSaleQty,
             });
 
@@ -648,7 +659,7 @@ contract("PhlipSale", (accounts) => {
             );
 
             // Ensure package was created
-            await verifyPackagePrice(0, tokenUnits(1));
+            await verifyPackagePrice(0, tokenUnits(2));
             await verifyRemainingForSale(0, baseSaleQty);
             await validateCardBundle(
                 0,
@@ -747,7 +758,7 @@ contract("PhlipSale", (accounts) => {
 
             expectEvent(receipt, "CreatePackage", {
                 id: new BN(1),
-                price: tokenUnits(1),
+                price: tokenUnits(2),
                 numForSale: baseSaleQty,
             });
 
@@ -768,7 +779,7 @@ contract("PhlipSale", (accounts) => {
             );
 
             // Ensure package was created
-            await verifyPackagePrice(1, tokenUnits(1));
+            await verifyPackagePrice(1, tokenUnits(2));
             await verifyRemainingForSale(1, baseSaleQty);
             await validateCardBundle(
                 1,
@@ -935,7 +946,7 @@ contract("PhlipSale", (accounts) => {
             const receipt = await createMultiCardPackage();
             expectEvent(receipt, "CreatePackage", {
                 id: new BN(0),
-                price: tokenUnits(1),
+                price: tokenUnits(2),
                 numForSale: baseSaleQty,
             });
 
@@ -992,7 +1003,7 @@ contract("PhlipSale", (accounts) => {
             );
 
             // Ensure package was created
-            await verifyPackagePrice(0, tokenUnits(1));
+            await verifyPackagePrice(0, tokenUnits(2));
             await verifyRemainingForSale(0, baseSaleQty);
             await validateCardBundle(
                 0,
@@ -1115,7 +1126,7 @@ contract("PhlipSale", (accounts) => {
         });
         it("should fail when caller sends less ETH than package price", async () => {
             await expectRevert(
-                purchasePackage(0, tokenUnits(0.5)),
+                purchasePackage(0, tokenUnits(1)),
                 "Not enough ETH to cover cost"
             );
         });
@@ -1147,9 +1158,9 @@ contract("PhlipSale", (accounts) => {
             await setAllCardDefaultSupplies();
 
             // Set sale info for pink text/image and white text cards
-            await setCardSaleInfo(0, tokenUnits(1));
-            await setCardSaleInfo(1, tokenUnits(1));
-            await setCardSaleInfo(2, tokenUnits(1));
+            await setCardSaleInfo(0, tokenUnits(2));
+            await setCardSaleInfo(1, tokenUnits(2));
+            await setCardSaleInfo(2, tokenUnits(2));
 
             await setGeneralSaleActive();
         });
@@ -1168,7 +1179,7 @@ contract("PhlipSale", (accounts) => {
         });
         it("should fail when caller sends less ETH than card price", async () => {
             await expectRevert(
-                purchaseCard(0, tokenUnits(0.5)),
+                purchaseCard(0, tokenUnits(1)),
                 "Not enough ETH to cover cost"
             );
         });

@@ -15,6 +15,8 @@ contract("WhiteCard", (accounts) => {
     const [admin, cardOwner, voucherHolder, recipient, account, otherAccount] =
         accounts;
 
+    const baseDevWallet = accounts[8];
+
     // 100 second cliff
     const baseCliff = new BN(100);
 
@@ -246,9 +248,14 @@ contract("WhiteCard", (accounts) => {
 
     before(async () => {
         // Initialize contract state
-        cardInstance = await WhiteCard.new(baseUri, baseMaxUriChanges, {
-            from: admin,
-        });
+        cardInstance = await WhiteCard.new(
+            baseUri,
+            baseDevWallet,
+            baseMaxUriChanges,
+            {
+                from: admin,
+            }
+        );
 
         tokenInstance1 = await ERC20Mock.new({ from: admin });
         tokenInstance2 = await ERC20Mock.new({ from: admin });

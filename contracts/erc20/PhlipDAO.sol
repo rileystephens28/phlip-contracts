@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -7,6 +7,9 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+
+// import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+// import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 /**
  * @title PhlipDAO
@@ -25,6 +28,11 @@ contract PhlipDAO is
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
 
+    uint256 private _totalSupply = 5479500000 * 10**decimals();
+
+    // IUniswapV2Router02 public uniswapV2Router;
+    // address public uniswapV2Pair;
+
     /**
      * @dev Create contract with initial supply of 5,479,500,000 tokens. Only DEFAULT_ADMIN_ROLE
      * is assigned because other roles can be assigned later by admin
@@ -33,9 +41,20 @@ contract PhlipDAO is
         ERC20(_name, _symbol)
         ERC20Permit(_name)
     {
+        // IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
+        //     0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+        // );
+        // address _uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
+        //     .createPair(address(this), _uniswapV2Router.WETH());
+
+        // uniswapV2Router = _uniswapV2Router;
+        // uniswapV2Pair = _uniswapV2Pair;
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _mint(msg.sender, 5479500000 * 10**decimals());
+        _mint(msg.sender, _totalSupply);
     }
+
+    receive() external payable {}
 
     /**
      * @dev Allow address with PAUSER role to pause token transfers
@@ -71,6 +90,24 @@ contract PhlipDAO is
     {
         _burn(account, amount);
     }
+
+    // function swapTokensForEth(uint256 tokenAmount) private {
+    //     // generate the uniswap pair path of token -> weth
+    //     address[] memory path = new address[](2);
+    //     path[0] = address(this);
+    //     path[1] = uniswapV2Router.WETH();
+
+    //     _approve(address(this), address(uniswapV2Router), tokenAmount);
+
+    //     // make the swap for any ETH amount
+    //     uniswapV2Router.swapExactTokensForETH(
+    //         tokenAmount,
+    //         0,
+    //         path,
+    //         address(this),
+    //         block.timestamp
+    //     );
+    // }
 
     /**
      * @dev Function called before tokens are transferred. Override to make
