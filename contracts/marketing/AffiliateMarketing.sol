@@ -190,9 +190,14 @@ contract AffiliateMarketing {
     |__________________________________*/
 
     /**
-     * @dev Create a new campaign from the given parameters (must have a budget or time range).
-     * To create a campaign without a budget use 0 for _rewardsBudget param.
-     * To create a campaign without a time range use 0 for _startTime and _endTime params.
+     * @dev Create a new campaign from the given parameters.
+     *
+     * Requirements:
+     * - `_owner` cannot be the zero address
+     * - `_startTime` must be in the future
+     * - `_endTime` must be greater than `_startTime`
+     * - `_rewardPercentage` must be between 0 and 10000
+     *
      * @param _owner Owner of the campaign
      * @param _uri URI containing the new campaign's information
      * @param _startTime The time when the campaign becomes active
@@ -209,10 +214,6 @@ contract AffiliateMarketing {
         require(
             _owner != address(0),
             "AffiliateMarketing: Owner cannot be the 0x0"
-        );
-        require(
-            bytes(_uri).length > 0,
-            "AffiliateMarketing: URI cannot be empty"
         );
         require(
             _startTime > block.timestamp - 1,
@@ -245,7 +246,13 @@ contract AffiliateMarketing {
     }
 
     /**
-     * @dev Update the URI of an existing campaign
+     * @dev Update the URI of an existing campaign.
+     *
+     * Requirements:
+     * - `_campaignId` must exist.
+     * - `_owner` must match `_campaignId` owner.
+     * - `_uri` cannot be blank.
+     *
      * @param _campaignId ID of the campaign to update
      * @param _owner Owner of the campaign
      * @param _uri New URI for the campaign
@@ -274,7 +281,13 @@ contract AffiliateMarketing {
     }
 
     /**
-     * @dev Update the URI of an existing campaign
+     * @dev Update the owner address of an existing campaign.
+     *
+     * Requirements:
+     * - `_campaignId` must exist.
+     * - `_owner` must match `_campaignId` owner.
+     * - `_newOwner` cannot be the zero address.
+     *
      * @param _campaignId ID of the campaign to update
      * @param _owner Owner of the campaign
      * @param _newOwner New owner address
@@ -301,7 +314,13 @@ contract AffiliateMarketing {
     }
 
     /**
-     * @dev Add affiliate that uses campaign's standard reward to campaign
+     * @dev Add affiliate that uses campaign's standard reward to campaign.
+     *
+     * Requirements:
+     * - `_campaignId` must exist.
+     * - `_affiliate` cannot be the zero address.
+     * - `_affiliate` cannot already be an affiliate of the campaign.
+     *
      * @param _campaignId The ID of the campaign to add affiliate to
      * @param _affiliate The affiliate address to add to campaign
      */
@@ -333,6 +352,13 @@ contract AffiliateMarketing {
 
     /**
      * @dev Add affiliate that uses custom reward to campaign
+     *
+     * Requirements:
+     * - `_campaignId` must exist.
+     * - `_affiliate` cannot be the zero address.
+     * - `_affiliate` cannot already be an affiliate of the campaign.
+     * - `_customRewardPercentage` must be between 0 and 10000
+     *
      * @param _campaignId The ID of the campaign to add affiliate to
      * @param _affiliate The affiliate address to add to campaign
      * @param _customRewardPercentage Custom percentage of sales that will be paid to the affiliate
@@ -342,6 +368,7 @@ contract AffiliateMarketing {
         address _affiliate,
         uint128 _customRewardPercentage
     ) internal virtual {
+        require(_customRewardPercentage > 0, "AffiliateMarketing: Reward is 0");
         require(
             _customRewardPercentage <= percentCeiling,
             "AffiliateMarketing: Exceeded reward ceiling"
@@ -355,7 +382,13 @@ contract AffiliateMarketing {
     }
 
     /**
-     * @dev Add affiliate that uses custom reward to campaign
+     * @dev Credit affiliate with sale.
+     *
+     * Requirements:
+     * - `_campaignId` must exist.
+     * - `_affiliate` must be registered to the campaign.
+     * - `_saleValue` must be greater than 0.
+     *
      * @param _campaignId The ID of the campaign to add affiliate to
      * @param _affiliate The affiliate address to add to campaign
      * @param _saleValue The value of the sale (in wei)
@@ -372,6 +405,10 @@ contract AffiliateMarketing {
             _campaignExists(_campaignId),
             "AffiliateMarketing: Campaign does not exist"
         );
+        require(
+            affiliate.isRegistered,
+            "AffiliateMarketing: Affiliate not registered"
+        );
         require(_saleValue > 0, "AffiliateMarketing: Sale value cannot be 0");
 
         campaign.totalSalesValue += _saleValue;
@@ -384,7 +421,13 @@ contract AffiliateMarketing {
     }
 
     /**
-     * @dev Send ETH reward to affiliate
+     * @dev Send ETH reward to affiliate.
+     *
+     * Requirements:
+     * - `_campaignId` must exist.
+     * - `_affiliate` must be registered to the campaign.
+     * - `_saleValue` must be greater than 0.
+     *
      * @param _campaignId The ID of the campaign to query
      * @param _affiliate The affiliate address to send rewards to
      */
