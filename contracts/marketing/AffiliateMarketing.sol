@@ -217,17 +217,14 @@ contract AffiliateMarketing {
         );
         require(
             _startTime > block.timestamp - 1,
-            "AffiliateMarketing: Cannot start in the past"
+            "AffiliateMarketing: Start time cannot be in the past"
         );
         require(
             _startTime < _endTime,
             "AffiliateMarketing: Start time must be before end time"
         );
 
-        require(
-            _rewardPercentage > 0,
-            "AffiliateMarketing: Exceeded reward ceiling"
-        );
+        require(_rewardPercentage > 0, "AffiliateMarketing: Reward is 0");
         require(
             _rewardPercentage < percentCeiling,
             "AffiliateMarketing: Exceeded reward ceiling"
