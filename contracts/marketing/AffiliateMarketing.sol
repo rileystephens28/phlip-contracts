@@ -114,6 +114,7 @@ contract AffiliateMarketing {
      */
     function _campaignExists(uint256 _campaignId)
         internal
+        view
         virtual
         returns (bool)
     {
@@ -127,6 +128,7 @@ contract AffiliateMarketing {
      */
     function _campaignIsActive(uint256 _campaignId)
         internal
+        view
         virtual
         returns (bool)
     {
@@ -219,6 +221,11 @@ contract AffiliateMarketing {
         require(
             _startTime < _endTime,
             "AffiliateMarketing: Start time must be before end time"
+        );
+
+        require(
+            _rewardPercentage > 0,
+            "AffiliateMarketing: Exceeded reward ceiling"
         );
         require(
             _rewardPercentage < percentCeiling,
