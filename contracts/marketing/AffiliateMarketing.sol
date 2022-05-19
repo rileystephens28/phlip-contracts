@@ -149,7 +149,7 @@ contract AffiliateMarketing {
      * @param _affiliateId ID of the affiliate to query
      * @return The affiliate's total rewards earned (in wei)
      */
-    function getAffiliateTotalRewards(uint256 _affiliateId)
+    function totalRewardsOf(uint256 _affiliateId)
         public
         view
         returns (uint256)
@@ -162,7 +162,7 @@ contract AffiliateMarketing {
      * @param _affiliateId ID of the affiliate to query
      * @return The affiliate's unclaimed rewards (in wei)
      */
-    function getAffiliateUnclaimedRewards(uint256 _affiliateId)
+    function unclaimedRewardsOf(uint256 _affiliateId)
         public
         view
         returns (uint256)
@@ -458,7 +458,7 @@ contract AffiliateMarketing {
         );
         require(
             !_addressIsRegistered(_campaignId, _affiliate),
-            "AffiliateMarketing: Already registered"
+            "AffiliateMarketing: Already joined campaign"
         );
 
         require(_commission > 0, "AffiliateMarketing: Reward is 0");

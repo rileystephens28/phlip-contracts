@@ -16,12 +16,18 @@ contract AffiliateMarketingMock is AffiliateMarketing {
 
     function createCampaign(
         address _owner,
-        string memory _uri,
         uint128 _startTime,
         uint128 _endTime,
-        uint128 _rewardPercentage
+        uint32 _standardCommission,
+        string memory _uri
     ) public {
-        _createCampaign(_owner, _uri, _startTime, _endTime, _rewardPercentage);
+        _createCampaign(
+            _owner,
+            _startTime,
+            _endTime,
+            _standardCommission,
+            _uri
+        );
     }
 
     function updateCampaignMetadata(
@@ -43,34 +49,27 @@ contract AffiliateMarketingMock is AffiliateMarketing {
     function addStandardAffiliate(uint256 _campaignId, address _affiliate)
         public
     {
-        _addStandardAffiliate(_campaignId, _affiliate);
+        uint32 commission = getCampaign(_campaignId).standardCommission;
+        _addAffiliateToCampaign(_campaignId, _affiliate, commission);
     }
 
     function addCustomAffiliate(
         uint256 _campaignId,
-        address _owner,
         address _affiliate,
-        uint128 _customRewardPercentage
+        uint32 _customCommission
     ) public {
-        _addCustomAffiliate(
-            _campaignId,
-            _owner,
-            _affiliate,
-            _customRewardPercentage
-        );
+        _addAffiliateToCampaign(_campaignId, _affiliate, _customCommission);
     }
 
     function attributeSaleToAffiliate(
         uint256 _campaignId,
-        address _affiliate,
+        uint256 _affiliateId,
         uint256 _saleValue
     ) public {
-        _attributeSaleToAffiliate(_campaignId, _affiliate, _saleValue);
+        _attributeSaleToAffiliate(_campaignId, _affiliateId, _saleValue);
     }
 
-    function sendAffiliateReward(uint256 _campaignId, address _affiliate)
-        public
-    {
-        _sendAffiliateReward(_campaignId, _affiliate);
+    function sendRewardsToAffiliate(uint256 _affiliateId) public {
+        _sendRewardsToAffiliate(_affiliateId);
     }
 }

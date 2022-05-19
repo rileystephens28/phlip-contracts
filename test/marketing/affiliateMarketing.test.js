@@ -21,15 +21,15 @@ contract("AffiliateMarketing", (accounts) => {
 
     const baseUri = "campaign-uri.com";
     const testUri = "campaign-test.com";
-    const baseCampaignReward = new BN(500); // 5%
-    const baseCustomReward = new BN(1000); // 10%
+    const baseCommission = new BN(500); // 5%
+    const customCommission = new BN(1000); // 10%
     const baseSaleValue = tokenUnits(10);
-    const rewardMax = new BN(10000);
+    const maxCommission = new BN(10000);
 
     const createCampaign = async (
         owner = campaignOwner,
         uri = baseUri,
-        reward = baseCampaignReward,
+        commission = baseCommission,
         startTime = null,
         endTime = null
     ) => {
@@ -42,53 +42,62 @@ contract("AffiliateMarketing", (accounts) => {
         }
         return await marketingInstance.createCampaign(
             owner,
-            uri,
             startTime,
             endTime,
-            reward
+            commission,
+            uri
         );
     };
 
     const updateCampaignMetadata = async (
-        id = 0,
+        campaignId = 0,
         uri = baseUri,
         owner = campaignOwner
     ) => {
-        return await marketingInstance.updateCampaignMetadata(id, owner, uri);
+        return await marketingInstance.updateCampaignMetadata(
+            campaignId,
+            owner,
+            uri
+        );
     };
 
     const updateCampaignOwner = async (
-        id = 0,
+        campaignId = 0,
         owner = campaignOwner,
         newOwner = otherAccount
     ) => {
-        return await marketingInstance.updateCampaignOwner(id, owner, newOwner);
+        return await marketingInstance.updateCampaignOwner(
+            campaignId,
+            owner,
+            newOwner
+        );
     };
 
     const addStandardAffiliate = async (
-        id = 0,
+        campaignId = 0,
         affiliate = standardAffiliate
     ) => {
-        return await marketingInstance.addStandardAffiliate(id, affiliate);
+        return await marketingInstance.addStandardAffiliate(
+            campaignId,
+            affiliate
+        );
     };
 
     const addCustomAffiliate = async (
-        id = 0,
-        owner = campaignOwner,
+        campaignId = 0,
         affiliate = customAffiliate,
-        reward = baseCustomReward
+        commission = customCommission
     ) => {
         return await marketingInstance.addCustomAffiliate(
-            id,
-            owner,
+            campaignId,
             affiliate,
-            reward
+            commission
         );
     };
 
     const attributeSaleToAffiliate = async (
-        id = 0,
-        affiliate = standardAffiliate,
+        campaignId = 0,
+        affiliateId = 0,
         saleValue = baseSaleValue
     ) => {
         saleValue = new BN(saleValue);
@@ -97,17 +106,14 @@ contract("AffiliateMarketing", (accounts) => {
         await marketingInstance.send(saleValue);
 
         return await marketingInstance.attributeSaleToAffiliate(
-            id,
-            affiliate,
+            campaignId,
+            affiliateId,
             saleValue
         );
     };
 
-    const sendAffiliateReward = async (
-        id = 0,
-        affiliate = standardAffiliate
-    ) => {
-        return await marketingInstance.sendAffiliateReward(id, affiliate);
+    const sendRewardsToAffiliate = async (affiliateId = 0) => {
+        return await marketingInstance.sendRewardsToAffiliate(affiliateId);
     };
 
     const verifyCampaignExists = async (id, bool) => {
@@ -120,25 +126,14 @@ contract("AffiliateMarketing", (accounts) => {
         active.should.be.equal(bool);
     };
 
-    const verifyAffiliateRewardTotal = async (campaignId, affiliate, val) => {
-        const rewardTotal = await marketingInstance.getAffiliateRewardTotal(
-            campaignId,
-            affiliate
-        );
-        rewardTotal.should.be.bignumber.equal(new BN(val));
+    const verifyTotalRewards = async (affiliateId, val) => {
+        const rewards = await marketingInstance.totalRewardsOf(affiliateId);
+        rewards.should.be.bignumber.equal(new BN(val));
     };
 
-    const verifyAffiliateRewardEntitlement = async (
-        campaignId,
-        affiliate,
-        val
-    ) => {
-        const rewardEntitlement =
-            await marketingInstance.getAffiliateRewardEntitlement(
-                campaignId,
-                affiliate
-            );
-        rewardEntitlement.should.be.bignumber.equal(new BN(val));
+    const verifyUnclaimedRewards = async (affiliateId, val) => {
+        const rewards = await marketingInstance.unclaimedRewardsOf(affiliateId);
+        rewards.should.be.bignumber.equal(new BN(val));
     };
 
     beforeEach(async () => {
@@ -162,7 +157,7 @@ contract("AffiliateMarketing", (accounts) => {
                 createCampaign(
                     campaignOwner,
                     baseUri,
-                    baseCampaignReward,
+                    baseCommission,
                     startTime
                 ),
                 "AffiliateMarketing: Start time cannot be in the past"
@@ -176,7 +171,7 @@ contract("AffiliateMarketing", (accounts) => {
                 createCampaign(
                     campaignOwner,
                     baseUri,
-                    baseCampaignReward,
+                    baseCommission,
                     startTime,
                     endTime
                 ),
@@ -322,49 +317,34 @@ contract("AffiliateMarketing", (accounts) => {
         // Failure case
         it("should fail when campaign does not exist", async () => {
             await expectRevert(
-                addCustomAffiliate(3, constants.ZERO_ADDRESS),
+                addCustomAffiliate(3),
                 "AffiliateMarketing: Campaign does not exist"
             );
         });
-        it("should fail when affiliate has already joined campaign", async () => {
-            await addCustomAffiliate(0, campaignOwner, standardAffiliate);
+
+        it("should fail when affiliate address is 0x0", async () => {
             await expectRevert(
-                addCustomAffiliate(0, campaignOwner, standardAffiliate),
-                "AffiliateMarketing: Already joined campaign"
-            );
-        });
-        it("should fail when new owner address is 0x0", async () => {
-            await expectRevert(
-                addCustomAffiliate(0, campaignOwner, constants.ZERO_ADDRESS),
+                addCustomAffiliate(0, constants.ZERO_ADDRESS),
                 "AffiliateMarketing: Affiliate cannot be 0x0"
             );
         });
-        it("should fail when owner address does not match campaign owner", async () => {
+        it("should fail when commission is 0%", async () => {
             await expectRevert(
-                addCustomAffiliate(0, otherAccount),
-                "AffiliateMarketing: Not campaign owner"
-            );
-        });
-        it("should fail when reward is 0%", async () => {
-            await expectRevert(
-                addCustomAffiliate(
-                    0,
-                    campaignOwner,
-                    standardAffiliate,
-                    new BN(0)
-                ),
+                addCustomAffiliate(0, standardAffiliate, new BN(0)),
                 "AffiliateMarketing: Reward is 0"
             );
         });
-        it("should fail when reward is greater than 100%", async () => {
+        it("should fail when commission is greater than 100%", async () => {
             await expectRevert(
-                addCustomAffiliate(
-                    0,
-                    campaignOwner,
-                    standardAffiliate,
-                    new BN(10001)
-                ),
+                addCustomAffiliate(0, standardAffiliate, new BN(10001)),
                 "AffiliateMarketing: Exceeded reward ceiling"
+            );
+        });
+        it("should fail when affiliate has already joined campaign", async () => {
+            await addCustomAffiliate();
+            await expectRevert(
+                addCustomAffiliate(),
+                "AffiliateMarketing: Already joined campaign"
             );
         });
 
@@ -392,52 +372,36 @@ contract("AffiliateMarketing", (accounts) => {
         });
         it("should fail when affiliate has not joined campaign", async () => {
             await expectRevert(
-                attributeSaleToAffiliate(0, otherAccount),
-                "AffiliateMarketing: Affiliate not registered"
+                attributeSaleToAffiliate(0, 5),
+                "AffiliateMarketing: Not registered with campaign"
             );
         });
         it("should fail when sale value is 0", async () => {
             await expectRevert(
-                attributeSaleToAffiliate(0, standardAffiliate, 0),
+                attributeSaleToAffiliate(0, 0, 0),
                 "AffiliateMarketing: Sale value is 0"
             );
         });
 
         it("should pass when attributing a valid sale to a standard affiliate", async () => {
-            await attributeSaleToAffiliate(0, standardAffiliate, baseSaleValue);
+            await attributeSaleToAffiliate(0, 0, baseSaleValue);
 
             const expectedReward = baseSaleValue
-                .mul(baseCampaignReward)
-                .div(rewardMax);
+                .mul(baseCommission)
+                .div(maxCommission);
 
-            await verifyAffiliateRewardTotal(
-                0,
-                standardAffiliate,
-                expectedReward
-            );
-            await verifyAffiliateRewardEntitlement(
-                0,
-                standardAffiliate,
-                expectedReward
-            );
+            await verifyTotalRewards(0, expectedReward);
+            await verifyUnclaimedRewards(0, expectedReward);
         });
         it("should pass when attributing a valid sale to a custom affiliate", async () => {
-            await attributeSaleToAffiliate(0, customAffiliate, baseSaleValue);
+            await attributeSaleToAffiliate(0, 1, baseSaleValue);
 
             const expectedReward = baseSaleValue
-                .mul(baseCustomReward)
-                .div(rewardMax);
+                .mul(customCommission)
+                .div(maxCommission);
 
-            await verifyAffiliateRewardTotal(
-                0,
-                customAffiliate,
-                expectedReward
-            );
-            await verifyAffiliateRewardEntitlement(
-                0,
-                customAffiliate,
-                expectedReward
-            );
+            await verifyTotalRewards(1, expectedReward);
+            await verifyUnclaimedRewards(1, expectedReward);
         });
     });
 
@@ -449,127 +413,113 @@ contract("AffiliateMarketing", (accounts) => {
         });
 
         // Failure case
-        it("should fail when campaign does not exist", async () => {
+        it("should fail when affiliate does not exist", async () => {
             await expectRevert(
-                sendAffiliateReward(3),
-                "AffiliateMarketing: Campaign does not exist"
+                sendRewardsToAffiliate(5),
+                "AffiliateMarketing: Affiliate does not exist"
             );
         });
-        it("should fail when affiliate has not joined campaign", async () => {
-            await expectRevert(
-                sendAffiliateReward(0, otherAccount),
-                "AffiliateMarketing: Affiliate not registered"
-            );
-        });
+
         it("should fail when reward owed is 0", async () => {
             await expectRevert(
-                sendAffiliateReward(),
+                sendRewardsToAffiliate(),
                 "AffiliateMarketing: No reward"
             );
         });
 
         it("should pass when standard affiliate has never withdrawn reward", async () => {
             // Record sale and withdraw reward
-            await attributeSaleToAffiliate(0, standardAffiliate, baseSaleValue);
-            await sendAffiliateReward(0, standardAffiliate);
+            await attributeSaleToAffiliate();
 
             const expectedReward = baseSaleValue
-                .mul(baseCampaignReward)
-                .div(rewardMax);
+                .mul(baseCommission)
+                .div(maxCommission);
+
+            await verifyUnclaimedRewards(0, expectedReward);
+
+            await sendRewardsToAffiliate();
 
             // Reward owed should now be 0
-            await verifyAffiliateRewardEntitlement(0, standardAffiliate, 0);
+            await verifyUnclaimedRewards(0, 0);
         });
 
         it("should pass when standard affiliate has withdrawn reward", async () => {
             const expectedReward = baseSaleValue
-                .mul(baseCampaignReward)
-                .div(rewardMax);
+                .mul(baseCommission)
+                .div(maxCommission);
 
             // Record sale and withdraw reward
-            await attributeSaleToAffiliate(0, standardAffiliate, baseSaleValue);
-            await sendAffiliateReward(0, standardAffiliate);
+            await attributeSaleToAffiliate();
+
+            // Reward owed should = expectedReward
+            await verifyUnclaimedRewards(0, expectedReward);
+
+            await sendRewardsToAffiliate();
 
             // Reward owed should now be 0
-            await verifyAffiliateRewardEntitlement(0, standardAffiliate, 0);
+            await verifyUnclaimedRewards(0, 0);
 
-            // Record sale and withdraw reward
-            await attributeSaleToAffiliate(0, standardAffiliate, baseSaleValue);
+            // Record another sale
+            await attributeSaleToAffiliate();
 
             // Should have more rewards to withdraw
-            await verifyAffiliateRewardEntitlement(
-                0,
-                standardAffiliate,
-                expectedReward
-            );
+            await verifyUnclaimedRewards(0, expectedReward);
 
-            await sendAffiliateReward(0, standardAffiliate);
+            await sendRewardsToAffiliate();
 
             // Reward owed should now be 0 again
-            await verifyAffiliateRewardEntitlement(0, standardAffiliate, 0);
+            await verifyUnclaimedRewards(0, 0);
 
             // Reward should reflect both sales
-            await verifyAffiliateRewardTotal(
-                0,
-                standardAffiliate,
-                expectedReward.mul(new BN(2))
-            );
+            await verifyTotalRewards(0, expectedReward.mul(new BN(2)));
         });
 
         it("should pass when custom affiliate has never withdrawn reward", async () => {
             const expectedReward = baseSaleValue
-                .mul(baseCustomReward)
-                .div(rewardMax);
+                .mul(customCommission)
+                .div(maxCommission);
 
             // Record sale and withdraw reward
-            await attributeSaleToAffiliate(0, customAffiliate, baseSaleValue);
+            await attributeSaleToAffiliate(0, 1, baseSaleValue);
 
             // Should have rewards to withdraw
-            await verifyAffiliateRewardEntitlement(
-                0,
-                customAffiliate,
-                expectedReward
-            );
+            await verifyUnclaimedRewards(1, expectedReward);
 
-            await sendAffiliateReward(0, customAffiliate);
+            await sendRewardsToAffiliate(1);
 
             // Should now have no rewards to withdraw
-            await verifyAffiliateRewardEntitlement(0, customAffiliate, 0);
+            await verifyUnclaimedRewards(1, 0);
         });
 
         it("should pass when custom affiliate has withdrawn reward", async () => {
             const expectedReward = baseSaleValue
-                .mul(baseCustomReward)
-                .div(rewardMax);
+                .mul(customCommission)
+                .div(maxCommission);
 
             // Record sale and withdraw reward
-            await attributeSaleToAffiliate(0, customAffiliate, baseSaleValue);
-            await sendAffiliateReward(0, customAffiliate);
+            await attributeSaleToAffiliate(0, 1, baseSaleValue);
+
+            // Should have rewards to withdraw
+            await verifyUnclaimedRewards(1, expectedReward);
+
+            await sendRewardsToAffiliate(1);
 
             // Reward owed should now be 0
-            await verifyAffiliateRewardEntitlement(0, customAffiliate, 0);
+            await verifyUnclaimedRewards(0, 0);
 
-            // Record sale and withdraw reward
-            await attributeSaleToAffiliate(0, customAffiliate, baseSaleValue);
+            // Record another sale
+            await attributeSaleToAffiliate(0, 1, baseSaleValue);
 
             // Should have more rewards to withdraw
-            await verifyAffiliateRewardEntitlement(
-                0,
-                customAffiliate,
-                expectedReward
-            );
+            await verifyUnclaimedRewards(1, expectedReward);
 
-            await sendAffiliateReward(0, customAffiliate);
+            await sendRewardsToAffiliate(1);
 
             // Should now have no rewards to withdraw
-            await verifyAffiliateRewardEntitlement(0, customAffiliate, 0);
+            await verifyUnclaimedRewards(1, 0);
 
             // Reward should reflect both sales
-            await verifyAffiliateRewardTotal(
-                0,
-                customAffiliate,
-                expectedReward.mul(new BN(2))
-            );
+            await verifyTotalRewards(1, expectedReward.mul(new BN(2)));
         });
     });
 });
