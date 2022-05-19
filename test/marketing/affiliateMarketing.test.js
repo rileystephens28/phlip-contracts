@@ -1,6 +1,7 @@
 const AffiliateMarketingMock = artifacts.require("AffiliateMarketingMock");
 const {
     expectRevert,
+    expectEvent,
     constants,
     BN,
     time,
@@ -51,7 +52,7 @@ contract("AffiliateMarketing", (accounts) => {
 
     const updateCampaignMetadata = async (
         campaignId = 0,
-        uri = baseUri,
+        uri = testUri,
         owner = campaignOwner
     ) => {
         return await marketingInstance.updateCampaignMetadata(
@@ -193,7 +194,25 @@ contract("AffiliateMarketing", (accounts) => {
 
         // Passing case
         it("should pass when params are valid", async () => {
-            await createCampaign();
+            let startTime = await time.latest();
+            startTime = startTime.add(time.duration.hours(1));
+            let endTime = startTime.add(time.duration.days(1));
+
+            const receipt = await createCampaign(
+                campaignOwner,
+                baseUri,
+                baseCommission,
+                startTime,
+                endTime
+            );
+            expectEvent(receipt, "CreateCampaign", {
+                id: new BN(0),
+                owner: campaignOwner,
+                startTime: startTime,
+                endTime: endTime,
+                commission: baseCommission,
+                uri: baseUri,
+            });
 
             // Should have a created campaign
             await verifyCampaignExists(0, true);
@@ -236,9 +255,11 @@ contract("AffiliateMarketing", (accounts) => {
 
         // Passing case
         it("should pass when params are valid", async () => {
-            await updateCampaignMetadata();
-
-            // Should have updated campaign URI
+            const receipt = await updateCampaignMetadata();
+            expectEvent(receipt, "UpdateCampaignMetadata", {
+                id: new BN(0),
+                uri: testUri,
+            });
         });
     });
 
@@ -269,9 +290,11 @@ contract("AffiliateMarketing", (accounts) => {
 
         // Passing case
         it("should pass when params are valid", async () => {
-            await updateCampaignOwner();
-
-            // Should have updated campaign owner address
+            const receipt = await updateCampaignOwner();
+            expectEvent(receipt, "UpdateCampaignOwner", {
+                id: new BN(0),
+                newOwner: otherAccount,
+            });
         });
     });
 
@@ -303,9 +326,13 @@ contract("AffiliateMarketing", (accounts) => {
 
         // Passing case
         it("should pass when params are valid", async () => {
-            await addStandardAffiliate();
-
-            // Should have registered affiliate to campaign
+            const receipt = await addStandardAffiliate();
+            expectEvent(receipt, "AddAffiliate", {
+                campaignId: new BN(0),
+                affiliateId: new BN(0),
+                affiliateAddress: standardAffiliate,
+                commission: baseCommission,
+            });
         });
     });
 
@@ -350,9 +377,13 @@ contract("AffiliateMarketing", (accounts) => {
 
         // Passing case
         it("should pass when params are valid", async () => {
-            await addCustomAffiliate();
-
-            // Should have registered affiliate to campaign
+            const receipt = await addCustomAffiliate();
+            expectEvent(receipt, "AddAffiliate", {
+                campaignId: new BN(0),
+                affiliateId: new BN(0),
+                affiliateAddress: customAffiliate,
+                commission: customCommission,
+            });
         });
     });
 
@@ -384,7 +415,12 @@ contract("AffiliateMarketing", (accounts) => {
         });
 
         it("should pass when attributing a valid sale to a standard affiliate", async () => {
-            await attributeSaleToAffiliate(0, 0, baseSaleValue);
+            const receipt = await attributeSaleToAffiliate(0, 0, baseSaleValue);
+            expectEvent(receipt, "AttributeSale", {
+                campaignId: new BN(0),
+                affiliateId: new BN(0),
+                saleValue: baseSaleValue,
+            });
 
             const expectedReward = baseSaleValue
                 .mul(baseCommission)
@@ -394,7 +430,12 @@ contract("AffiliateMarketing", (accounts) => {
             await verifyUnclaimedRewards(0, expectedReward);
         });
         it("should pass when attributing a valid sale to a custom affiliate", async () => {
-            await attributeSaleToAffiliate(0, 1, baseSaleValue);
+            const receipt = await attributeSaleToAffiliate(0, 1, baseSaleValue);
+            expectEvent(receipt, "AttributeSale", {
+                campaignId: new BN(0),
+                affiliateId: new BN(1),
+                saleValue: baseSaleValue,
+            });
 
             const expectedReward = baseSaleValue
                 .mul(customCommission)
@@ -437,7 +478,11 @@ contract("AffiliateMarketing", (accounts) => {
 
             await verifyUnclaimedRewards(0, expectedReward);
 
-            await sendRewardsToAffiliate();
+            const receipt = await sendRewardsToAffiliate();
+            expectEvent(receipt, "SendRewards", {
+                affiliateId: new BN(0),
+                rewardValue: expectedReward,
+            });
 
             // Reward owed should now be 0
             await verifyUnclaimedRewards(0, 0);
@@ -485,7 +530,11 @@ contract("AffiliateMarketing", (accounts) => {
             // Should have rewards to withdraw
             await verifyUnclaimedRewards(1, expectedReward);
 
-            await sendRewardsToAffiliate(1);
+            const receipt = await sendRewardsToAffiliate(1);
+            expectEvent(receipt, "SendRewards", {
+                affiliateId: new BN(1),
+                rewardValue: expectedReward,
+            });
 
             // Should now have no rewards to withdraw
             await verifyUnclaimedRewards(1, 0);

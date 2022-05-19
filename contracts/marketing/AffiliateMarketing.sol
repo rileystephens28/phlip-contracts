@@ -20,7 +20,7 @@ contract AffiliateMarketing {
         address indexed owner,
         uint128 startTime,
         uint128 endTime,
-        uint32 standardCommission,
+        uint32 commission,
         string uri
     );
 
