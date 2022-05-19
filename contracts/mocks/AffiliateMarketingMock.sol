@@ -4,11 +4,7 @@ pragma solidity 0.8.13;
 import "../marketing/AffiliateMarketing.sol";
 
 contract AffiliateMarketingMock is AffiliateMarketing {
-    bool public didProtectedAction;
-
-    constructor() {
-        didProtectedAction = false;
-    }
+    receive() external payable {}
 
     function campaignExists(uint256 _campaignId) public view returns (bool) {
         return _campaignExists(_campaignId);
@@ -28,6 +24,14 @@ contract AffiliateMarketingMock is AffiliateMarketing {
         _createCampaign(_owner, _uri, _startTime, _endTime, _rewardPercentage);
     }
 
+    function updateCampaignMetadata(
+        uint256 _campaignId,
+        address _owner,
+        string memory _uri
+    ) public {
+        _updateCampaignMetadata(_campaignId, _owner, _uri);
+    }
+
     function updateCampaignOwner(
         uint256 _campaignId,
         address _owner,
@@ -44,10 +48,16 @@ contract AffiliateMarketingMock is AffiliateMarketing {
 
     function addCustomAffiliate(
         uint256 _campaignId,
+        address _owner,
         address _affiliate,
         uint128 _customRewardPercentage
     ) public {
-        _addCustomAffiliate(_campaignId, _affiliate, _customRewardPercentage);
+        _addCustomAffiliate(
+            _campaignId,
+            _owner,
+            _affiliate,
+            _customRewardPercentage
+        );
     }
 
     function attributeSaleToAffiliate(

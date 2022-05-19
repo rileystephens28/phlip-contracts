@@ -336,7 +336,7 @@ contract AffiliateMarketing {
         );
         require(
             _affiliate != address(0),
-            "AffiliateMarketing: Cannot add 0x0 to campaign"
+            "AffiliateMarketing: Affiliate cannot be 0x0"
         );
 
         Affiliate storage affiliate = campaign.affiliates[_affiliate];
@@ -362,19 +362,25 @@ contract AffiliateMarketing {
      */
     function _addCustomAffiliate(
         uint256 _campaignId,
+        address _owner,
         address _affiliate,
         uint128 _customRewardPercentage
     ) internal virtual {
+        Campaign storage campaign = _campaigns[_campaignId];
+        Affiliate storage affiliate = campaign.affiliates[_affiliate];
+
+        require(
+            campaign.owner == _owner,
+            "AffiliateMarketing: Not campaign owner"
+        );
+
         require(_customRewardPercentage > 0, "AffiliateMarketing: Reward is 0");
         require(
             _customRewardPercentage <= percentCeiling,
             "AffiliateMarketing: Exceeded reward ceiling"
         );
+
         _addStandardAffiliate(_campaignId, _affiliate);
-
-        Campaign storage campaign = _campaigns[_campaignId];
-        Affiliate storage affiliate = campaign.affiliates[_affiliate];
-
         affiliate.customRewardPercentage = _customRewardPercentage;
     }
 
@@ -406,7 +412,7 @@ contract AffiliateMarketing {
             affiliate.isRegistered,
             "AffiliateMarketing: Affiliate not registered"
         );
-        require(_saleValue > 0, "AffiliateMarketing: Sale value cannot be 0");
+        require(_saleValue > 0, "AffiliateMarketing: Sale value is 0");
 
         campaign.totalSalesValue += _saleValue;
         affiliate.salesValue += _saleValue;
@@ -441,7 +447,7 @@ contract AffiliateMarketing {
         );
         require(
             affiliate.isRegistered,
-            "AffiliateMarketing: Affiliate is not registered"
+            "AffiliateMarketing: Affiliate not registered"
         );
 
         uint256 reward = _caclulateAffiliateRewardEntitlement(
