@@ -15,7 +15,7 @@ import "@maticnetwork/fx-portal/contracts/tunnel/FxBaseRootTunnel.sol";
  * Once payment is received, this contract will make a call to the child contract to mint
  * individual cards or all cards in a package.
  *
- * ## StateSync Addresses
+ * ## StateSync Ethereum Addresses
  * ### Goerli
  * - _checkpointManager: 0x2890bA17EfE978480615e330ecB65333b880928e
  * - _fxRoot: 0x3d1d3E34f7fB6D26245E6640E1c50710eFFf15bA
@@ -306,7 +306,7 @@ contract CrowdSaleRootTunnel is Ownable, ReentrancyGuard, FxBaseRootTunnel {
      * sent the correct amount of ETH to cover the cost.
      * @param _cardID ID of the card to purchase.
      */
-    function purchaseCard(uint128 _cardID, string memory _uri)
+    function purchaseCard(uint128 _cardID)
         public
         payable
         onlyGeneralSale

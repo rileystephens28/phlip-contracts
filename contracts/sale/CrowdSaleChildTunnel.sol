@@ -16,7 +16,7 @@ import "../interfaces/IPhlipCard.sol";
  * This contract is responsible for minting individual cards or all cards in a package that
  * were purchases from root contract.
  *
- * ## StateSync Addresses
+ * ## StateSync Polygon Addresses
  * ### Mumbai
  * - _fxChild: 0xCf73231F28B7331BBe3124B907840A94851f9f11
  *
@@ -25,22 +25,16 @@ import "../interfaces/IPhlipCard.sol";
  */
 contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
     using SafeERC20 for IERC20;
+    using Counters for Counters.Counter;
 
-    /// @dev Message types
+    /// @dev FX-Portal message types
     bytes32 public constant PURCHASE_CARD = keccak256("PURCHASE_CARD");
     bytes32 public constant PURCHASE_PACKAGE = keccak256("PURCHASE_PACKAGE");
 
-    event CreatePackage(uint256 id, uint256 price, uint128 numForSale);
-    event PurchasePackage(uint256 indexed id, address purchaser);
-    event PurchaseCard(uint256 indexed cardID, address purchaser);
-
-    enum SaleState {
-        INACTIVE,
-        PRESALE_ACTIVE,
-        SALE_ACTIVE
-    }
-
-    SaleState private _saleStaus;
+    /// @dev FX-Portal state vars
+    uint256 public latestStateId;
+    address public latestRootMessageSender;
+    bytes public latestData;
 
     enum Color {
         PINK,
@@ -56,30 +50,7 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
         Color color;
         Varient varient;
         address contractAddress;
-        uint128 totalSupply;
-        uint128 mintedSupply;
     }
-
-    // Structures information required to sell and
-    // mint single cards during the sale period.
-    struct CardSaleInfo {
-        uint256 price;
-        uint128 numSold;
-        uint256[] scheduleIDs;
-    }
-
-    // Card IDs to use in _cards mapping
-    uint128 private _pinkTextCard = 0;
-    uint128 private _pinkImageCard = 1;
-    uint128 private _whiteTextCard = 2;
-    uint128 private _whiteBlankCard = 3;
-
-    // Mapping of IDs to card info
-    mapping(uint128 => CardInfo) private _cards;
-
-    // Maps card IDs to respective card sale info
-    mapping(uint128 => CardSaleInfo) private _cardSaleInfo;
-    mapping(uint128 => bool) private _registeredSaleInfo;
 
     struct CardBundle {
         uint128 cardID;
@@ -87,31 +58,34 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
         uint256[] scheduleIDs;
     }
 
-    // Structures information required to sell and
-    // mint several cards at once during the presale period.
-    struct PresalePackage {
-        uint256 price;
-        uint128 numForSale;
-        uint128 numSold;
-        CardBundle[] cardBundles;
-    }
+    // Token contract addresses
+    address private immutable _daoTokenAddress;
+    address private immutable _p2eTokenAddress;
 
-    // Mapping of IDs to presale packages
-    mapping(uint256 => PresalePackage) private _packages;
+    // Wallet addresses containing tokens
+    address private immutable _daoWalletAddress;
+    address private immutable _p2eWalletAddress;
 
-    // Tracks package IDs that have been created
-    mapping(uint256 => bool) private _registeredPackages;
+    // Cliff and duration for all vesting schedules
+    uint256 private immutable _vestingCliff;
+    uint256 private immutable _vestingDuration;
 
-    address _daoTokenAddress;
-    address _p2eTokenAddress;
+    // Card IDs to use in _cards mapping
+    uint128 private immutable _pinkTextCard = 0;
+    uint128 private immutable _pinkImageCard = 1;
+    uint128 private immutable _whiteTextCard = 2;
+    uint128 private immutable _whiteBlankCard = 3;
 
-    address _daoWalletAddress;
-    address _p2eWalletAddress;
+    Counters.Counter internal _packageIds;
 
-    address payable _proceedsWalletAddress;
+    // Mapping of IDs to card info
+    mapping(uint128 => CardInfo) private _cards;
 
-    uint256 _vestingCliff;
-    uint256 _vestingDuration;
+    // Card IDs => array of vesting schedule IDs
+    mapping(uint128 => uint256[]) private _cardVestingSchedules;
+
+    // package IDs => card bundle array for the package
+    mapping(uint256 => CardBundle[]) private _packages;
 
     constructor(
         address _pcAddress,
@@ -120,7 +94,6 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
         address _p2eToken,
         address _daoWallet,
         address _p2eWallet,
-        address payable _proceedsWallet,
         uint256 _cliff,
         uint256 _duration,
         address _fxChild
@@ -131,7 +104,6 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
         require(_p2eToken != address(0), "P2E tokens cannot be 0x0");
         require(_daoWallet != address(0), "DAO wallet cannot be 0x0");
         require(_p2eWallet != address(0), "P2E wallet cannot be 0x0");
-        require(_proceedsWallet != address(0), "Proceeds wallet cannot be 0x0");
         require(_cliff > 0, "Vesting cliff must be greater than 0");
         require(_duration > 0, "Vesting duration must be greater than 0");
 
@@ -143,8 +115,6 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
 
         _vestingCliff = _cliff;
         _vestingDuration = _duration;
-
-        _proceedsWalletAddress = _proceedsWallet;
 
         CardInfo storage ptCard = _cards[_pinkTextCard];
         ptCard.color = Color.PINK;
@@ -167,134 +137,26 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
         wbCard.contractAddress = _wcAddress;
     }
 
-    /**
-     * @dev Ensures the presale is active and reverts if not.
-     */
-    modifier onlyPresale() {
-        require(
-            _saleStaus == SaleState.PRESALE_ACTIVE,
-            "Presale is not active"
-        );
-        _;
-    }
-
-    /**
-     * @dev Ensures the presale is active and reverts if not.
-     */
-    modifier onlyGeneralSale() {
-        require(
-            _saleStaus == SaleState.SALE_ACTIVE,
-            "General sale is not active"
-        );
-        _;
-    }
-
-    /***********************************|
-    |          View Functions           |
-    |__________________________________*/
-
-    /**
-     * @dev Getter for current sale status.
-     */
-    function saleStatus() public view returns (uint8) {
-        return uint8(_saleStaus);
-    }
-
-    /**
-     * @dev Getter for the price in WEI of a presale package.
-     * @param _cardID ID of the card to query
-     */
-    function getCardPrice(uint128 _cardID) public view returns (uint256) {
-        return _cardSaleInfo[_cardID].price;
-    }
-
-    /**
-     * @dev Getter for the price in WEI of a presale package.
-     * @param _packageID ID of the package to query
-     */
-    function getPackagePrice(uint256 _packageID) public view returns (uint256) {
-        return _packages[_packageID].price;
-    }
-
-    /**
-     * @dev Getter for number of remaining presale packages available for sale
-     * @param _packageID ID of the package to query
-     */
-    function getPackagesRemaining(uint256 _packageID)
-        public
-        view
-        returns (uint128)
-    {
-        PresalePackage storage package = _packages[_packageID];
-        return package.numForSale - package.numSold;
-    }
-
-    /**
-     * @dev Getter for a card's sale information.
-     * @param _cardID ID of the card to query
-     */
-    function getSaleInfo(uint128 _cardID)
-        public
-        view
-        returns (CardSaleInfo memory)
-    {
-        return _cardSaleInfo[_cardID];
-    }
-
-    /**
-     * @dev Getter for number of remaining presale packages available for sale
-     * @param _packageID ID of the package to query
-     */
-    function getCardBundles(uint256 _packageID)
-        public
-        view
-        returns (CardBundle[] memory)
-    {
-        PresalePackage storage package = _packages[_packageID];
-        return package.cardBundles;
-    }
-
-    /**
-     * @dev Getter for max supply of a specific card.
-     * @param _cardID ID of the card to query
-     */
-    function maxSupplyOf(uint128 _cardID) public view returns (uint128) {
-        CardInfo storage card = _cards[_cardID];
-        return card.totalSupply;
-    }
-
-    /**
-     * @dev Getter for number of minted cards of a specific color & type.
-     * @param _cardID ID of the card to query
-     */
-    function mintedSupplyOf(uint128 _cardID) public view returns (uint128) {
-        CardInfo storage card = _cards[_cardID];
-        return card.mintedSupply;
-    }
-
     /***********************************|
     |       Only Owner Functions        |
     |__________________________________*/
 
     /**
-     * @dev Allows contract owner to set presale active state.
+     * @dev Allows contract owner to set vesting schedule info for cards.
      *
      * Requirements:
      * - Must be called by the contract owner
      * - `_cardID` must be 0, 1, 2, or 3
-     * - `_price` must be greater than 0
      * - `_scheduleIDs` must contain IDs for existing schedules vesting with
      * reserves containing enough tokens to create vesting capsules from
      *
      * @param _scheduleIDs Array containing vesting schedule IDs.
      */
-    function setCardSaleInfo(
+    function setCardVestingInfo(
         uint128 _cardID,
-        uint256 _price,
         uint256[] calldata _scheduleIDs
     ) public onlyOwner {
         require(_cardID < 4, "Invalid card ID");
-        require(_price > 0, "Price must be greater than 0");
 
         IVestingTreasury treasury = IVestingTreasury(
             _cards[_cardID].contractAddress
@@ -306,165 +168,162 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
             );
         }
 
-        _registeredSaleInfo[_cardID] = true;
-        CardSaleInfo storage saleInfo = _cardSaleInfo[_cardID];
-        saleInfo.price = _price;
-        saleInfo.scheduleIDs = _scheduleIDs;
+        _cardVestingSchedules[_cardID] = _scheduleIDs;
     }
 
     /**
      * @dev Allows contract owner to create a presale package that contains 1 card type
-     * @param _packageID ID of the package to create (or overwrite)
-     * @param _weiPrice The price of the package in wei
-     * @param _numForSale Number of packages that can be bought
-     * @param _numCards Number of cards in the package
      * @param _cardID ID of the card in the package (can be 0-3)
+     * @param _numCards Number of cards in the package
      * @param _daoAmount The amount of DAO tokens that will vest in card
      * @param _p2eAmount The amount of P2E tokens that will vest in card
+     * @param _reserveMultiple Multplier for filling vesting schedule reserves.
+     * Should equal number of expected packages that will be created.
      */
     function createSingleCardPackage(
-        uint256 _packageID,
-        uint256 _weiPrice,
-        uint128 _numForSale,
-        uint128 _numCards,
         uint128 _cardID,
+        uint128 _numCards,
         uint256 _daoAmount,
-        uint256 _p2eAmount
+        uint256 _p2eAmount,
+        uint256 _reserveMultiple
     ) public onlyOwner {
-        require(!_registeredPackages[_packageID], "Package already exists");
-        require(_weiPrice > 0, "Price cannot be 0");
-        require(_numForSale > 0, "Number of packages cannot be 0");
+        require(
+            _reserveMultiple > 0,
+            "CrowdSaleChildTunnel: Resever multiple is 0"
+        );
 
-        _registeredPackages[_packageID] = true;
-        PresalePackage storage package = _packages[_packageID];
-        package.price = _weiPrice;
-        package.numForSale = _numForSale;
+        uint256 packageId = _packageIds.current();
+        _packageIds.increment();
+
+        CardBundle[] storage bundle = _packages[packageId];
 
         // Add vesting info with card info and number of card in package
-        package.cardBundles.push(
+        bundle.push(
             _createCardBundle(
                 _cardID,
                 _numCards,
-                _numForSale,
                 _daoAmount,
-                _p2eAmount
+                _p2eAmount,
+                _reserveMultiple
             )
         );
-
-        emit CreatePackage(_packageID, _weiPrice, _numForSale);
     }
 
     /**
-     * @dev Allows contract owner to create a presale package that contains 1 card type
-     * @param _packageID ID of the package to create (or overwrite)
-     * @param _weiPrice The price of the package in wei
-     * @param _numForSale Number of packages that can be bought
+     * @dev Allows contract owner to create a presale package that contains multiple card types
      * @param _cardIDs Array of IDs of the card in the package (can be 0-3)
      * @param _numCards Array containing number of each card in the package
-     * @param _daoAmounts Array containing the amount of DAO tokens that will vest in each card
-     * @param _p2eAmounts Array containing the amount of P2E tokens that will vest in each card
+     * @param _daoAmounts Array of DAO tokens amounts that will vest in each card
+     * @param _p2eAmounts Array of P2E tokens amounts that will vest in each card
+     * @param _reserveMultiples Array of multpliers for filling vesting schedule
+     * reserves. Should equal number of expected packages that will be created.
      */
     function createMultiCardPackage(
-        uint256 _packageID,
-        uint256 _weiPrice,
-        uint128 _numForSale,
         uint128[] calldata _cardIDs,
         uint128[] calldata _numCards,
         uint256[] calldata _daoAmounts,
-        uint256[] calldata _p2eAmounts
+        uint256[] calldata _p2eAmounts,
+        uint256[] calldata _reserveMultiples
     ) public onlyOwner {
-        require(!_registeredPackages[_packageID], "Package already exists");
-        require(_weiPrice > 0, "Price cannot be 0");
-        require(_numForSale > 0, "Number of packages cannot be 0");
+        uint256 packageId = _packageIds.current();
+        _packageIds.increment();
 
-        _registeredPackages[_packageID] = true;
-
-        PresalePackage storage package = _packages[_packageID];
-        package.price = _weiPrice;
-        package.numForSale = _numForSale;
+        CardBundle[] storage bundle = _packages[packageId];
 
         for (uint256 i = 0; i < _numCards.length; i++) {
             // Add vesting info with card info and number of card in package
-            package.cardBundles.push(
+            bundle.push(
                 _createCardBundle(
                     _cardIDs[i],
                     _numCards[i],
-                    _numForSale,
                     _daoAmounts[i],
-                    _p2eAmounts[i]
+                    _p2eAmounts[i],
+                    _reserveMultiples[i]
                 )
             );
         }
-
-        emit CreatePackage(_packageID, _weiPrice, _numForSale);
     }
 
     /***********************************|
-    |    External Purchase Functions    |
+    |         Tunnel Functions          |
     |__________________________________*/
 
     /**
-     * @dev Allows caller to purchase a presale package if they
-     * have sent the correct amount of ETH to cover the package cost.
-     * @param _packageID ID of the package to purchase.
+     * @dev Invoked by polygon validators via a system call. Accepts purchase
+     * info from CrowdSaleRootTunnel and mints card(s) from card/package purchase.
+     *
+     * Note - Since invokation is from a system call, no events will be emitted during execution.
+     * @param stateId Unique state id
+     * @param sender Root message sender
+     * @param data Bytes message that was sent from Root Tunnel
      */
-    function _executePackagePurchase(uint256 _packageID) internal {
-        require(_registeredPackages[_packageID], "Package does not exist");
+    function _processMessageFromRoot(
+        uint256 stateId,
+        address sender,
+        bytes memory data
+    ) internal override validateSender(sender) {
+        latestStateId = stateId;
+        latestRootMessageSender = sender;
+        latestData = data;
 
-        PresalePackage storage package = _packages[_packageID];
-        require(package.numSold < package.numForSale, "Package not available");
-        require(msg.value > package.price - 1, "Not enough ETH to cover cost");
+        (bytes32 syncType, bytes memory syncData) = abi.decode(
+            data,
+            (bytes32, bytes)
+        );
 
-        package.numSold += 1;
-
-        for (uint256 i = 0; i < package.cardBundles.length; i++) {
-            CardBundle storage pkgDetails = package.cardBundles[i];
-            CardInfo storage card = _cards[pkgDetails.cardID];
-            card.mintedSupply += pkgDetails.numCards;
-
-            for (uint256 j = 0; j < pkgDetails.numCards; j++) {
-                // Mint card
-                IPhlipCard(card.contractAddress).mintCard(
-                    msg.sender,
-                    "",
-                    uint256(card.varient),
-                    pkgDetails.scheduleIDs
-                );
-            }
-        }
-
-        emit PurchasePackage(_packageID, msg.sender);
-
-        uint256 refundAmount = msg.value - package.price;
-        if (refundAmount > 0) {
-            payable(msg.sender).transfer(refundAmount);
+        if (syncType == PURCHASE_CARD) {
+            _executeCardPurchase(syncData);
+        } else if (syncType == PURCHASE_PACKAGE) {
+            _executePackagePurchase(syncData);
+        } else {
+            revert("CrowdSaleChildTunnel: INVALID_SYNC_TYPE");
         }
     }
 
     /**
-     * @dev Allows caller to purchase a card if they have
-     * sent the correct amount of ETH to cover the cost.
-     * @param _purchaseData ABI encoded data containing info about the purchase from root
+     * @dev Accepts card purchase data from CrowdSaleRootTunnel and mints card accordingly.
+     * @param _purchaseData ABI encoded data about the purchase from root contract
      */
     function _executeCardPurchase(bytes memory _purchaseData) internal {
-        (address purchaser, uint256 cardId) = abi.decode(
+        (address purchaser, uint128 cardId) = abi.decode(
             _purchaseData,
-            (address, uint256)
+            (address, uint128)
         );
+
+        CardInfo storage card = _cards[cardId];
 
         // Mint card
         IPhlipCard(card.contractAddress).mintCard(
-            msg.sender,
-            _uri,
+            purchaser,
+            "",
             uint256(card.varient),
-            saleInfo.scheduleIDs
+            _cardVestingSchedules[cardId]
         );
+    }
 
-        emit PurchaseCard(cardId, msg.sender);
+    /**
+     * @dev Accepts package purchase data from CrowdSaleRootTunnel and mints cards accordingly.
+     * @param _purchaseData ABI encoded data about the purchase from root contract
+     */
+    function _executePackagePurchase(bytes memory _purchaseData) internal {
+        (address purchaser, uint256 packageId) = abi.decode(
+            _purchaseData,
+            (address, uint256)
+        );
+        CardBundle[] storage cardBundles = _packages[packageId];
 
-        uint256 refundAmount = msg.value - saleInfo.price;
-        if (refundAmount > 0) {
-            payable(msg.sender).transfer(refundAmount);
+        for (uint256 i = 0; i < cardBundles.length; i++) {
+            CardInfo storage card = _cards[cardBundles[i].cardID];
+
+            for (uint256 j = 0; j < cardBundles[i].numCards; j++) {
+                // Mint card
+                IPhlipCard(card.contractAddress).mintCard(
+                    purchaser,
+                    "",
+                    uint256(card.varient),
+                    cardBundles[i].scheduleIDs
+                );
+            }
         }
     }
 
@@ -483,13 +342,14 @@ contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
     function _createCardBundle(
         uint128 _cardID,
         uint128 _numCards,
-        uint256 _reserveMultiple,
         uint256 _daoAmount,
-        uint256 _p2eAmount
+        uint256 _p2eAmount,
+        uint256 _reserveMultiple
     ) private returns (CardBundle memory) {
         require(_numCards > 0, "Number of cards cannot be 0");
         require(_daoAmount > 0, "DAO token amount cannot be 0");
         require(_p2eAmount > 0, "P2E token amount cannot be 0");
+        require(_reserveMultiple > 0, "Resever multiple is 0");
 
         IVestingTreasury cardTreasury = IVestingTreasury(
             _cards[_cardID].contractAddress
