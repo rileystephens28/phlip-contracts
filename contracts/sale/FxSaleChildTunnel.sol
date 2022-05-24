@@ -3,11 +3,8 @@ pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@maticnetwork/fx-portal/contracts/tunnel/FxBaseChildTunnel.sol";
-import "../cards/PinkCard.sol";
-import "../cards/WhiteCard.sol";
 import "../interfaces/IVestingTreasury.sol";
 import "../interfaces/IPhlipCard.sol";
 
@@ -23,8 +20,7 @@ import "../interfaces/IPhlipCard.sol";
  * ### Mainnet
  * - _fxChild: 0x8397259c983751DAf40400790063935a11afa28a
  */
-contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
-    using SafeERC20 for IERC20;
+contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
     using Counters for Counters.Counter;
 
     /// @dev FX-Portal message types
@@ -71,10 +67,10 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     uint256 private immutable _vestingDuration;
 
     // Card IDs to use in _cards mapping
-    uint128 private immutable _pinkTextCard = 0;
-    uint128 private immutable _pinkImageCard = 1;
-    uint128 private immutable _whiteTextCard = 2;
-    uint128 private immutable _whiteBlankCard = 3;
+    uint128 private constant _pinkTextCard = 0;
+    uint128 private constant _pinkImageCard = 1;
+    uint128 private constant _whiteTextCard = 2;
+    uint128 private constant _whiteBlankCard = 3;
 
     Counters.Counter internal _packageIds;
 
@@ -189,7 +185,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     ) public onlyOwner {
         require(
             _reserveMultiple > 0,
-            "CrowdSaleChildTunnel: Resever multiple is 0"
+            "FxSaleChildTunnel: Resever multiple is 0"
         );
 
         uint256 packageId = _packageIds.current();
@@ -249,6 +245,27 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     |__________________________________*/
 
     /**
+     * @dev External entry point to receive and relay messages originating
+     * from the fxChild.
+     *
+     * Non-reentrancy is crucial to avoid a cross-chain call being able
+     * to impersonate anyone by just looping through this with user-defined
+     * arguments.
+     *
+     * @param stateId Unique state id
+     * @param rootMessageSender Address of root message sender
+     * @param data Bytes message that was sent from Root Tunnel
+     */
+    function processMessageFromRoot(
+        uint256 stateId,
+        address rootMessageSender,
+        bytes calldata data
+    ) external override nonReentrant {
+        require(msg.sender == fxChild, "FxSaleChildTunnel: Invalid sender");
+        _processMessageFromRoot(stateId, rootMessageSender, data);
+    }
+
+    /**
      * @dev Invoked by polygon validators via a system call. Accepts purchase
      * info from CrowdSaleRootTunnel and mints card(s) from card/package purchase.
      *
@@ -276,7 +293,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
         } else if (syncType == PURCHASE_PACKAGE) {
             _executePackagePurchase(syncData);
         } else {
-            revert("CrowdSaleChildTunnel: INVALID_SYNC_TYPE");
+            revert("FxSaleChildTunnel: Invalid message type");
         }
     }
 
