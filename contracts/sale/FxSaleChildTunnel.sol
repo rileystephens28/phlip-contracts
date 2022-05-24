@@ -23,7 +23,7 @@ import "../interfaces/IPhlipCard.sol";
  * ### Mainnet
  * - _fxChild: 0x8397259c983751DAf40400790063935a11afa28a
  */
-contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
+contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
 

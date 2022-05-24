@@ -24,7 +24,7 @@ import "@maticnetwork/fx-portal/contracts/tunnel/FxBaseRootTunnel.sol";
  * - _checkpointManager: 0x86e4dc95c7fbdbf52e33d563bbdb00823894c287
  * - _fxRoot: 0xfe5e5D361b2ad62c541bAb87C45a0B9B018389a2
  */
-contract CrowdSaleRootTunnel is Ownable, ReentrancyGuard, FxBaseRootTunnel {
+contract FxSaleRootTunnel is Ownable, ReentrancyGuard, FxBaseRootTunnel {
     using SafeERC20 for IERC20;
 
     /// @dev Message types
