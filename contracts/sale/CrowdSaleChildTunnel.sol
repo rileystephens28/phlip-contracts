@@ -5,50 +5,30 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "./cards/PinkCard.sol";
-import "./cards/WhiteCard.sol";
-import "./interfaces/IVestingTreasury.sol";
-import "./interfaces/IPhlipCard.sol";
+import "@maticnetwork/fx-portal/contracts/tunnel/FxBaseChildTunnel.sol";
+import "../cards/PinkCard.sol";
+import "../cards/WhiteCard.sol";
+import "../interfaces/IVestingTreasury.sol";
+import "../interfaces/IPhlipCard.sol";
 
 /**
-
-## Bundled White Text Package Indexes
-    whiteText1 = 0;
-    whiteText2 = 1;
-    whiteText3 = 2;
-    whiteText5 = 3;
-    whiteText10 = 4;
-    whiteText20 = 5;
-
-## Bundled Pink Text Package Indexes
-    pinkText1 = 6;
-    pinkText2 = 7;
-    pinkText3 = 8;
-
-## Bundled Pink Image Package Indexes
-    pinkImage1 = 9;
-    pinkImage2 = 10;
-    pinkImage3 = 11;
-
-## Bundled Pink Combo Package Indexes
-    pinkCombo1 = 12;
-    pinkCombo2 = 13;
-    pinkCombo3 = 14;
-
-## Full House Package Indexes
-    fullHouse = 6;
-    doubleFullHouse = 7;
-    tripleFullHouse = 8;
-
-## Whale Package Indexes
-    belugaWhale = 9;
-    humpbackWhale = 10;
-    blueWhale = 11;
-
+ * @dev Child contract for the Phlip cross-chain crowdsale that will be deployed on Polygon.
+ * This contract is responsible for minting individual cards or all cards in a package that
+ * were purchases from root contract.
+ *
+ * ## StateSync Addresses
+ * ### Mumbai
+ * - _fxChild: 0xCf73231F28B7331BBe3124B907840A94851f9f11
+ *
+ * ### Mainnet
+ * - _fxChild: 0x8397259c983751DAf40400790063935a11afa28a
  */
-contract PhlipSale is Ownable, ReentrancyGuard {
+contract CrowdSaleChildTunnel is Ownable, FxBaseChildTunnel {
     using SafeERC20 for IERC20;
+
+    /// @dev Message types
+    bytes32 public constant PURCHASE_CARD = keccak256("PURCHASE_CARD");
+    bytes32 public constant PURCHASE_PACKAGE = keccak256("PURCHASE_PACKAGE");
 
     event CreatePackage(uint256 id, uint256 price, uint128 numForSale);
     event PurchasePackage(uint256 indexed id, address purchaser);
@@ -142,8 +122,9 @@ contract PhlipSale is Ownable, ReentrancyGuard {
         address _p2eWallet,
         address payable _proceedsWallet,
         uint256 _cliff,
-        uint256 _duration
-    ) {
+        uint256 _duration,
+        address _fxChild
+    ) FxBaseChildTunnel(_fxChild) {
         require(_pcAddress != address(0), "Pink card cannot be 0x0");
         require(_wcAddress != address(0), "White card cannot be 0x0");
         require(_daoToken != address(0), "DAO tokens cannot be 0x0");
@@ -300,46 +281,6 @@ contract PhlipSale is Ownable, ReentrancyGuard {
      *
      * Requirements:
      * - Must be called by the contract owner
-     * - `_state` must be 0, 1, or 2
-     *
-     * @param _state New sale state.
-     */
-    function setSaleStatus(uint8 _state) public onlyOwner {
-        require(_state < 3, "Invalid sale status");
-        _saleStaus = SaleState(_state);
-    }
-
-    /**
-     * @dev Allows contract owner to set total supply of card.
-     *
-     * Note - This function should be called after contract is deployed
-     *      and before configuring card sale info and card packages.
-     *
-     * Requirements:
-     * - Must be called by the contract owner
-     * - `_cardID` must be 0, 1, 2, or 3
-     * - `_supply` must be greater than 0
-     *
-     * @param _cardID ID of the card to set.
-     * @param _supply New total supply.
-     */
-    function setCardMaxSupply(uint128 _cardID, uint128 _supply)
-        public
-        onlyOwner
-    {
-        require(_saleStaus == SaleState.INACTIVE, "Cannot change during sale");
-        require(_cardID < 4, "Invalid card ID");
-        require(_supply > 0, "Supply must be greater than 0");
-
-        CardInfo storage card = _cards[_cardID];
-        card.totalSupply = _supply;
-    }
-
-    /**
-     * @dev Allows contract owner to set presale active state.
-     *
-     * Requirements:
-     * - Must be called by the contract owner
      * - `_cardID` must be 0, 1, 2, or 3
      * - `_price` must be greater than 0
      * - `_scheduleIDs` must contain IDs for existing schedules vesting with
@@ -467,12 +408,7 @@ contract PhlipSale is Ownable, ReentrancyGuard {
      * have sent the correct amount of ETH to cover the package cost.
      * @param _packageID ID of the package to purchase.
      */
-    function purchasePackage(uint256 _packageID)
-        public
-        payable
-        onlyPresale
-        nonReentrant
-    {
+    function _executePackagePurchase(uint256 _packageID) internal {
         require(_registeredPackages[_packageID], "Package does not exist");
 
         PresalePackage storage package = _packages[_packageID];
@@ -508,23 +444,13 @@ contract PhlipSale is Ownable, ReentrancyGuard {
     /**
      * @dev Allows caller to purchase a card if they have
      * sent the correct amount of ETH to cover the cost.
-     * @param _cardID ID of the card to purchase.
+     * @param _purchaseData ABI encoded data containing info about the purchase from root
      */
-    function purchaseCard(uint128 _cardID, string memory _uri)
-        public
-        payable
-        onlyGeneralSale
-        nonReentrant
-    {
-        require(_registeredSaleInfo[_cardID], "Not available for sale");
-
-        CardInfo storage card = _cards[_cardID];
-        CardSaleInfo storage saleInfo = _cardSaleInfo[_cardID];
-        require(card.mintedSupply < card.totalSupply, "Max supply reached");
-        require(msg.value > saleInfo.price - 1, "Not enough ETH to cover cost");
-
-        card.mintedSupply += 1;
-        saleInfo.numSold += 1;
+    function _executeCardPurchase(bytes memory _purchaseData) internal {
+        (address purchaser, uint256 cardId) = abi.decode(
+            _purchaseData,
+            (address, uint256)
+        );
 
         // Mint card
         IPhlipCard(card.contractAddress).mintCard(
@@ -534,7 +460,7 @@ contract PhlipSale is Ownable, ReentrancyGuard {
             saleInfo.scheduleIDs
         );
 
-        emit PurchaseCard(_cardID, msg.sender);
+        emit PurchaseCard(cardId, msg.sender);
 
         uint256 refundAmount = msg.value - saleInfo.price;
         if (refundAmount > 0) {
