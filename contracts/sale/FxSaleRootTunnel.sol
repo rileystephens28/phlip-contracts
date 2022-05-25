@@ -31,8 +31,13 @@ contract FxSaleRootTunnel is Ownable, ReentrancyGuard, FxBaseRootTunnel {
     bytes32 public constant PURCHASE_CARD = keccak256("PURCHASE_CARD");
     bytes32 public constant PURCHASE_PACKAGE = keccak256("PURCHASE_PACKAGE");
 
-    event PurchaseCard(uint256 indexed cardID, address purchaser);
+    event PurchaseCard(uint256 indexed id, address purchaser);
     event PurchasePackage(uint256 indexed id, address purchaser);
+    event RegisterPackage(
+        uint256 indexed id,
+        uint256 price,
+        uint256 numForSale
+    );
 
     enum SaleState {
         INACTIVE,
@@ -244,22 +249,24 @@ contract FxSaleRootTunnel is Ownable, ReentrancyGuard, FxBaseRootTunnel {
     /**
      * @dev Allows contract owner to create a presale package that contains 1 card type
      * @param _packageID ID of the package in child tunnel contract
-     * @param _weiPrice The price of the package in wei
+     * @param _price The price of the package in wei
      * @param _numForSale Number of packages that can be bought
      */
     function registerChildPackage(
         uint256 _packageID,
-        uint256 _weiPrice,
+        uint256 _price,
         uint128 _numForSale
     ) public onlyOwner {
-        require(!_registeredPackages[_packageID], "Package already exists");
-        require(_weiPrice > 0, "Price cannot be 0");
+        require(!_registeredPackages[_packageID], "Package already registered");
+        require(_price > 0, "Price cannot be 0");
         require(_numForSale > 0, "Number of packages cannot be 0");
 
         _registeredPackages[_packageID] = true;
         PresalePackage storage package = _packages[_packageID];
-        package.price = _weiPrice;
+        package.price = _price;
         package.numForSale = _numForSale;
+
+        emit RegisterPackage(_packageID, _price, _numForSale);
     }
 
     /***********************************|
@@ -283,9 +290,7 @@ contract FxSaleRootTunnel is Ownable, ReentrancyGuard, FxBaseRootTunnel {
         require(package.numSold < package.numForSale, "Package not available");
         require(msg.value > package.price - 1, "Not enough ETH to cover cost");
 
-        unchecked {
-            package.numSold += 1;
-        }
+        package.numSold += 1;
 
         // Craft message with purchaser address and package ID
         bytes memory message = abi.encode(
@@ -313,12 +318,11 @@ contract FxSaleRootTunnel is Ownable, ReentrancyGuard, FxBaseRootTunnel {
         nonReentrant
     {
         CardInfo storage card = _cards[_cardID];
+        require(_cardID < 4, "Invalid card ID");
         require(card.mintedSupply < card.totalSupply, "Max supply reached");
         require(msg.value > card.price - 1, "Not enough ETH to cover cost");
 
-        unchecked {
-            card.mintedSupply += 1;
-        }
+        card.mintedSupply += 1;
 
         // Craft message with purchaser address and package ID
         bytes memory message = abi.encode(
