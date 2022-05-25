@@ -3,10 +3,9 @@ pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@maticnetwork/fx-portal/contracts/tunnel/FxBaseChildTunnel.sol";
 import "../interfaces/IVestingTreasury.sol";
 import "../interfaces/IPhlipCard.sol";
+import "./FxBaseChildTunnel.sol";
 
 /**
  * @dev Child contract for the Phlip cross-chain crowdsale that will be deployed on Polygon.
@@ -20,7 +19,7 @@ import "../interfaces/IPhlipCard.sol";
  * ### Mainnet
  * - _fxChild: 0x8397259c983751DAf40400790063935a11afa28a
  */
-contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
+contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     using Counters for Counters.Counter;
 
     /// @dev FX-Portal message types
@@ -32,18 +31,12 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
     address public latestRootMessageSender;
     bytes public latestData;
 
-    enum Color {
-        PINK,
-        WHITE
-    }
-
     enum Varient {
         TEXT,
         SPECIAL
     }
 
     struct CardInfo {
-        Color color;
         Varient varient;
         address contractAddress;
     }
@@ -113,22 +106,18 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
         _vestingDuration = _duration;
 
         CardInfo storage ptCard = _cards[_pinkTextCard];
-        ptCard.color = Color.PINK;
         ptCard.varient = Varient.TEXT;
         ptCard.contractAddress = _pcAddress;
 
         CardInfo storage piCard = _cards[_pinkImageCard];
-        piCard.color = Color.PINK;
         piCard.varient = Varient.SPECIAL;
         piCard.contractAddress = _pcAddress;
 
         CardInfo storage wtCard = _cards[_whiteTextCard];
-        wtCard.color = Color.WHITE;
         wtCard.varient = Varient.TEXT;
         wtCard.contractAddress = _wcAddress;
 
         CardInfo storage wbCard = _cards[_whiteBlankCard];
-        wbCard.color = Color.WHITE;
         wbCard.varient = Varient.SPECIAL;
         wbCard.contractAddress = _wcAddress;
     }
@@ -185,7 +174,7 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
     ) public onlyOwner {
         require(
             _reserveMultiple > 0,
-            "FxSaleChildTunnel: Resever multiple is 0"
+            "FxSaleChildTunnel: Reserve multiple is 0"
         );
 
         uint256 packageId = _packageIds.current();
@@ -211,15 +200,15 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
      * @param _numCards Array containing number of each card in the package
      * @param _daoAmounts Array of DAO tokens amounts that will vest in each card
      * @param _p2eAmounts Array of P2E tokens amounts that will vest in each card
-     * @param _reserveMultiples Array of multpliers for filling vesting schedule
-     * reserves. Should equal number of expected packages that will be created.
+     * @param _reserveMultiple Multplier for filling vesting schedule reserves.
+     * Should equal number of expected packages that will be created.
      */
     function createMultiCardPackage(
         uint128[] calldata _cardIDs,
         uint128[] calldata _numCards,
         uint256[] calldata _daoAmounts,
         uint256[] calldata _p2eAmounts,
-        uint256[] calldata _reserveMultiples
+        uint256 _reserveMultiple
     ) public onlyOwner {
         uint256 packageId = _packageIds.current();
         _packageIds.increment();
@@ -234,7 +223,7 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
                     _numCards[i],
                     _daoAmounts[i],
                     _p2eAmounts[i],
-                    _reserveMultiples[i]
+                    _reserveMultiple
                 )
             );
         }
@@ -245,33 +234,13 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
     |__________________________________*/
 
     /**
-     * @dev External entry point to receive and relay messages originating
-     * from the fxChild.
-     *
-     * Non-reentrancy is crucial to avoid a cross-chain call being able
-     * to impersonate anyone by just looping through this with user-defined
-     * arguments.
-     *
-     * @param stateId Unique state id
-     * @param rootMessageSender Address of root message sender
-     * @param data Bytes message that was sent from Root Tunnel
-     */
-    function processMessageFromRoot(
-        uint256 stateId,
-        address rootMessageSender,
-        bytes calldata data
-    ) external override nonReentrant {
-        require(msg.sender == fxChild, "FxSaleChildTunnel: Invalid sender");
-        _processMessageFromRoot(stateId, rootMessageSender, data);
-    }
-
-    /**
      * @dev Invoked by polygon validators via a system call. Accepts purchase
      * info from CrowdSaleRootTunnel and mints card(s) from card/package purchase.
      *
-     * Note - Since invokation is from a system call, no events will be emitted during execution.
+     * Since invokation is from a system call, no events will be emitted during execution.
+     *
      * @param stateId Unique state id
-     * @param sender Root message sender
+     * @param sender Address of root message sender
      * @param data Bytes message that was sent from Root Tunnel
      */
     function _processMessageFromRoot(
@@ -350,6 +319,15 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
 
     /**
      * @dev Creates vesting schedules and fills reserves for a card in package
+     *
+     * Requirements:
+     * - `_numCards` must be > 0
+     * - `_daoAmount` must be > 0
+     * - `_p2eAmount` must be > 0
+     * - `_reserveMultiple` must be > 0
+     * - `_daoWalletAddress` must approve pink & white card contracts as spender
+     * - `_p2eWalletAddress` must approve pink & white card contracts as spender
+     *
      * @param _cardID ID of the card in the package (can be 0-3)
      * @param _numCards Number of cards in the package
      * @param _reserveMultiple Multplier used when filling vesting schedule reserves
@@ -363,10 +341,10 @@ contract FxSaleChildTunnel is Ownable, ReentrancyGuard, FxBaseChildTunnel {
         uint256 _p2eAmount,
         uint256 _reserveMultiple
     ) private returns (CardBundle memory) {
-        require(_numCards > 0, "Number of cards cannot be 0");
-        require(_daoAmount > 0, "DAO token amount cannot be 0");
-        require(_p2eAmount > 0, "P2E token amount cannot be 0");
-        require(_reserveMultiple > 0, "Resever multiple is 0");
+        require(_numCards > 0, "Number of cards is 0");
+        require(_daoAmount > 0, "DAO token amount is 0");
+        require(_p2eAmount > 0, "P2E token amount is 0");
+        require(_reserveMultiple > 0, "Reserve multiple is 0");
 
         IVestingTreasury cardTreasury = IVestingTreasury(
             _cards[_cardID].contractAddress
