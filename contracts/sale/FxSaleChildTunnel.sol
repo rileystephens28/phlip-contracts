@@ -123,6 +123,36 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     }
 
     /***********************************|
+    |          View Functions           |
+    |__________________________________*/
+
+    /**
+     * @dev Getter for card bundles in a package
+     * @param _packageId ID of the package to query
+     * @return Array of card bundles
+     */
+    function getPackageInfo(uint256 _packageId)
+        public
+        view
+        returns (CardBundle[] memory)
+    {
+        return _packages[_packageId];
+    }
+
+    /**
+     * @dev Getter for vesting schedules used by a card
+     * @param _cardId ID of the card to query
+     * @return Array of vesting schedule IDs
+     */
+    function getCardVestingInfo(uint128 _cardId)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        return _cardVestingSchedules[_cardId];
+    }
+
+    /***********************************|
     |       Only Owner Functions        |
     |__________________________________*/
 
