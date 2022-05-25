@@ -306,6 +306,10 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
             (address, uint128)
         );
 
+        // These checks will also be performed by the root contract
+        require(purchaser != address(0), "FxSaleChildTunnel: Purchaser is 0x0");
+        require(cardId < 4, "FxSaleChildTunnel: Invalid card ID");
+
         CardInfo storage card = _cards[cardId];
 
         // Mint card
@@ -326,6 +330,14 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
             _purchaseData,
             (address, uint256)
         );
+
+        // These checks will also be performed by the root contract
+        require(purchaser != address(0), "FxSaleChildTunnel: Purchaser is 0x0");
+        require(
+            packageId < _packageIds.current(),
+            "FxSaleChildTunnel: Invalid package ID"
+        );
+
         CardBundle[] storage cardBundles = _packages[packageId];
 
         for (uint256 i = 0; i < cardBundles.length; i++) {

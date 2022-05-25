@@ -37,7 +37,7 @@ contract FxSaleChildTunnelMock is FxSaleChildTunnel {
         _processMessageFromRoot(
             stateId,
             sender,
-            _craftCardPurchaseMessage(purchaser, cardId)
+            abi.encode(PURCHASE_CARD, abi.encode(purchaser, cardId))
         );
     }
 
@@ -50,31 +50,15 @@ contract FxSaleChildTunnelMock is FxSaleChildTunnel {
         _processMessageFromRoot(
             stateId,
             sender,
-            _craftPackagePurchaseMessage(purchaser, pkgId)
+            abi.encode(PURCHASE_PACKAGE, abi.encode(purchaser, pkgId))
         );
     }
 
     function invokeCardPurchase(address purchaser, uint128 cardId) public {
-        _executeCardPurchase(_craftCardPurchaseMessage(purchaser, cardId));
+        _executeCardPurchase(abi.encode(purchaser, cardId));
     }
 
     function invokePackagePurchase(address purchaser, uint256 pkgId) public {
-        _executePackagePurchase(_craftPackagePurchaseMessage(purchaser, pkgId));
-    }
-
-    function _craftCardPurchaseMessage(address purchaser, uint128 cardId)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return abi.encode(PURCHASE_CARD, abi.encode(purchaser, cardId));
-    }
-
-    function _craftPackagePurchaseMessage(address purchaser, uint256 pkgId)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        return abi.encode(PURCHASE_PACKAGE, abi.encode(purchaser, pkgId));
+        _executePackagePurchase(abi.encode(purchaser, pkgId));
     }
 }

@@ -1,4 +1,4 @@
-const FxSaleChildTunnel = artifacts.require("FxSaleChildTunnel");
+const FxSaleChildTunnel = artifacts.require("FxSaleChildTunnelMock");
 const PinkCard = artifacts.require("PinkCard");
 const WhiteCard = artifacts.require("WhiteCard");
 const DaoToken = artifacts.require("PhlipDAO");
@@ -22,7 +22,8 @@ contract("FxSaleChildTunnel", (accounts) => {
         whiteCardInstance,
         daoInstance,
         p2eInstance;
-    const [admin, tokenWallet, otherAccount] = accounts;
+    const [admin, tokenWallet, purchaser, fxChild, fxRootTunnel, otherAccount] =
+        accounts;
 
     const baseDevWallet = accounts[8];
 
@@ -164,6 +165,102 @@ contract("FxSaleChildTunnel", (accounts) => {
                 gas: gasEstimate,
             }
         );
+    };
+
+    const receiveCardPurchaseMessage = async (
+        stateId = 0,
+        sender = fxRootTunnel,
+        buyer = purchaser,
+        cardId = 0,
+        from = admin
+    ) => {
+        const gasEstimate =
+            await childSaleInstance.receiveCardPurchaseMessage.estimateGas(
+                new BN(stateId),
+                sender,
+                buyer,
+                cardId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.receiveCardPurchaseMessage(
+            new BN(stateId),
+            sender,
+            buyer,
+            cardId,
+            {
+                from: from,
+                gas: gasEstimate,
+            }
+        );
+    };
+
+    const receivePackagePurchaseMessage = async (
+        stateId = 0,
+        sender = fxRootTunnel,
+        buyer = purchaser,
+        pkgId = 0,
+        from = admin
+    ) => {
+        const gasEstimate =
+            await childSaleInstance.receivePackagePurchaseMessage.estimateGas(
+                new BN(stateId),
+                sender,
+                buyer,
+                pkgId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.receivePackagePurchaseMessage(
+            new BN(stateId),
+            sender,
+            buyer,
+            pkgId,
+            {
+                from: from,
+                gas: gasEstimate,
+            }
+        );
+    };
+
+    const invokeCardPurchase = async (
+        cardId = 0,
+        buyer = purchaser,
+        from = admin
+    ) => {
+        const gasEstimate =
+            await childSaleInstance.invokeCardPurchase.estimateGas(
+                buyer,
+                cardId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.invokeCardPurchase(buyer, cardId, {
+            from: from,
+            gas: gasEstimate,
+        });
+    };
+
+    const invokePackagePurchase = async (
+        pkgId = 0,
+        buyer = purchaser,
+        from = admin
+    ) => {
+        const gasEstimate =
+            await childSaleInstance.invokePackagePurchase.estimateGas(
+                buyer,
+                pkgId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.invokePackagePurchase(buyer, pkgId, {
+            from: from,
+            gas: gasEstimate,
+        });
     };
 
     const setCardVestingInfo = async (
@@ -308,9 +405,11 @@ contract("FxSaleChildTunnel", (accounts) => {
             tokenWallet,
             baseCliff,
             baseDuration,
-            constants.ZERO_ADDRESS, // leave fxChild as 0x0 until we can mock it
+            fxChild,
             { from: admin }
         );
+
+        await childSaleInstance.setFxRootTunnel(fxRootTunnel);
 
         // Grant child sale contract treasury & minter roles for pink cards
         await pinkCardInstance.grantRole(
@@ -339,6 +438,146 @@ contract("FxSaleChildTunnel", (accounts) => {
         // Approve white card contract to spend tokens on behalf of tokenWallet
         await setMaxApproval(daoInstance, whiteCardInstance.address);
         await setMaxApproval(p2eInstance, whiteCardInstance.address);
+    });
+
+    describe("Deploying Contract", async () => {
+        // Failure case
+        it("should fail when pink card address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    constants.ZERO_ADDRESS,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "Pink card cannot be 0x0"
+            );
+        });
+        it("should fail when white card address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    constants.ZERO_ADDRESS,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "White card cannot be 0x0"
+            );
+        });
+        it("should fail when DAO token address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    constants.ZERO_ADDRESS,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "DAO tokens cannot be 0x0"
+            );
+        });
+        it("should fail when P2E token address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    constants.ZERO_ADDRESS,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "P2E tokens cannot be 0x0"
+            );
+        });
+        it("should fail when DAO wallet address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    constants.ZERO_ADDRESS,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "DAO wallet cannot be 0x0"
+            );
+        });
+        it("should fail when P2E wallet address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    constants.ZERO_ADDRESS,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "P2E wallet cannot be 0x0"
+            );
+        });
+        it("should fail when vesting cliff is 0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    new BN(0),
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "Vesting cliff must be greater than 0"
+            );
+        });
+        it("should fail when cliff time is 0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    new BN(0),
+                    fxChild,
+                    { from: admin }
+                ),
+                "Vesting duration must be greater than 0"
+            );
+        });
     });
 
     describe("Setting Card Vesting Info", async () => {
@@ -748,6 +987,216 @@ contract("FxSaleChildTunnel", (accounts) => {
                     [new BN(0), new BN(1)],
                 ]
             );
+        });
+    });
+
+    describe("Executing Card Purchase", async () => {
+        beforeEach(async () => {
+            await createAndFillDefaultSchedules();
+        });
+
+        // Failure case
+        it("should fail when purchaser is 0x0", async () => {
+            await expectRevert(
+                invokeCardPurchase(0, constants.ZERO_ADDRESS),
+                "FxSaleChildTunnel: Purchaser is 0x0"
+            );
+        });
+        it("should fail when card ID is invalid", async () => {
+            await expectRevert(
+                invokeCardPurchase(5, purchaser),
+                "FxSaleChildTunnel: Invalid card ID"
+            );
+        });
+
+        // Passing case
+        it("should pass when purchasing pink card with valid params", async () => {
+            await invokeCardPurchase(0);
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+            await verifyCardBalance(pinkCardInstance, purchaser, 1);
+        });
+        it("should pass when purchasing white card with valid params", async () => {
+            await invokeCardPurchase(2);
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+            await verifyCardBalance(whiteCardInstance, purchaser, 1);
+        });
+    });
+
+    describe("Executing Package Purchase", async () => {
+        beforeEach(async () => {
+            await createAndFillDefaultSchedules();
+        });
+
+        // Failure case
+        it("should fail when purchaser is 0x0", async () => {
+            await expectRevert(
+                invokePackagePurchase(0, constants.ZERO_ADDRESS),
+                "FxSaleChildTunnel: Purchaser is 0x0"
+            );
+        });
+        it("should fail when package ID is invalid", async () => {
+            await expectRevert(
+                invokePackagePurchase(5, purchaser),
+                "FxSaleChildTunnel: Invalid package ID"
+            );
+        });
+
+        // Passing case
+        it("should pass when purchasing pink single card package", async () => {
+            // Pink card package - ID 0
+            await createSingleCardPackage(0);
+
+            await invokePackagePurchase(0);
+
+            // Verify purchaser account is card owner
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+            await verifyCardOwner(pinkCardInstance, 1, purchaser);
+
+            // Verify purchaser account is card minter
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+            await verifyCardMinter(pinkCardInstance, 1, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(pinkCardInstance, purchaser, baseCardQty);
+        });
+        it("should pass when purchasing white single card package", async () => {
+            // White card package - ID 0
+            await createSingleCardPackage(2);
+
+            await invokePackagePurchase();
+
+            // Verify purchaser account is card owner
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+            await verifyCardOwner(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account is card minter
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+            await verifyCardMinter(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(whiteCardInstance, purchaser, baseCardQty);
+        });
+        it("should pass when purchasing multi card package that has pink text and image cards", async () => {
+            // Multi card package with pink text and image cards - ID 0
+            await createMultiCardPackage();
+
+            await invokePackagePurchase();
+
+            // Verify purchaser account is pink text card owner
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is pink image card owner
+            await verifyCardOwner(pinkCardInstance, 1, purchaser);
+            await verifyCardOwner(pinkCardInstance, 2, purchaser);
+
+            // Verify purchaser account is pink text card minter
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is pink image card minter
+            await verifyCardMinter(pinkCardInstance, 1, purchaser);
+            await verifyCardMinter(pinkCardInstance, 2, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(pinkCardInstance, purchaser, 3);
+        });
+        it("should pass when purchasing multi card package that has white text and blank cards", async () => {
+            // Multi card package with white text and image cards - ID 0
+            await createMultiCardPackage([new BN(2), new BN(3)]);
+
+            await invokePackagePurchase();
+
+            // Verify purchaser account is white text card owner
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white blank card owner
+            await verifyCardOwner(whiteCardInstance, 1, purchaser);
+            await verifyCardOwner(whiteCardInstance, 2, purchaser);
+
+            // Verify purchaser account is white text card minter
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white blank card minter
+            await verifyCardMinter(whiteCardInstance, 1, purchaser);
+            await verifyCardMinter(whiteCardInstance, 2, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(whiteCardInstance, purchaser, 3);
+        });
+        it("should pass when purchasing multi card package that has pink and white cards", async () => {
+            // Multi card package with pink and white cards - ID 0
+            await createMultiCardPackage([new BN(0), new BN(2)]);
+
+            await invokePackagePurchase();
+
+            // Verify purchaser account is pink text card owner
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white text card owner
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+            await verifyCardOwner(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account is pink text card minter
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white text card minter
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+            await verifyCardMinter(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account has correct balances
+            await verifyCardBalance(pinkCardInstance, purchaser, 1);
+            await verifyCardBalance(whiteCardInstance, purchaser, 2);
+        });
+    });
+
+    describe("Receiving Messages From Root", async () => {
+        beforeEach(async () => {
+            await createAndFillDefaultSchedules();
+        });
+
+        context("For Card Purchase", async () => {
+            // Failure case
+            it("should fail when sender is not fxChild", async () => {
+                await expectRevert(
+                    receiveCardPurchaseMessage(0, otherAccount),
+                    "FxBaseChildTunnel: INVALID_SENDER_FROM_ROOT"
+                );
+            });
+
+            // Passing case
+            it("should pass when sender is fxChild", async () => {
+                await receiveCardPurchaseMessage();
+                await verifyCardMinter(pinkCardInstance, 0, purchaser);
+                await verifyCardOwner(pinkCardInstance, 0, purchaser);
+                await verifyCardBalance(pinkCardInstance, purchaser, 1);
+            });
+        });
+
+        context("For Package Purchase", async () => {
+            // Failure case
+            it("should fail when sender is not fxChild", async () => {
+                await expectRevert(
+                    receivePackagePurchaseMessage(0, otherAccount),
+                    "FxBaseChildTunnel: INVALID_SENDER_FROM_ROOT"
+                );
+            });
+
+            // Passing case
+            it("should pass when purchasing single card package and sender is fxChild", async () => {
+                await createSingleCardPackage();
+                await receivePackagePurchaseMessage();
+                await verifyCardBalance(
+                    pinkCardInstance,
+                    purchaser,
+                    baseCardQty
+                );
+            });
+            it("should pass when purchasing multi card package and sender is fxChild", async () => {
+                await createMultiCardPackage();
+                await receivePackagePurchaseMessage();
+                await verifyCardBalance(pinkCardInstance, purchaser, 3);
+            });
         });
     });
 });
