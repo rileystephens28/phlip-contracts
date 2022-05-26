@@ -4,6 +4,7 @@
     "main": "truffle-config.js",
     "author": "Riley Stephens",
     "dependencies": {
+        "@maticnetwork/fx-portal": "^1.0.4",
         "@openzeppelin/contracts": "^4.6.0",
         "@openzeppelin/test-helpers": "^0.5.15",
         "ganache-core": "^2.13.2",

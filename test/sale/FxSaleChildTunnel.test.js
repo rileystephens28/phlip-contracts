@@ -1,4 +1,4 @@
-const CrowdSale = artifacts.require("PhlipSale");
+const FxSaleChildTunnel = artifacts.require("FxSaleChildTunnelMock");
 const PinkCard = artifacts.require("PinkCard");
 const WhiteCard = artifacts.require("WhiteCard");
 const DaoToken = artifacts.require("PhlipDAO");
@@ -16,13 +16,14 @@ require("chai").should();
 const TREASURER_ROLE = web3.utils.soliditySha3("TREASURER_ROLE");
 const MINTER_ROLE = web3.utils.soliditySha3("MINTER_ROLE");
 
-contract("PhlipSale", (accounts) => {
-    let saleInstance,
+contract("FxSaleChildTunnel", (accounts) => {
+    let childSaleInstance,
         pinkCardInstance,
         whiteCardInstance,
         daoInstance,
         p2eInstance;
-    const [admin, tokenWallet, proceedsWallet, otherAccount] = accounts;
+    const [admin, tokenWallet, purchaser, fxChild, fxRootTunnel, otherAccount] =
+        accounts;
 
     const baseDevWallet = accounts[8];
 
@@ -103,36 +104,30 @@ contract("PhlipSale", (accounts) => {
     };
 
     const createSingleCardPackage = async (
-        packageID = 0,
-        weiPrice = tokenUnits(2),
-        numForSale = baseSaleQty,
-        numCards = baseCardQty,
         cardID = 0,
+        numCards = baseCardQty,
         daoAmount = baseDaoAmount,
         p2eAmount = baseP2eAmount,
+        reserveMultiple = baseSaleQty,
         from = admin
     ) => {
         const gasEstimate =
-            await saleInstance.createSingleCardPackage.estimateGas(
-                packageID,
-                weiPrice,
-                new BN(numForSale),
+            await childSaleInstance.createSingleCardPackage.estimateGas(
+                cardID,
                 new BN(numCards),
-                new BN(cardID),
-                daoAmount,
-                p2eAmount,
+                new BN(daoAmount),
+                new BN(p2eAmount),
+                new BN(reserveMultiple),
                 {
                     from: from,
                 }
             );
-        return await saleInstance.createSingleCardPackage(
-            packageID,
-            weiPrice,
-            new BN(numForSale),
+        return await childSaleInstance.createSingleCardPackage(
+            cardID,
             new BN(numCards),
-            new BN(cardID),
-            daoAmount,
-            p2eAmount,
+            new BN(daoAmount),
+            new BN(p2eAmount),
+            new BN(reserveMultiple),
             {
                 from: from,
                 gas: gasEstimate,
@@ -141,36 +136,30 @@ contract("PhlipSale", (accounts) => {
     };
 
     const createMultiCardPackage = async (
-        packageID = 0,
-        weiPrice = tokenUnits(2),
-        numForSale = baseSaleQty,
         cardIDs = [new BN(0), new BN(1)],
         numCards = [new BN(1), new BN(2)],
         daoAmounts = [tokenUnits(100), tokenUnits(200)],
         p2eAmounts = [tokenUnits(1000), tokenUnits(2000)],
+        reserveMultiple = baseSaleQty,
         from = admin
     ) => {
         const gasEstimate =
-            await saleInstance.createMultiCardPackage.estimateGas(
-                packageID,
-                weiPrice,
-                new BN(numForSale),
+            await childSaleInstance.createMultiCardPackage.estimateGas(
                 cardIDs,
                 numCards,
                 daoAmounts,
                 p2eAmounts,
+                new BN(reserveMultiple),
                 {
                     from: from,
                 }
             );
-        return await saleInstance.createMultiCardPackage(
-            packageID,
-            weiPrice,
-            new BN(numForSale),
+        return await childSaleInstance.createMultiCardPackage(
             cardIDs,
             numCards,
             daoAmounts,
             p2eAmounts,
+            new BN(reserveMultiple),
             {
                 from: from,
                 gas: gasEstimate,
@@ -178,102 +167,117 @@ contract("PhlipSale", (accounts) => {
         );
     };
 
-    const setCardMaxSupply = async (
-        cardID = 0,
-        supply = new BN(3),
+    const receiveCardPurchaseMessage = async (
+        stateId = 0,
+        sender = fxRootTunnel,
+        buyer = purchaser,
+        cardId = 0,
         from = admin
     ) => {
-        const gasEstimate = await saleInstance.setCardMaxSupply.estimateGas(
-            cardID,
-            supply,
-            { from: from }
+        const gasEstimate =
+            await childSaleInstance.receiveCardPurchaseMessage.estimateGas(
+                new BN(stateId),
+                sender,
+                buyer,
+                cardId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.receiveCardPurchaseMessage(
+            new BN(stateId),
+            sender,
+            buyer,
+            cardId,
+            {
+                from: from,
+                gas: gasEstimate,
+            }
         );
-        return await saleInstance.setCardMaxSupply(cardID, supply, {
+    };
+
+    const receivePackagePurchaseMessage = async (
+        stateId = 0,
+        sender = fxRootTunnel,
+        buyer = purchaser,
+        pkgId = 0,
+        from = admin
+    ) => {
+        const gasEstimate =
+            await childSaleInstance.receivePackagePurchaseMessage.estimateGas(
+                new BN(stateId),
+                sender,
+                buyer,
+                pkgId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.receivePackagePurchaseMessage(
+            new BN(stateId),
+            sender,
+            buyer,
+            pkgId,
+            {
+                from: from,
+                gas: gasEstimate,
+            }
+        );
+    };
+
+    const invokeCardPurchase = async (
+        cardId = 0,
+        buyer = purchaser,
+        from = admin
+    ) => {
+        const gasEstimate =
+            await childSaleInstance.invokeCardPurchase.estimateGas(
+                buyer,
+                cardId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.invokeCardPurchase(buyer, cardId, {
             from: from,
             gas: gasEstimate,
         });
     };
 
-    const setAllCardDefaultSupplies = async () => {
-        await setCardMaxSupply(0, new BN(2));
-        await setCardMaxSupply(1, new BN(3));
-        await setCardMaxSupply(2, new BN(4));
-        await setCardMaxSupply(3, new BN(5));
+    const invokePackagePurchase = async (
+        pkgId = 0,
+        buyer = purchaser,
+        from = admin
+    ) => {
+        const gasEstimate =
+            await childSaleInstance.invokePackagePurchase.estimateGas(
+                buyer,
+                pkgId,
+                {
+                    from: from,
+                }
+            );
+        return await childSaleInstance.invokePackagePurchase(buyer, pkgId, {
+            from: from,
+            gas: gasEstimate,
+        });
     };
 
-    const setCardSaleInfo = async (
+    const setCardVestingInfo = async (
         cardID = 0,
-        weiPrice = tokenUnits(2),
         scheduleIds = [new BN(0), new BN(1)],
         from = admin
     ) => {
-        const gasEstimate = await saleInstance.setCardSaleInfo.estimateGas(
-            cardID,
-            weiPrice,
-            scheduleIds,
-            { from: from }
-        );
-        return await saleInstance.setCardSaleInfo(
-            cardID,
-            weiPrice,
-            scheduleIds,
-            {
-                from: from,
-                gas: gasEstimate,
-            }
-        );
-    };
-
-    const purchaseCard = async (
-        cardID = 0,
-        weiPrice = tokenUnits(2),
-        uri = baseUri,
-        from = otherAccount
-    ) => {
-        const gasEstimate = await saleInstance.purchaseCard.estimateGas(
-            cardID,
-            uri,
-            { from: from, value: weiPrice }
-        );
-        return await saleInstance.purchaseCard(cardID, uri, {
+        const gasEstimate =
+            await childSaleInstance.setCardVestingInfo.estimateGas(
+                cardID,
+                scheduleIds,
+                { from: from }
+            );
+        return await childSaleInstance.setCardVestingInfo(cardID, scheduleIds, {
             from: from,
-            value: weiPrice,
             gas: gasEstimate,
         });
-    };
-
-    const purchasePackage = async (
-        packageID = 0,
-        weiPrice = tokenUnits(2),
-        from = otherAccount
-    ) => {
-        const gasEstimate = await saleInstance.purchasePackage.estimateGas(
-            packageID,
-            { from: from, value: weiPrice }
-        );
-        return await saleInstance.purchasePackage(packageID, {
-            from: from,
-            value: weiPrice,
-            gas: gasEstimate,
-        });
-    };
-
-    const setSaleStatus = async (val, from = admin) => {
-        return await saleInstance.setSaleStatus(val, {
-            from: from,
-        });
-    };
-
-    const setSaleInactive = async (from = admin) => {
-        return await setSaleStatus(0, from);
-    };
-
-    const setPresaleActive = async (from = admin) => {
-        return await setSaleStatus(1, from);
-    };
-
-    const setGeneralSaleActive = async (from = admin) => {
-        return await setSaleStatus(2, from);
     };
 
     const setMaxApproval = async (
@@ -286,60 +290,26 @@ contract("PhlipSale", (accounts) => {
         });
     };
 
-    const verifySaleStatus = async (val) => {
-        const status = await saleInstance.saleStatus();
-        status.should.be.bignumber.equal(new BN(val));
-    };
-
-    const verifyCardPrice = async (cardId, val) => {
-        const price = await saleInstance.getCardPrice(cardId);
-        price.should.be.bignumber.equal(new BN(val));
-    };
-
-    const verifyPackagePrice = async (pkgId, val) => {
-        const price = await saleInstance.getPackagePrice(pkgId);
-        price.should.be.bignumber.equal(new BN(val));
-    };
-
-    const verifyCardMaxSupply = async (cardId, val) => {
-        const max = await saleInstance.maxSupplyOf(cardId);
-        max.should.be.bignumber.equal(new BN(val));
-    };
-
-    const verifyCardMintedSupply = async (cardId, val) => {
-        const minted = await saleInstance.mintedSupplyOf(cardId);
-        minted.should.be.bignumber.equal(new BN(val));
-    };
-
-    const verifyRemainingForSale = async (pkgId, val) => {
-        const remaining = await saleInstance.getPackagesRemaining(pkgId);
-        remaining.should.be.bignumber.equal(new BN(val));
-    };
-
-    const validateCardSaleInfo = async (
+    const validateCardVestingInfo = async (
         id,
-        price = tokenUnits(1),
         scheduleIds = [new BN(0), new BN(1)]
     ) => {
-        const saleInfo = await saleInstance.getSaleInfo(id);
+        const vestingInfo = await childSaleInstance.getCardVestingInfo(id);
 
         // check that the new card sale info has correct values
-        saleInfo["price"].should.be.bignumber.equal(price);
-        saleInfo["scheduleIDs"].length.should.equal(scheduleIds.length);
+        vestingInfo.length.should.equal(scheduleIds.length);
         for (let i = 0; i < scheduleIds.length; i++) {
-            saleInfo["scheduleIDs"][i].should.be.bignumber.equal(
-                scheduleIds[i]
-            );
+            vestingInfo[i].should.be.bignumber.equal(scheduleIds[i]);
         }
     };
 
-    const validateCardBundle = async (
+    const validatePackageInfo = async (
         pkgId,
         cardIds,
         cardNums,
         scheduleIds
     ) => {
-        const bundles = await saleInstance.getCardBundles(pkgId);
+        const bundles = await childSaleInstance.getPackageInfo(pkgId);
         for (let i = 0; i < bundles.length; i++) {
             const bundle = bundles[i];
             bundle.cardID.should.be.bignumber.equal(cardIds[i]);
@@ -426,26 +396,40 @@ contract("PhlipSale", (accounts) => {
             from: tokenWallet,
         });
 
-        saleInstance = await CrowdSale.new(
+        childSaleInstance = await FxSaleChildTunnel.new(
             pinkCardInstance.address,
             whiteCardInstance.address,
             daoInstance.address,
             p2eInstance.address,
             tokenWallet,
             tokenWallet,
-            proceedsWallet,
             baseCliff,
             baseDuration,
+            fxChild,
             { from: admin }
         );
 
-        // Grant sale contract treasury & minter roles for pink cards
-        await pinkCardInstance.grantRole(TREASURER_ROLE, saleInstance.address);
-        await pinkCardInstance.grantRole(MINTER_ROLE, saleInstance.address);
+        await childSaleInstance.setFxRootTunnel(fxRootTunnel);
 
-        // Grant sale contract treasury & minter roles for white cards
-        await whiteCardInstance.grantRole(TREASURER_ROLE, saleInstance.address);
-        await whiteCardInstance.grantRole(MINTER_ROLE, saleInstance.address);
+        // Grant child sale contract treasury & minter roles for pink cards
+        await pinkCardInstance.grantRole(
+            TREASURER_ROLE,
+            childSaleInstance.address
+        );
+        await pinkCardInstance.grantRole(
+            MINTER_ROLE,
+            childSaleInstance.address
+        );
+
+        // Grant child sale contract treasury & minter roles for white cards
+        await whiteCardInstance.grantRole(
+            TREASURER_ROLE,
+            childSaleInstance.address
+        );
+        await whiteCardInstance.grantRole(
+            MINTER_ROLE,
+            childSaleInstance.address
+        );
 
         // Approve pink card contract to spend tokens on behalf of tokenWallet
         await setMaxApproval(daoInstance, pinkCardInstance.address);
@@ -456,191 +440,220 @@ contract("PhlipSale", (accounts) => {
         await setMaxApproval(p2eInstance, whiteCardInstance.address);
     });
 
-    describe("Setting Sale Status", async () => {
+    describe("Deploying Contract", async () => {
         // Failure case
-        it("should fail when caller is not contract owner", async () => {
+        it("should fail when pink card address is 0x0", async () => {
             await expectRevert(
-                setSaleStatus(1, otherAccount),
-                "Ownable: caller is not the owner"
+                FxSaleChildTunnel.new(
+                    constants.ZERO_ADDRESS,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "Pink card cannot be 0x0"
             );
         });
-        it("should fail when status is not valid", async () => {
-            await expectRevert(setSaleStatus(4), "Invalid sale status");
+        it("should fail when white card address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    constants.ZERO_ADDRESS,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "White card cannot be 0x0"
+            );
         });
-
-        // Passing case
-        it("should pass when setting presale to active", async () => {
-            await setPresaleActive();
-            await verifySaleStatus(1);
+        it("should fail when DAO token address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    constants.ZERO_ADDRESS,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "DAO tokens cannot be 0x0"
+            );
         });
-        it("should pass when setting general sale to active", async () => {
-            await setGeneralSaleActive();
-            await verifySaleStatus(2);
+        it("should fail when P2E token address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    constants.ZERO_ADDRESS,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "P2E tokens cannot be 0x0"
+            );
         });
-        it("should pass when changing pre/general sale from active to inactive", async () => {
-            await setPresaleActive();
-            await verifySaleStatus(1);
-
-            await setSaleInactive();
-            await verifySaleStatus(0);
-
-            await setGeneralSaleActive();
-            await verifySaleStatus(2);
-
-            await setSaleInactive();
-            await verifySaleStatus(0);
+        it("should fail when DAO wallet address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    constants.ZERO_ADDRESS,
+                    tokenWallet,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "DAO wallet cannot be 0x0"
+            );
+        });
+        it("should fail when P2E wallet address is 0x0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    constants.ZERO_ADDRESS,
+                    baseCliff,
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "P2E wallet cannot be 0x0"
+            );
+        });
+        it("should fail when vesting cliff is 0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    new BN(0),
+                    baseDuration,
+                    fxChild,
+                    { from: admin }
+                ),
+                "Vesting cliff must be greater than 0"
+            );
+        });
+        it("should fail when cliff time is 0", async () => {
+            await expectRevert(
+                FxSaleChildTunnel.new(
+                    pinkCardInstance.address,
+                    whiteCardInstance.address,
+                    daoInstance.address,
+                    p2eInstance.address,
+                    tokenWallet,
+                    tokenWallet,
+                    baseCliff,
+                    new BN(0),
+                    fxChild,
+                    { from: admin }
+                ),
+                "Vesting duration must be greater than 0"
+            );
         });
     });
 
-    describe("Setting Card Max Supply", async () => {
-        // Failure case
-        it("should fail when caller is not contract owner", async () => {
-            await expectRevert(
-                setCardMaxSupply(0, new BN(2), otherAccount),
-                "Ownable: caller is not the owner"
-            );
-        });
-        it("should fail when supply is 0", async () => {
-            await expectRevert(
-                setCardMaxSupply(0, 0),
-                "Supply must be greater than 0"
-            );
-        });
-        it("should fail when presale is active", async () => {
-            await setPresaleActive();
-            await expectRevert(setCardMaxSupply(), "Cannot change during sale");
-        });
-
-        it("should fail when general sale is active", async () => {
-            await setGeneralSaleActive();
-            await expectRevert(setCardMaxSupply(), "Cannot change during sale");
-        });
-
-        // Passing case
-        it("should pass when caller is contract owner ans supply > 0", async () => {
-            await setCardMaxSupply(0, new BN(5));
-            await verifyCardMaxSupply(0, new BN(5));
-        });
-    });
-
-    describe("Setting Card Purchase Info", async () => {
+    describe("Setting Card Vesting Info", async () => {
         beforeEach(async () => {
             await createAndFillDefaultSchedules();
-            await setAllCardDefaultSupplies();
         });
 
         // Failure case
         it("should fail when caller is not contract owner", async () => {
             await expectRevert(
-                setCardSaleInfo(
-                    0,
-                    tokenUnits(1),
-                    [new BN(0), new BN(1)],
-                    otherAccount
-                ),
+                setCardVestingInfo(0, [new BN(0), new BN(1)], otherAccount),
                 "Ownable: caller is not the owner"
             );
         });
         it("should fail when card ID is not valid", async () => {
-            await expectRevert(setCardSaleInfo(4), "Invalid card ID");
-        });
-        it("should fail when sale price is 0", async () => {
-            await expectRevert(
-                setCardSaleInfo(0, 0),
-                "Price must be greater than 0"
-            );
+            await expectRevert(setCardVestingInfo(4), "Invalid card ID");
         });
         it("should fail when vesting schedule does not exist", async () => {
             await expectRevert(
-                setCardSaleInfo(0, tokenUnits(1), [new BN(0), new BN(2)]),
+                setCardVestingInfo(0, [new BN(0), new BN(2)]),
                 "Vesting schedule ID is invalid"
             );
         });
 
         // Passing case
         it("should pass when params are valid for pink text card", async () => {
-            const price = tokenUnits(1);
-            await setCardSaleInfo(0, price);
-            await validateCardSaleInfo(0, price);
+            await setCardVestingInfo(0);
+            await validateCardVestingInfo(0);
         });
         it("should pass when params are valid for pink image card", async () => {
-            const price = tokenUnits(2);
-            await setCardSaleInfo(1, price);
-            await validateCardSaleInfo(1, price);
+            await setCardVestingInfo(1);
+            await validateCardVestingInfo(1);
         });
         it("should pass when params are valid for white text card", async () => {
-            const price = tokenUnits(3);
-            await setCardSaleInfo(2, price);
-            await validateCardSaleInfo(2, price);
+            await setCardVestingInfo(2);
+            await validateCardVestingInfo(2);
         });
     });
 
     describe("Creating Single Card package", async () => {
-        beforeEach(async () => {
-            await setAllCardDefaultSupplies();
-        });
         // Failure case
-        it("should fail when package ID already exists", async () => {
-            await createSingleCardPackage();
-            await expectRevert(
-                createSingleCardPackage(),
-                "Package already exists"
-            );
-        });
-        it("should fail when package price is 0", async () => {
-            await expectRevert(
-                createSingleCardPackage(0, 0),
-                "Price cannot be 0"
-            );
-        });
-        it("should fail when number of packages for sale is 0", async () => {
-            await expectRevert(
-                createSingleCardPackage(0, tokenUnits(1), 0),
-                "Number of packages cannot be 0"
-            );
-        });
+
         it("should fail when number of cards is 0", async () => {
             await expectRevert(
-                createSingleCardPackage(0, tokenUnits(1), 1, 0),
-                "Number of cards cannot be 0"
+                createSingleCardPackage(0, 0),
+                "Number of cards is 0"
             );
         });
         it("should fail when DAO token amount is 0", async () => {
             await expectRevert(
-                createSingleCardPackage(
-                    0,
-                    tokenUnits(1),
-                    1,
-                    1,
-                    0,
-                    tokenUnits(0)
-                ),
-                "DAO token amount cannot be 0"
+                createSingleCardPackage(0, baseCardQty, 0),
+                "DAO token amount is 0"
             );
         });
         it("should fail when P2E token amount is 0", async () => {
             await expectRevert(
+                createSingleCardPackage(0, baseCardQty, baseDaoAmount, 0),
+                "P2E token amount is 0"
+            );
+        });
+        it("should fail when reserve multiple is 0", async () => {
+            await expectRevert(
                 createSingleCardPackage(
                     0,
-                    tokenUnits(1),
-                    1,
-                    1,
-                    0,
+                    baseCardQty,
                     baseDaoAmount,
-                    tokenUnits(0)
+                    baseP2eAmount,
+                    0
                 ),
-                "P2E token amount cannot be 0"
+                "Reserve multiple is 0"
             );
         });
 
         // Passing case
         it("should pass when package contains pink text cards", async () => {
-            const receipt = await createSingleCardPackage();
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(0),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createSingleCardPackage();
 
             // Ensure vesting schedules were created
             await validateSchedule(0, pinkCardInstance, daoInstance.address);
@@ -658,10 +671,8 @@ contract("PhlipSale", (accounts) => {
                 baseP2eAmount.mul(baseCardQty).mul(baseSaleQty)
             );
 
-            // Ensure package was created
-            await verifyPackagePrice(0, tokenUnits(2));
-            await verifyRemainingForSale(0, baseSaleQty);
-            await validateCardBundle(
+            // Ensure package was created correctly
+            await validatePackageInfo(
                 0,
                 [new BN(0)],
                 [baseCardQty],
@@ -669,19 +680,7 @@ contract("PhlipSale", (accounts) => {
             );
         });
         it("should pass when package contains pink image cards", async () => {
-            const receipt = await createSingleCardPackage(
-                0,
-                tokenUnits(2),
-                baseSaleQty,
-                baseCardQty,
-                1
-            );
-
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(0),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createSingleCardPackage(1);
 
             // Ensure vesting schedules were created
             await validateSchedule(0, pinkCardInstance, daoInstance.address);
@@ -699,10 +698,8 @@ contract("PhlipSale", (accounts) => {
                 baseP2eAmount.mul(baseCardQty).mul(baseSaleQty)
             );
 
-            // Ensure package was created
-            await verifyPackagePrice(0, tokenUnits(2));
-            await verifyRemainingForSale(0, baseSaleQty);
-            await validateCardBundle(
+            // Ensure package was created correctly
+            await validatePackageInfo(
                 0,
                 [new BN(1)],
                 [baseCardQty],
@@ -710,19 +707,7 @@ contract("PhlipSale", (accounts) => {
             );
         });
         it("should pass when package contains white text cards", async () => {
-            const receipt = await createSingleCardPackage(
-                0,
-                tokenUnits(2),
-                baseSaleQty,
-                baseCardQty,
-                2
-            );
-
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(0),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createSingleCardPackage(2);
 
             // Ensure vesting schedules were created
             await validateSchedule(0, whiteCardInstance, daoInstance.address);
@@ -740,10 +725,8 @@ contract("PhlipSale", (accounts) => {
                 baseP2eAmount.mul(baseCardQty).mul(baseSaleQty)
             );
 
-            // Ensure package was created
-            await verifyPackagePrice(0, tokenUnits(2));
-            await verifyRemainingForSale(0, baseSaleQty);
-            await validateCardBundle(
+            // Ensure package was created correctly
+            await validatePackageInfo(
                 0,
                 [new BN(2)],
                 [baseCardQty],
@@ -753,14 +736,7 @@ contract("PhlipSale", (accounts) => {
 
         it("should pass when package with same card & type has been created already", async () => {
             await createSingleCardPackage();
-
-            const receipt = await createSingleCardPackage(1);
-
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(1),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createSingleCardPackage();
 
             // Ensure vesting schedules were created
             await validateSchedule(2, pinkCardInstance, daoInstance.address);
@@ -778,10 +754,8 @@ contract("PhlipSale", (accounts) => {
                 baseP2eAmount.mul(baseCardQty).mul(baseSaleQty)
             );
 
-            // Ensure package was created
-            await verifyPackagePrice(1, tokenUnits(2));
-            await verifyRemainingForSale(1, baseSaleQty);
-            await validateCardBundle(
+            // Ensure package was created correctly
+            await validatePackageInfo(
                 1,
                 [new BN(0)],
                 [baseCardQty],
@@ -791,19 +765,7 @@ contract("PhlipSale", (accounts) => {
         it("should pass when package with same card but different type has been created already", async () => {
             await createSingleCardPackage();
 
-            const receipt = await createSingleCardPackage(
-                1,
-                tokenUnits(2),
-                baseSaleQty,
-                baseCardQty,
-                1
-            );
-
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(1),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createSingleCardPackage(1);
 
             // Ensure vesting schedules were created
             await validateSchedule(2, pinkCardInstance, daoInstance.address);
@@ -821,10 +783,8 @@ contract("PhlipSale", (accounts) => {
                 baseP2eAmount.mul(baseCardQty).mul(baseSaleQty)
             );
 
-            // Ensure package was created
-            await verifyPackagePrice(1, tokenUnits(2));
-            await verifyRemainingForSale(1, baseSaleQty);
-            await validateCardBundle(
+            // Ensure package was created correctly
+            await validatePackageInfo(
                 1,
                 [new BN(1)],
                 [baseCardQty],
@@ -834,19 +794,7 @@ contract("PhlipSale", (accounts) => {
         it("should pass when package with different card has been created already", async () => {
             await createSingleCardPackage();
 
-            const receipt = await createSingleCardPackage(
-                1,
-                tokenUnits(2),
-                baseSaleQty,
-                baseCardQty,
-                2
-            );
-
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(1),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createSingleCardPackage(2);
 
             // Ensure vesting schedules were created
             await validateSchedule(0, whiteCardInstance, daoInstance.address);
@@ -864,10 +812,8 @@ contract("PhlipSale", (accounts) => {
                 baseP2eAmount.mul(baseCardQty).mul(baseSaleQty)
             );
 
-            // Ensure package was created
-            await verifyPackagePrice(1, tokenUnits(2));
-            await verifyRemainingForSale(1, baseSaleQty);
-            await validateCardBundle(
+            // Ensure package was created correctly
+            await validatePackageInfo(
                 1,
                 [new BN(2)],
                 [baseCardQty],
@@ -877,78 +823,41 @@ contract("PhlipSale", (accounts) => {
     });
 
     describe("Creating Multi Card package", async () => {
-        beforeEach(async () => {
-            await setAllCardDefaultSupplies();
-        });
-
         // Failure case
-        it("should fail when package ID already exists", async () => {
-            await createMultiCardPackage();
-            await expectRevert(
-                createMultiCardPackage(),
-                "Package already exists"
-            );
-        });
-        it("should fail when package price is 0", async () => {
-            await expectRevert(
-                createMultiCardPackage(0, 0),
-                "Price cannot be 0"
-            );
-        });
-        it("should fail when number of packages for sale is 0", async () => {
-            await expectRevert(
-                createMultiCardPackage(0, tokenUnits(1), 0),
-                "Number of packages cannot be 0"
-            );
-        });
         it("should fail when number of cards is 0", async () => {
             await expectRevert(
                 createMultiCardPackage(
-                    0,
-                    tokenUnits(1),
-                    baseSaleQty,
                     [new BN(0), new BN(1)],
-                    [new BN(1), new BN(0)]
+                    [new BN(0), new BN(1)]
                 ),
-                "Number of cards cannot be 0"
+                "Number of cards is 0"
             );
         });
         it("should fail when DAO token amount is 0", async () => {
             await expectRevert(
                 createMultiCardPackage(
-                    0,
-                    tokenUnits(1),
-                    baseSaleQty,
                     [new BN(0), new BN(1)],
                     [new BN(1), new BN(2)],
                     [tokenUnits(0), tokenUnits(200)]
                 ),
-                "DAO token amount cannot be 0"
+                "DAO token amount is 0"
             );
         });
         it("should fail when P2E token amount is 0", async () => {
             await expectRevert(
                 createMultiCardPackage(
-                    0,
-                    tokenUnits(1),
-                    baseSaleQty,
                     [new BN(0), new BN(1)],
                     [new BN(1), new BN(2)],
                     [tokenUnits(100), tokenUnits(200)],
-                    [tokenUnits(0), tokenUnits(200)]
+                    [tokenUnits(0), tokenUnits(2000)]
                 ),
-                "P2E token amount cannot be 0"
+                "P2E token amount is 0"
             );
         });
 
         // Passing case
         it("should pass when package contains pink text & image cards", async () => {
-            const receipt = await createMultiCardPackage();
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(0),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createMultiCardPackage();
 
             // Ensure text card vesting schedules were created
             await validateSchedule(
@@ -1003,9 +912,7 @@ contract("PhlipSale", (accounts) => {
             );
 
             // Ensure package was created
-            await verifyPackagePrice(0, tokenUnits(2));
-            await verifyRemainingForSale(0, baseSaleQty);
-            await validateCardBundle(
+            await validatePackageInfo(
                 0,
                 [new BN(0), new BN(1)],
                 [new BN(1), new BN(2)],
@@ -1016,17 +923,7 @@ contract("PhlipSale", (accounts) => {
             );
         });
         it("should pass when package contains pink & white cards", async () => {
-            const receipt = await createMultiCardPackage(
-                0,
-                tokenUnits(2),
-                baseSaleQty,
-                [new BN(0), new BN(2)]
-            );
-            expectEvent(receipt, "CreatePackage", {
-                id: new BN(0),
-                price: tokenUnits(2),
-                numForSale: baseSaleQty,
-            });
+            await createMultiCardPackage([new BN(0), new BN(2)]);
 
             // Ensure text card vesting schedules were created
             await validateSchedule(
@@ -1081,9 +978,7 @@ contract("PhlipSale", (accounts) => {
             );
 
             // Ensure package was created
-            await verifyPackagePrice(0, tokenUnits(2));
-            await verifyRemainingForSale(0, baseSaleQty);
-            await validateCardBundle(
+            await validatePackageInfo(
                 0,
                 [new BN(0), new BN(2)],
                 [new BN(1), new BN(2)],
@@ -1095,138 +990,213 @@ contract("PhlipSale", (accounts) => {
         });
     });
 
-    describe("Purchasing Card Packages", async () => {
+    describe("Executing Card Purchase", async () => {
         beforeEach(async () => {
-            await setAllCardDefaultSupplies();
-            await createSingleCardPackage();
-            await createMultiCardPackage(1);
-            await setPresaleActive();
+            await createAndFillDefaultSchedules();
         });
 
         // Failure case
-        it("should fail when package ID is not valid", async () => {
+        it("should fail when purchaser is 0x0", async () => {
             await expectRevert(
-                purchasePackage(2, tokenUnits(1)),
-                "Package does not exist"
+                invokeCardPurchase(0, constants.ZERO_ADDRESS),
+                "FxSaleChildTunnel: Purchaser is 0x0"
             );
         });
-        it("should fail when sale is not active", async () => {
-            await setSaleInactive();
-            await expectRevert(purchasePackage(), "Presale is not active");
-        });
-        it("should fail when general sale is active", async () => {
-            await setGeneralSaleActive();
-            await expectRevert(purchasePackage(), "Presale is not active");
-        });
-        it("should fail when package sold out", async () => {
-            for (let i = 0; i < baseSaleQty; i++) {
-                await purchasePackage();
-            }
-            await expectRevert(purchasePackage(), "Package not available");
-        });
-        it("should fail when caller sends less ETH than package price", async () => {
+        it("should fail when card ID is invalid", async () => {
             await expectRevert(
-                purchasePackage(0, tokenUnits(1)),
-                "Not enough ETH to cover cost"
+                invokeCardPurchase(5, purchaser),
+                "FxSaleChildTunnel: Invalid card ID"
             );
         });
 
         // Passing case
-        it("should pass when purchasing single card package", async () => {
-            const receipt = await purchasePackage();
-            expectEvent(receipt, "PurchasePackage", {
-                id: new BN(0),
-                purchaser: otherAccount,
-            });
-
-            // Ensure package was marked as sold
-            await verifyRemainingForSale(0, baseSaleQty - 1);
-            await verifyCardMintedSupply(0, 2);
-
-            // Ensure account was credited with correct number & type of cards
-            await verifyCardBalance(pinkCardInstance, otherAccount, 2);
-            await verifyCardOwner(pinkCardInstance, 0, otherAccount);
-            await verifyCardOwner(pinkCardInstance, 1, otherAccount);
+        it("should pass when purchasing pink card with valid params", async () => {
+            await invokeCardPurchase(0);
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+            await verifyCardBalance(pinkCardInstance, purchaser, 1);
+        });
+        it("should pass when purchasing white card with valid params", async () => {
+            await invokeCardPurchase(2);
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+            await verifyCardBalance(whiteCardInstance, purchaser, 1);
         });
     });
 
-    describe("Purchasing Cards", async () => {
+    describe("Executing Package Purchase", async () => {
         beforeEach(async () => {
-            // Create pink card vesting schedules and fill reserves
             await createAndFillDefaultSchedules();
-
-            await setAllCardDefaultSupplies();
-
-            // Set sale info for pink text/image and white text cards
-            await setCardSaleInfo(0, tokenUnits(2));
-            await setCardSaleInfo(1, tokenUnits(2));
-            await setCardSaleInfo(2, tokenUnits(2));
-
-            await setGeneralSaleActive();
         });
 
         // Failure case
-        it("should fail when card ID is not valid or sale info not set", async () => {
-            await expectRevert(purchaseCard(4), "Not available for sale");
-        });
-        it("should fail when sale is not active", async () => {
-            await setSaleInactive();
-            await expectRevert(purchaseCard(), "General sale is not active");
-        });
-        it("should fail when presale is active", async () => {
-            await setPresaleActive();
-            await expectRevert(purchaseCard(), "General sale is not active");
-        });
-        it("should fail when caller sends less ETH than card price", async () => {
+        it("should fail when purchaser is 0x0", async () => {
             await expectRevert(
-                purchaseCard(0, tokenUnits(1)),
-                "Not enough ETH to cover cost"
+                invokePackagePurchase(0, constants.ZERO_ADDRESS),
+                "FxSaleChildTunnel: Purchaser is 0x0"
             );
         });
-        it("should fail when max supply is reached", async () => {
-            // Purchase both available pink text cards
-            const totalSupply = await saleInstance.maxSupplyOf(0);
-            for (let i = 0; i < totalSupply; i++) {
-                await purchaseCard(0);
-            }
-
-            // Attempt to purchase another card
-            await expectRevert(purchaseCard(), "Max supply reached");
+        it("should fail when package ID is invalid", async () => {
+            await expectRevert(
+                invokePackagePurchase(5, purchaser),
+                "FxSaleChildTunnel: Invalid package ID"
+            );
         });
 
         // Passing case
-        it("should pass when purchasing pink text cards", async () => {
-            const price = await saleInstance.getCardPrice(0);
-            await purchaseCard(0, price);
+        it("should pass when purchasing pink single card package", async () => {
+            // Pink card package - ID 0
+            await createSingleCardPackage(0);
 
-            // Ensure card was marked as sold
-            await verifyCardMintedSupply(0, 1);
+            await invokePackagePurchase(0);
 
-            // Ensure account was credited with card
-            await verifyCardOwner(pinkCardInstance, 0, otherAccount);
-            await verifyCardBalance(pinkCardInstance, otherAccount, 1);
+            // Verify purchaser account is card owner
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+            await verifyCardOwner(pinkCardInstance, 1, purchaser);
+
+            // Verify purchaser account is card minter
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+            await verifyCardMinter(pinkCardInstance, 1, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(pinkCardInstance, purchaser, baseCardQty);
         });
-        it("should pass when purchasing pink image cards", async () => {
-            const price = await saleInstance.getCardPrice(1);
-            await purchaseCard(1, price);
+        it("should pass when purchasing white single card package", async () => {
+            // White card package - ID 0
+            await createSingleCardPackage(2);
 
-            // Ensure card was marked as sold
-            await verifyCardMintedSupply(1, 1);
+            await invokePackagePurchase();
 
-            // Ensure account was credited with card
-            await verifyCardOwner(pinkCardInstance, 0, otherAccount);
-            await verifyCardBalance(pinkCardInstance, otherAccount, 1);
+            // Verify purchaser account is card owner
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+            await verifyCardOwner(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account is card minter
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+            await verifyCardMinter(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(whiteCardInstance, purchaser, baseCardQty);
         });
-        it("should pass when purchasing white text cards", async () => {
-            const price = await saleInstance.getCardPrice(2);
-            await purchaseCard(2, price);
+        it("should pass when purchasing multi card package that has pink text and image cards", async () => {
+            // Multi card package with pink text and image cards - ID 0
+            await createMultiCardPackage();
 
-            // Ensure card was marked as sold
-            await verifyCardMintedSupply(2, 1);
+            await invokePackagePurchase();
 
-            // Ensure account was credited with card
-            await verifyCardOwner(whiteCardInstance, 0, otherAccount);
-            await verifyCardBalance(whiteCardInstance, otherAccount, 1);
+            // Verify purchaser account is pink text card owner
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is pink image card owner
+            await verifyCardOwner(pinkCardInstance, 1, purchaser);
+            await verifyCardOwner(pinkCardInstance, 2, purchaser);
+
+            // Verify purchaser account is pink text card minter
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is pink image card minter
+            await verifyCardMinter(pinkCardInstance, 1, purchaser);
+            await verifyCardMinter(pinkCardInstance, 2, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(pinkCardInstance, purchaser, 3);
+        });
+        it("should pass when purchasing multi card package that has white text and blank cards", async () => {
+            // Multi card package with white text and image cards - ID 0
+            await createMultiCardPackage([new BN(2), new BN(3)]);
+
+            await invokePackagePurchase();
+
+            // Verify purchaser account is white text card owner
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white blank card owner
+            await verifyCardOwner(whiteCardInstance, 1, purchaser);
+            await verifyCardOwner(whiteCardInstance, 2, purchaser);
+
+            // Verify purchaser account is white text card minter
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white blank card minter
+            await verifyCardMinter(whiteCardInstance, 1, purchaser);
+            await verifyCardMinter(whiteCardInstance, 2, purchaser);
+
+            // Verify purchaser account has correct balance
+            await verifyCardBalance(whiteCardInstance, purchaser, 3);
+        });
+        it("should pass when purchasing multi card package that has pink and white cards", async () => {
+            // Multi card package with pink and white cards - ID 0
+            await createMultiCardPackage([new BN(0), new BN(2)]);
+
+            await invokePackagePurchase();
+
+            // Verify purchaser account is pink text card owner
+            await verifyCardOwner(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white text card owner
+            await verifyCardOwner(whiteCardInstance, 0, purchaser);
+            await verifyCardOwner(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account is pink text card minter
+            await verifyCardMinter(pinkCardInstance, 0, purchaser);
+
+            // Verify purchaser account is white text card minter
+            await verifyCardMinter(whiteCardInstance, 0, purchaser);
+            await verifyCardMinter(whiteCardInstance, 1, purchaser);
+
+            // Verify purchaser account has correct balances
+            await verifyCardBalance(pinkCardInstance, purchaser, 1);
+            await verifyCardBalance(whiteCardInstance, purchaser, 2);
+        });
+    });
+
+    describe("Receiving Messages From Root", async () => {
+        beforeEach(async () => {
+            await createAndFillDefaultSchedules();
+        });
+
+        context("For Card Purchase", async () => {
+            // Failure case
+            it("should fail when sender is not fxChild", async () => {
+                await expectRevert(
+                    receiveCardPurchaseMessage(0, otherAccount),
+                    "FxBaseChildTunnel: INVALID_SENDER_FROM_ROOT"
+                );
+            });
+
+            // Passing case
+            it("should pass when sender is fxChild", async () => {
+                await receiveCardPurchaseMessage();
+                await verifyCardMinter(pinkCardInstance, 0, purchaser);
+                await verifyCardOwner(pinkCardInstance, 0, purchaser);
+                await verifyCardBalance(pinkCardInstance, purchaser, 1);
+            });
+        });
+
+        context("For Package Purchase", async () => {
+            // Failure case
+            it("should fail when sender is not fxChild", async () => {
+                await expectRevert(
+                    receivePackagePurchaseMessage(0, otherAccount),
+                    "FxBaseChildTunnel: INVALID_SENDER_FROM_ROOT"
+                );
+            });
+
+            // Passing case
+            it("should pass when purchasing single card package and sender is fxChild", async () => {
+                await createSingleCardPackage();
+                await receivePackagePurchaseMessage();
+                await verifyCardBalance(
+                    pinkCardInstance,
+                    purchaser,
+                    baseCardQty
+                );
+            });
+            it("should pass when purchasing multi card package and sender is fxChild", async () => {
+                await createMultiCardPackage();
+                await receivePackagePurchaseMessage();
+                await verifyCardBalance(pinkCardInstance, purchaser, 3);
+            });
         });
     });
 });

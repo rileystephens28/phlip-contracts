@@ -2,8 +2,6 @@
 pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title AffiliateMarketing
@@ -12,7 +10,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * to them. Each affilate agreement allows for custom commission rates.
  */
 contract AffiliateMarketing {
-    using SafeERC20 for IERC20;
     using Counters for Counters.Counter;
 
     event CreateCampaign(
@@ -83,22 +80,23 @@ contract AffiliateMarketing {
         string uri;
     }
 
-    Counters.Counter private _affiliateIdCounter;
-    Counters.Counter private _campaignIdCounter;
+    // Allows for percentages with 2 decimal places. Ex: 10.55% = 1055
+    uint256 constant maxCommission = 10000;
+
+    Counters.Counter internal _affiliateIdCounter;
+    Counters.Counter internal _campaignIdCounter;
 
     // Tracks affiliates by ID
-    mapping(uint256 => Affiliate) private _affiliates;
+    mapping(uint256 => Affiliate) internal _affiliates;
 
     // Tracks campaigns by ID
-    mapping(uint256 => Campaign) private _campaigns;
+    mapping(uint256 => Campaign) internal _campaigns;
 
     // Campaign ID => Affiliate ID => is registered
     mapping(uint256 => mapping(uint256 => bool)) private _affiliateRegs;
 
     // Campaign ID => Affiliate address => is registered
     mapping(uint256 => mapping(address => bool)) private _addressRegs;
-
-    uint256 immutable maxCommission = 10000; // Allows for percentages with 2 decimal places. Ex: 10.55% = 1055
 
     /***********************************|
     |          View Functions           |
@@ -298,7 +296,7 @@ contract AffiliateMarketing {
      * - `_owner` cannot be the zero address
      * - `_startTime` must be in the future
      * - `_endTime` must be greater than `_startTime`
-     * - `_rewardPercentage` must be between 0 and 10000
+     * - `_standardCommission` must be between 0 and 10000
      *
      * @param _owner Owner of the campaign
      * @param _startTime The time when the campaign becomes active
@@ -509,8 +507,8 @@ contract AffiliateMarketing {
         uint256 _saleValue
     ) internal virtual {
         require(
-            _campaignExists(_campaignId),
-            "AffiliateMarketing: Campaign does not exist"
+            _campaignIsActive(_campaignId),
+            "AffiliateMarketing: Campaign not active"
         );
         require(
             _affiliateIsRegistered(_campaignId, _affiliateId),
