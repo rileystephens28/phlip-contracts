@@ -730,4 +730,42 @@ contract("FxSaleRootTunnel", (accounts) => {
             await verifyUnclaimedRewards(1, expectedReward);
         });
     });
+
+    describe("Withdrawing Affiliate Rewards", async () => {
+        beforeEach(async () => {
+            // Create campaign and add affiliate
+            let startTime = await time.latest();
+            startTime = startTime.add(time.duration.days(1));
+            await createCampaign(owner, baseCommission, startTime);
+            await affiliateSignUp();
+
+            await setGeneralSaleActive();
+
+            time.increaseTo(startTime.add(time.duration.minutes(1)));
+
+            const price = tokenUnits(2);
+            await setCardPrice(0, price);
+            await purchaseCard(0, 1, 1, price);
+        });
+
+        // Failure case
+        it("should fail when caller does not match affiliate account address", async () => {
+            await expectRevert(
+                withdrawAffiliateRewards(1, otherAccount),
+                "Caller is not affiliate"
+            );
+        });
+
+        it("should pass when caller does match affiliate account address", async () => {
+            const expectedReward = tokenUnits(2)
+                .mul(baseCommission)
+                .div(maxCommission);
+
+            await verifyUnclaimedRewards(1, expectedReward);
+
+            await withdrawAffiliateRewards();
+
+            await verifyUnclaimedRewards(1, 0);
+        });
+    });
 });
