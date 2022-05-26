@@ -6,6 +6,7 @@ const {
     expectRevert,
     expectEvent,
     constants,
+    time,
 } = require("@openzeppelin/test-helpers");
 const { tokenUnits } = require("../helpers");
 require("chai").should();
@@ -14,14 +15,18 @@ contract("FxSaleRootTunnel", (accounts) => {
     let rootSaleInstance;
     const [
         owner,
-        tokenWallet,
         checkpointManager,
         fxChildTunnel,
         proceedsWallet,
+        standardAffiliate,
+        customAffiliate,
         otherAccount,
     ] = accounts;
 
     const baseSaleQty = new BN(2);
+    const baseCommission = new BN(500); // 5%
+    const customCommission = new BN(1000); // 10%
+    const maxCommission = new BN(10000);
 
     const registerChildPackage = async (
         packageID = 0,
@@ -83,34 +88,52 @@ contract("FxSaleRootTunnel", (accounts) => {
 
     const purchaseCard = async (
         cardID = 0,
+        campaignId = 0,
+        affiliateId = 0,
         msgValue = tokenUnits(2),
         from = otherAccount
     ) => {
         const gasEstimate = await rootSaleInstance.purchaseCard.estimateGas(
             cardID,
+            campaignId,
+            affiliateId,
             { from: from, value: msgValue }
         );
-        return await rootSaleInstance.purchaseCard(cardID, {
-            from: from,
-            value: msgValue,
-            gas: gasEstimate,
-        });
+        return await rootSaleInstance.purchaseCard(
+            cardID,
+            campaignId,
+            affiliateId,
+            {
+                from: from,
+                value: msgValue,
+                gas: gasEstimate,
+            }
+        );
     };
 
     const purchasePackage = async (
         packageID = 0,
+        campaignId = 0,
+        affiliateId = 0,
         msgValue = tokenUnits(2),
         from = otherAccount
     ) => {
         const gasEstimate = await rootSaleInstance.purchasePackage.estimateGas(
             packageID,
+            campaignId,
+            affiliateId,
             { from: from, value: msgValue }
         );
-        return await rootSaleInstance.purchasePackage(packageID, {
-            from: from,
-            value: msgValue,
-            gas: gasEstimate,
-        });
+        return await rootSaleInstance.purchasePackage(
+            packageID,
+            campaignId,
+            affiliateId,
+            {
+                from: from,
+                value: msgValue,
+                gas: gasEstimate,
+            }
+        );
     };
 
     const setSaleStatus = async (val, from = owner) => {
@@ -129,6 +152,61 @@ contract("FxSaleRootTunnel", (accounts) => {
 
     const setGeneralSaleActive = async (from = owner) => {
         return await setSaleStatus(2, from);
+    };
+
+    const createCampaign = async (
+        from = owner,
+        commission = baseCommission,
+        startTime = null,
+        endTime = null,
+        uri = "testUri"
+    ) => {
+        if (startTime === null) {
+            startTime = await time.latest();
+            startTime = startTime.add(time.duration.hours(1));
+        }
+        if (endTime === null) {
+            endTime = startTime.add(time.duration.days(1));
+        }
+        return await rootSaleInstance.createCampaign(
+            startTime,
+            endTime,
+            commission,
+            uri,
+            { from: from }
+        );
+    };
+
+    const addCustomAffiliate = async (
+        from = owner,
+        campaignId = 1,
+        affiliate = customAffiliate,
+        commission = customCommission
+    ) => {
+        return await rootSaleInstance.addCustomAffiliate(
+            campaignId,
+            affiliate,
+            commission,
+            { from: from }
+        );
+    };
+
+    const affiliateSignUp = async (
+        campaignId = 1,
+        from = standardAffiliate
+    ) => {
+        return await rootSaleInstance.affiliateSignUp(campaignId, {
+            from: from,
+        });
+    };
+
+    const withdrawAffiliateRewards = async (
+        affiliateId = 1,
+        from = standardAffiliate
+    ) => {
+        return await rootSaleInstance.withdrawAffiliateRewards(affiliateId, {
+            from: from,
+        });
     };
 
     const verifySaleStatus = async (val) => {
@@ -159,6 +237,11 @@ contract("FxSaleRootTunnel", (accounts) => {
     const verifyCardMintedSupply = async (cardId, val) => {
         const minted = await rootSaleInstance.mintedSupplyOf(cardId);
         minted.should.be.bignumber.equal(new BN(val));
+    };
+
+    const verifyUnclaimedRewards = async (affiliateId, val) => {
+        const rewards = await rootSaleInstance.unclaimedRewardsOf(affiliateId);
+        rewards.should.be.bignumber.equal(new BN(val));
     };
 
     beforeEach(async () => {
@@ -278,6 +361,87 @@ contract("FxSaleRootTunnel", (accounts) => {
         });
     });
 
+    describe("Creating Affiliate Campaign", async () => {
+        // Failure case
+        it("should fail when caller is not contract owner", async () => {
+            await expectRevert(
+                createCampaign(otherAccount),
+                "Ownable: caller is not the owner"
+            );
+        });
+
+        it("should pass when caller is owner and params are valid", async () => {
+            await createCampaign();
+
+            const campaign = await rootSaleInstance.getCampaign(1);
+            campaign["owner"].should.be.equal(owner);
+        });
+    });
+
+    describe("Adding Custom Affiliate", async () => {
+        beforeEach(async () => {
+            await createCampaign();
+        });
+
+        // Failure case
+        it("should fail when caller is not contract owner", async () => {
+            await expectRevert(
+                addCustomAffiliate(otherAccount),
+                "Ownable: caller is not the owner"
+            );
+        });
+
+        it("should fail when account has already registered as affiliate", async () => {
+            await addCustomAffiliate();
+            await expectRevert(
+                addCustomAffiliate(),
+                "AffiliateMarketing: Already joined campaign"
+            );
+        });
+
+        it("should pass when caller is owner and params are valid", async () => {
+            await addCustomAffiliate();
+
+            const isRegistered = await rootSaleInstance.affiliateIsRegistered(
+                1,
+                1
+            );
+            isRegistered.should.be.equal(true);
+        });
+    });
+
+    describe("Signing up as Affiliate", async () => {
+        beforeEach(async () => {
+            await createCampaign();
+        });
+
+        // Failure case
+        it("should fail when campaign ID is invalid", async () => {
+            await expectRevert(
+                affiliateSignUp(5),
+                "AffiliateMarketing: Campaign does not exist"
+            );
+        });
+
+        it("should fail when account has already registered as affiliate", async () => {
+            await affiliateSignUp();
+            await expectRevert(
+                affiliateSignUp(),
+                "AffiliateMarketing: Already joined campaign"
+            );
+        });
+
+        it("should pass when caller is owner and params are valid", async () => {
+            await affiliateSignUp();
+
+            const isRegistered = await rootSaleInstance.affiliateIsRegistered(
+                1,
+                1
+            );
+            isRegistered.should.be.equal(true);
+        });
+    });
+
     describe("Registering Child Card Packages", async () => {
         // Failure case
         it("should fail when caller is not owner", async () => {
@@ -316,8 +480,14 @@ contract("FxSaleRootTunnel", (accounts) => {
     });
 
     describe("Purchasing Card Packages", async () => {
+        let startTime;
         beforeEach(async () => {
             await registerChildPackage();
+
+            // Create presale campaign
+            startTime = await time.latest();
+            startTime = startTime.add(time.duration.days(1));
+            await createCampaign(owner, baseCommission, startTime);
 
             // Activate presale
             await setPresaleActive();
@@ -346,14 +516,38 @@ contract("FxSaleRootTunnel", (accounts) => {
         });
         it("should fail when caller sends less ETH than package price", async () => {
             await expectRevert(
-                purchasePackage(0, tokenUnits(1)),
+                purchasePackage(0, 0, 0, tokenUnits(1)),
                 "Not enough ETH to cover cost"
+            );
+        });
+        it("should fail when campaign ID is invalid", async () => {
+            await expectRevert(
+                purchasePackage(0, 5, 1),
+                "AffiliateMarketing: Campaign not active"
+            );
+        });
+        it("should fail when campaign has not begun", async () => {
+            await affiliateSignUp();
+
+            await expectRevert(
+                purchasePackage(0, 1, 1),
+                "AffiliateMarketing: Campaign not active"
+            );
+        });
+        it("should fail when affiliate ID not registered with campaign", async () => {
+            await expectRevert(
+                purchasePackage(0, 1, 5),
+                "AffiliateMarketing: Campaign not active"
             );
         });
 
         // Passing case
-        it("should pass when purchasing valid package", async () => {
-            const receipt = await purchasePackage();
+        it("should pass when referred by standard affiliate", async () => {
+            await affiliateSignUp();
+
+            time.increaseTo(startTime.add(time.duration.minutes(1)));
+
+            const receipt = await purchasePackage(0, 1, 1);
             expectEvent(receipt, "PurchasePackage", {
                 id: new BN(0),
                 purchaser: otherAccount,
@@ -361,6 +555,33 @@ contract("FxSaleRootTunnel", (accounts) => {
 
             // Ensure package was marked as sold
             await verifyRemainingForSale(0, baseSaleQty - 1);
+
+            const expectedReward = tokenUnits(2)
+                .mul(baseCommission)
+                .div(maxCommission);
+
+            await verifyUnclaimedRewards(1, expectedReward);
+        });
+
+        it("should pass when referred by custom affiliate", async () => {
+            await addCustomAffiliate();
+
+            time.increaseTo(startTime.add(time.duration.minutes(1)));
+
+            const receipt = await purchasePackage(0, 1, 1);
+            expectEvent(receipt, "PurchasePackage", {
+                id: new BN(0),
+                purchaser: otherAccount,
+            });
+
+            // Ensure package was marked as sold
+            await verifyRemainingForSale(0, baseSaleQty - 1);
+
+            const expectedReward = tokenUnits(2)
+                .mul(customCommission)
+                .div(maxCommission);
+
+            await verifyUnclaimedRewards(1, expectedReward);
         });
     });
 
@@ -376,6 +597,11 @@ contract("FxSaleRootTunnel", (accounts) => {
             await setCardPrice(0, tokenUnits(2));
             await setCardPrice(1, tokenUnits(2));
             await setCardPrice(2, tokenUnits(2));
+
+            // Create presale campaign
+            startTime = await time.latest();
+            startTime = startTime.add(time.duration.days(1));
+            await createCampaign(owner, baseCommission, startTime);
 
             await setGeneralSaleActive();
         });
@@ -394,7 +620,7 @@ contract("FxSaleRootTunnel", (accounts) => {
         });
         it("should fail when caller sends less ETH than card price", async () => {
             await expectRevert(
-                purchaseCard(0, tokenUnits(1)),
+                purchaseCard(0, 0, 0, tokenUnits(1)),
                 "Not enough ETH to cover cost"
             );
         });
@@ -408,11 +634,31 @@ contract("FxSaleRootTunnel", (accounts) => {
             // Attempt to purchase another card
             await expectRevert(purchaseCard(), "Max supply reached");
         });
+        it("should fail when campaign ID is invalid", async () => {
+            await expectRevert(
+                purchaseCard(0, 5, 1),
+                "AffiliateMarketing: Campaign not active"
+            );
+        });
+        it("should fail when campaign has not begun", async () => {
+            await affiliateSignUp();
+
+            await expectRevert(
+                purchaseCard(0, 1, 1),
+                "AffiliateMarketing: Campaign not active"
+            );
+        });
+        it("should fail when affiliate ID not registered with campaign", async () => {
+            await expectRevert(
+                purchaseCard(0, 1, 5),
+                "AffiliateMarketing: Campaign not active"
+            );
+        });
 
         // Passing case
         it("should pass when purchasing pink text cards", async () => {
             const price = await rootSaleInstance.getCardPrice(0);
-            const receipt = await purchaseCard(0, price);
+            const receipt = await purchaseCard(0, 0, 0, price);
             expectEvent(receipt, "PurchaseCard", {
                 id: new BN(0),
                 purchaser: otherAccount,
@@ -423,7 +669,7 @@ contract("FxSaleRootTunnel", (accounts) => {
         });
         it("should pass when purchasing pink image cards", async () => {
             const price = await rootSaleInstance.getCardPrice(1);
-            const receipt = await purchaseCard(1, price);
+            const receipt = await purchaseCard(1, 0, 0, price);
             expectEvent(receipt, "PurchaseCard", {
                 id: new BN(1),
                 purchaser: otherAccount,
@@ -433,7 +679,7 @@ contract("FxSaleRootTunnel", (accounts) => {
         });
         it("should pass when purchasing white text cards", async () => {
             const price = await rootSaleInstance.getCardPrice(2);
-            const receipt = await purchaseCard(2, price);
+            const receipt = await purchaseCard(2, 0, 0, price);
             expectEvent(receipt, "PurchaseCard", {
                 id: new BN(2),
                 purchaser: otherAccount,
@@ -441,6 +687,47 @@ contract("FxSaleRootTunnel", (accounts) => {
 
             // Ensure card was marked as sold
             await verifyCardMintedSupply(2, 1);
+        });
+        it("should pass when referred by standard affiliate", async () => {
+            await affiliateSignUp();
+
+            time.increaseTo(startTime.add(time.duration.minutes(1)));
+
+            const price = await rootSaleInstance.getCardPrice(0);
+            const receipt = await purchaseCard(0, 1, 1, price);
+            expectEvent(receipt, "PurchaseCard", {
+                id: new BN(0),
+                purchaser: otherAccount,
+            });
+
+            // Ensure card was marked as sold
+            await verifyCardMintedSupply(0, 1);
+
+            const expectedReward = price.mul(baseCommission).div(maxCommission);
+
+            await verifyUnclaimedRewards(1, expectedReward);
+        });
+
+        it("should pass when referred by custom affiliate", async () => {
+            await addCustomAffiliate();
+
+            time.increaseTo(startTime.add(time.duration.minutes(1)));
+
+            const price = await rootSaleInstance.getCardPrice(2);
+            const receipt = await purchaseCard(2, 1, 1, price);
+            expectEvent(receipt, "PurchaseCard", {
+                id: new BN(2),
+                purchaser: otherAccount,
+            });
+
+            // Ensure card was marked as sold
+            await verifyCardMintedSupply(2, 1);
+
+            const expectedReward = price
+                .mul(customCommission)
+                .div(maxCommission);
+
+            await verifyUnclaimedRewards(1, expectedReward);
         });
     });
 });
