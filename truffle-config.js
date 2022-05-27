@@ -14,12 +14,11 @@ module.exports = {
     api_keys: {
         etherscan: process.env.ETHERSCAN_API_KEY,
         polygonscan: process.env.POLYGONSCAN_API_KEY,
-        bscscan: process.env.BSCSCAN_API_KEY,
     },
     mocha: {
         reporter: "eth-gas-reporter",
         reporterOptions: {
-            coinmarketcap: "d7e5fdac-7c5d-4c95-a0b2-dd494bf2db93",
+            coinmarketcap: process.env.COINMARKETCAP_API_KEY,
             currency: "USD",
             showTimeSpent: true,
         },
@@ -130,36 +129,6 @@ module.exports = {
             gasPrice: 5e9,
             network_id: 1,
         },
-        binance_testnet: {
-            provider: () =>
-                new HDWalletProvider(
-                    mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
-                        process.env.MORALIS_SPEEDY_NODES_KEY
-                    }/bsc/testnet${
-                        process.env.ARCHIVE === true ? "/archive" : ""
-                    }`
-                ),
-            network_id: 97,
-            confirmations: 10,
-            timeoutBlocks: 200,
-            skipDryRun: true,
-        },
-        binance_mainnet: {
-            provider: () =>
-                new HDWalletProvider(
-                    mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
-                        process.env.MORALIS_SPEEDY_NODES_KEY
-                    }/bsc/mainnet${
-                        process.env.ARCHIVE === true ? "/archive" : ""
-                    }`
-                ),
-            network_id: 56,
-            confirmations: 10,
-            timeoutBlocks: 200,
-            skipDryRun: true,
-        },
         polygon_mumbai: {
             provider: () =>
                 new HDWalletProvider(
@@ -188,24 +157,6 @@ module.exports = {
             network_id: 137,
             confirmations: 3,
             timeoutBlocks: 200,
-            skipDryRun: true,
-        },
-        arbitrum_rinkeby: {
-            provider: () =>
-                new HDWalletProvider(
-                    mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_SPEEDY_NODES_KEY}/arbitrum/testnet`
-                ),
-            network_id: 421611,
-            skipDryRun: true,
-        },
-        arbitrum_mainnet: {
-            provider: () =>
-                new HDWalletProvider(
-                    mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${process.env.MORALIS_SPEEDY_NODES_KEY}/arbitrum/mainnet`
-                ),
-            network_id: 42161,
             skipDryRun: true,
         },
     },
