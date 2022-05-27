@@ -24,6 +24,12 @@
     "scripts": {
         "compile": "truffle compile --all",
         "migrate": "truffle migrate",
+        "migrate:ethereum:local": "truffle migrate --network ganache --to 6",
+        "migrate:ethereum:testnet": "truffle migrate --network goerli --to 6",
+        "migrate:ethereum:mainnet": "truffle migrate --network mainnet --to 6",
+        "migrate:polygon:local": "truffle migrate --network ganache --f 7",
+        "migrate:polygon:testnet": "truffle migrate --network polygon_mumbai --f 7",
+        "migrate:polygon:mainnet": "truffle migrate --network polygon_mainnet --f 7",
         "develop": "truffle develop",
         "console": "truffle console",
         "verify": "truffle run verify",

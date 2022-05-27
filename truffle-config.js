@@ -59,7 +59,7 @@ module.exports = {
             provider: () =>
                 new HDWalletProvider(
                     mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
+                    `wss://speedy-nodes-nyc.moralis.io/${
                         process.env.MORALIS_SPEEDY_NODES_KEY
                     }/eth/ropsten${
                         process.env.ARCHIVE === true ? "/archive" : ""
@@ -75,7 +75,7 @@ module.exports = {
             provider: () =>
                 new HDWalletProvider(
                     mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
+                    `wss://speedy-nodes-nyc.moralis.io/${
                         process.env.MORALIS_SPEEDY_NODES_KEY
                     }/eth/kovan${
                         process.env.ARCHIVE === true ? "/archive" : ""
@@ -90,7 +90,7 @@ module.exports = {
             provider: () =>
                 new HDWalletProvider(
                     mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
+                    `wss://speedy-nodes-nyc.moralis.io/${
                         process.env.MORALIS_SPEEDY_NODES_KEY
                     }/eth/rinkeby${
                         process.env.ARCHIVE === true ? "/archive" : ""
@@ -102,27 +102,27 @@ module.exports = {
         goerli: {
             provider: () => {
                 return new HDWalletProvider(
-                    process.env.MNEMONIC,
-                    `https://speedy-nodes-nyc.moralis.io/${
+                    mnemonic,
+                    `wss://speedy-nodes-nyc.moralis.io/${
                         process.env.MORALIS_SPEEDY_NODES_KEY
                     }/eth/goerli${
                         process.env.ARCHIVE === true ? "/archive" : ""
-                    }`
+                    }/ws`
                 );
             },
             network_id: 5,
-            gas: 4465030,
-            gasPrice: 10000000000,
+            gas: 6000000,
+            // gasPrice: 10000000000,
         },
         mainnet: {
             provider: function () {
                 return new HDWalletProvider(
                     mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
+                    `wss://speedy-nodes-nyc.moralis.io/${
                         process.env.MORALIS_SPEEDY_NODES_KEY
                     }/eth/mainnet${
                         process.env.ARCHIVE === true ? "/archive" : ""
-                    }`
+                    }/ws`
                 );
             },
             gas: 5000000,
@@ -133,11 +133,11 @@ module.exports = {
             provider: () =>
                 new HDWalletProvider(
                     mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
+                    `wss://speedy-nodes-nyc.moralis.io/${
                         process.env.MORALIS_SPEEDY_NODES_KEY
                     }/polygon/mumbai${
                         process.env.ARCHIVE === true ? "/archive" : ""
-                    }`
+                    }/ws`
                 ),
             network_id: 80001,
             confirmations: 2,
@@ -148,11 +148,11 @@ module.exports = {
             provider: () =>
                 new HDWalletProvider(
                     mnemonic,
-                    `https://speedy-nodes-nyc.moralis.io/${
+                    `wss://speedy-nodes-nyc.moralis.io/${
                         process.env.MORALIS_SPEEDY_NODES_KEY
                     }/polygon/mainnet${
                         process.env.ARCHIVE === true ? "/archive" : ""
-                    }`
+                    }/ws`
                 ),
             network_id: 137,
             confirmations: 3,
