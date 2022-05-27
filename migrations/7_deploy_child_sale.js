@@ -38,8 +38,6 @@ module.exports = async function (deployer, network, accounts) {
     const pinkCard = await PinkCard.deployed();
     const whiteCard = await WhiteCard.deployed();
 
-    console.log("TOKEN WALLET:", accounts[0]);
-
     // This assumes accounts[0] is the deployer of DAO and P2E
     await deployer.deploy(
         FxSaleChildTunnel,

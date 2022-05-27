@@ -19,10 +19,10 @@ module.exports = async function (deployer, network) {
     let checkpointManager;
     let fxRoot;
 
-    if (network === "goerli") {
+    if (network === "goerli" || network === "goerli-fork") {
         checkpointManager = stateSynce.goerli.checkpointManager;
         fxRoot = stateSynce.goerli.fxRoot;
-    } else if (network === "mainnet") {
+    } else if (network === "mainnet" || network === "mainnet-fork") {
         checkpointManager = stateSynce.mainnet.checkpointManager;
         fxRoot = stateSynce.mainnet.fxRoot;
     } else if (network === "ganache") {
