@@ -9,6 +9,6 @@ module.exports = {
         "utils",
         "lists/Blacklist.sol",
         "lists/Blacklister.sol",
-        "affiliates",
+        "sale/FxBaseChildTunnel.sol",
     ],
 };

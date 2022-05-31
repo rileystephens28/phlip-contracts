@@ -33,7 +33,7 @@
         "develop": "truffle develop",
         "console": "truffle console",
         "verify": "truffle run verify",
-        "coverage": "truffle run coverage --network local_test",
+        "coverage": "truffle run coverage --network local_coverage",
         "test": "truffle test",
         "docify": "node docify.js"
     }

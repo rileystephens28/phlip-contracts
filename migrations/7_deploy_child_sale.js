@@ -27,7 +27,11 @@ module.exports = async function (deployer, network, accounts) {
         fxChild = stateSynce.mumbai.fxChild;
     } else if (network === "polygon_mainnet") {
         fxChild = stateSynce.mainnet.fxChild;
-    } else if (network === "ganache" || network === "development") {
+    } else if (
+        network === "ganache" ||
+        network === "development" ||
+        network === "local_coverage"
+    ) {
         fxChild = constants.ZERO_ADDRESS;
     } else {
         throw new Error("Unknown network");

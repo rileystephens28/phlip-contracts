@@ -48,10 +48,9 @@ module.exports = {
             chainId: 1337,
             network_id: 5777,
         },
-        local_test: {
+        local_coverage: {
             host: "127.0.0.1",
             port: 7555,
-            chainId: 1337,
             network_id: "*",
             disableConfirmationListener: true,
         },
