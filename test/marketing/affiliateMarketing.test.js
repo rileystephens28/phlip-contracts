@@ -388,17 +388,43 @@ contract("AffiliateMarketing", (accounts) => {
     });
 
     describe("Attributing Affiliate Sales", async () => {
+        let startTime;
         beforeEach(async () => {
-            await createCampaign();
+            // Create presale campaign
+            startTime = await time.latest();
+            startTime = startTime.add(time.duration.days(1));
+            await createCampaign(
+                campaignOwner,
+                baseUri,
+                baseCommission,
+                startTime
+            );
+
             await addStandardAffiliate();
             await addCustomAffiliate();
+
+            time.increaseTo(startTime.add(time.duration.minutes(1)));
         });
 
         // Failure case
         it("should fail when campaign does not exist", async () => {
             await expectRevert(
                 attributeSaleToAffiliate(3),
-                "AffiliateMarketing: Campaign does not exist"
+                "AffiliateMarketing: Campaign not active"
+            );
+        });
+        it("should fail when campaign is not active", async () => {
+            await createCampaign(
+                campaignOwner,
+                baseUri,
+                baseCommission,
+                startTime.add(time.duration.hours(1))
+            );
+
+            await createCampaign();
+            await expectRevert(
+                attributeSaleToAffiliate(1),
+                "AffiliateMarketing: Campaign not active"
             );
         });
         it("should fail when affiliate has not joined campaign", async () => {
@@ -447,10 +473,22 @@ contract("AffiliateMarketing", (accounts) => {
     });
 
     describe("Withdrawing Affiliate Rewards", async () => {
+        let startTime;
         beforeEach(async () => {
-            await createCampaign();
+            // Create presale campaign
+            startTime = await time.latest();
+            startTime = startTime.add(time.duration.days(1));
+            await createCampaign(
+                campaignOwner,
+                baseUri,
+                baseCommission,
+                startTime
+            );
+
             await addStandardAffiliate();
             await addCustomAffiliate();
+
+            time.increaseTo(startTime.add(time.duration.minutes(1)));
         });
 
         // Failure case
