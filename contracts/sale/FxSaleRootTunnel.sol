@@ -57,24 +57,37 @@ contract FxSaleRootTunnel is
     uint128 private immutable _whiteTextCard = 2;
     uint128 private immutable _whiteBlankCard = 3;
 
-    // Structures information required to sell and
-    // mint single cards during the sale period.
+    /**
+     * @dev Structures information required to sell and
+     * mint single cards during the the presale/sale period.
+     * @param price Price of the card
+     * @param totalSupply Max number of cards that can be sold
+     * @param mintedSupply Number of cards that have been sold
+     */
     struct CardInfo {
         uint256 price;
         uint128 totalSupply;
         uint128 mintedSupply;
     }
 
-    // Structures information required to sell and
-    // mint several cards at once during the presale period.
+    /**
+     * @dev Structures information required to sell and
+     * mint several cards at once during the presale period.
+     * @param price Price of the package
+     * @param numForSale Number of package for sale
+     * @param numSold Number of packages sold
+     * @param numCards The number of cards in each package.
+     * The index of the array represents the card ID.
+     */
     struct PackageInfo {
         uint256 price;
         uint128 numForSale;
         uint128 numSold;
+        uint32[4] numCards;
     }
 
     // Card IDs => card info
-    mapping(uint128 => CardInfo) private _cards;
+    mapping(uint256 => CardInfo) private _cards;
 
     // Child contract package IDs => presale package info
     mapping(uint256 => PackageInfo) private _packages;
@@ -149,7 +162,7 @@ contract FxSaleRootTunnel is
      * @dev Getter for the price in WEI of a presale package.
      * @param _cardID ID of the card to query
      */
-    function getCardPrice(uint128 _cardID) public view returns (uint256) {
+    function getCardPrice(uint256 _cardID) public view returns (uint256) {
         return _cards[_cardID].price;
     }
 
@@ -178,7 +191,7 @@ contract FxSaleRootTunnel is
      * @dev Getter for max supply of a specific card.
      * @param _cardID ID of the card to query
      */
-    function maxSupplyOf(uint128 _cardID) public view returns (uint128) {
+    function maxSupplyOf(uint256 _cardID) public view returns (uint128) {
         CardInfo storage card = _cards[_cardID];
         return card.totalSupply;
     }
@@ -187,7 +200,7 @@ contract FxSaleRootTunnel is
      * @dev Getter for number of minted cards of a specific color & type.
      * @param _cardID ID of the card to query
      */
-    function mintedSupplyOf(uint128 _cardID) public view returns (uint128) {
+    function mintedSupplyOf(uint256 _cardID) public view returns (uint128) {
         CardInfo storage card = _cards[_cardID];
         return card.mintedSupply;
     }
@@ -224,7 +237,7 @@ contract FxSaleRootTunnel is
      * @param _cardID ID of the card to set.
      * @param _supply New total supply.
      */
-    function setCardMaxSupply(uint128 _cardID, uint128 _supply)
+    function setCardMaxSupply(uint256 _cardID, uint128 _supply)
         public
         onlyOwner
     {
@@ -247,7 +260,7 @@ contract FxSaleRootTunnel is
      * @param _cardID ID of the card to set.
      * @param _price Price (in wei) of the card.
      */
-    function setCardPrice(uint128 _cardID, uint256 _price) public onlyOwner {
+    function setCardPrice(uint256 _cardID, uint256 _price) public onlyOwner {
         require(_cardID < 4, "Invalid card ID");
         require(_price > 0, "Price must be greater than 0");
 
@@ -263,6 +276,7 @@ contract FxSaleRootTunnel is
      * - `_packageID` must not already be registered
      * - `_price` must be greater than 0
      * - `_numForSale` must be greater than 0
+     * - `_numCards` must contain at least 1 item with value greater than 0
      *
      * @param _packageID ID of the package in child tunnel contract
      * @param _price The price of the package in wei
@@ -271,16 +285,25 @@ contract FxSaleRootTunnel is
     function registerChildPackage(
         uint256 _packageID,
         uint256 _price,
-        uint128 _numForSale
+        uint128 _numForSale,
+        uint32[4] calldata _numCards
     ) public onlyOwner {
         require(!_registeredPackages[_packageID], "Package already registered");
         require(_price > 0, "Price cannot be 0");
         require(_numForSale > 0, "Number of packages cannot be 0");
+        require(
+            _numCards[0] > 0 ||
+                _numCards[1] > 0 ||
+                _numCards[2] > 0 ||
+                _numCards[3] > 0,
+            "Must contain at least one card"
+        );
 
         _registeredPackages[_packageID] = true;
         PackageInfo storage package = _packages[_packageID];
         package.price = _price;
         package.numForSale = _numForSale;
+        package.numCards = _numCards;
 
         emit RegisterPackage(_packageID, _price, _numForSale);
     }
@@ -349,8 +372,9 @@ contract FxSaleRootTunnel is
      * - `_campaignID` is active.
      * - `_affiliateID` must exist.
      * - `_affiliateID` is registered with campaign.
-     * - `package.numSold` cannot exceed `package.numForSale`.
-     * - `msg.value` must be greater than or equal to `package.price`.
+     * - `msg.value` >= `package.price`.
+     * - `package.numSold` <= `package.numForSale`.
+     * - For all cards in package, `card.mintedSupply` + `package.numCards' <= `card.totalSupply`.
      *
      * @param _packageID ID of the package to purchase.
      * @param _campaignID ID of the campaign the purchase occurred as a result of.
@@ -364,8 +388,23 @@ contract FxSaleRootTunnel is
         require(_registeredPackages[_packageID], "Package does not exist");
 
         PackageInfo storage package = _packages[_packageID];
-        require(package.numSold < package.numForSale, "Package not available");
         require(msg.value > package.price - 1, "Not enough ETH to cover cost");
+        require(package.numSold < package.numForSale, "Package not available");
+
+        // Check that enough cards are available to fulfill the package
+        for (uint256 i = 0; i < 4; i++) {
+            uint128 numCards = package.numCards[i];
+            CardInfo storage card = _cards[i];
+            if (numCards > 0) {
+                unchecked {
+                    require(
+                        card.mintedSupply + numCards < card.totalSupply + 1,
+                        "Not enough cards remaining"
+                    );
+                    card.mintedSupply += numCards;
+                }
+            }
+        }
 
         if (_campaignID != 0 && _affiliateID != 0) {
             _attributeSaleToAffiliate(_campaignID, _affiliateID, package.price);
@@ -399,15 +438,15 @@ contract FxSaleRootTunnel is
      * - `_campaignID` is active.
      * - `_affiliateID` must exist.
      * - `_affiliateID` is registered with campaign.
-     * - `card.mintedSupply` cannot exceed `card.totalSupply`.
-     * - `msg.value` must be greater than or equal to `card.price`.
+     * - `msg.value` >= `card.price`.
+     * - `card.mintedSupply` <= `card.totalSupply`.
      *
      * @param _cardID ID of the card to purchase.
      * @param _campaignID ID of the campaign the purchase occurred as a result of.
      * @param _affiliateID ID of the affiliate that referred the buyer
      */
     function purchaseCard(
-        uint128 _cardID,
+        uint256 _cardID,
         uint256 _campaignID,
         uint256 _affiliateID
     ) public payable onlyGeneralSale nonReentrant {
