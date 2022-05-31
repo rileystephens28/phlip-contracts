@@ -1,6 +1,21 @@
 # phlip-contracts
 Smart contracts that implement Phlip.io gameplay and token logic
 
+## Deployed
+### Goerli
+
+DAO Token - 0x37DE94CE20e3b0FE40b23D2f2aa94DD719831d2b
+
+P2E Token - 0xCF06f5d8D945C95280a6e7E18A584FB47B7A9596
+
+Profile - 0xD591B978E883d79030C8a55b59cda5d7B7Af4C49
+
+Pink Card - 0x24248E8EA56746a3C4bc4e6aAc82eA3AEe8008FE
+
+White Card - 0x6823Bac83EeB503bDee51F2Fbf232ab4A168A22d
+
+Root Sale - 0xa87d9C7f8d738eEb1561F59B9bF50e9464f432b1
+
 ## Phase 1 Test Coverage 
 ##### (Updated 04/29/2022 at 1:00PM CST)
 
