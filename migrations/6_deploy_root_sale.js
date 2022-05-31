@@ -25,7 +25,7 @@ module.exports = async function (deployer, network) {
     } else if (network === "mainnet" || network === "mainnet-fork") {
         checkpointManager = stateSynce.mainnet.checkpointManager;
         fxRoot = stateSynce.mainnet.fxRoot;
-    } else if (network === "ganache") {
+    } else if (network === "ganache" || network === "development") {
         // If we're on ganache, we must deploy the FxRootMock contract
         // or else sending messages to child will revert.
         checkpointManager = constants.ZERO_ADDRESS;
