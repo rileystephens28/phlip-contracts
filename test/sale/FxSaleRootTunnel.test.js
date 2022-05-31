@@ -24,6 +24,7 @@ contract("FxSaleRootTunnel", (accounts) => {
     ] = accounts;
 
     const baseSaleQty = new BN(2);
+    const baseCardQty = [new BN(1), new BN(2), new BN(3), new BN(0)];
     const baseCommission = new BN(500); // 5%
     const customCommission = new BN(1000); // 10%
     const maxCommission = new BN(10000);
@@ -32,6 +33,7 @@ contract("FxSaleRootTunnel", (accounts) => {
         packageID = 0,
         weiPrice = tokenUnits(2),
         numForSale = baseSaleQty,
+        numCards = baseCardQty,
         from = owner
     ) => {
         const gasEstimate =
@@ -39,6 +41,7 @@ contract("FxSaleRootTunnel", (accounts) => {
                 packageID,
                 weiPrice,
                 new BN(numForSale),
+                numCards,
                 {
                     from: from,
                 }
@@ -47,6 +50,7 @@ contract("FxSaleRootTunnel", (accounts) => {
             packageID,
             weiPrice,
             new BN(numForSale),
+            numCards,
             {
                 from: from,
                 gas: gasEstimate,
@@ -227,6 +231,15 @@ contract("FxSaleRootTunnel", (accounts) => {
     const verifyRemainingForSale = async (pkgId, val) => {
         const remaining = await rootSaleInstance.getPackagesRemaining(pkgId);
         remaining.should.be.bignumber.equal(new BN(val));
+    };
+
+    const verifyCardsInPackage = async (pkgId, arr) => {
+        const cardsInPackage = await rootSaleInstance.getCardsInPackage(pkgId);
+        cardsInPackage.length.should.be.equal(4);
+        cardsInPackage[0].should.be.bignumber.equal(new BN(arr[0]));
+        cardsInPackage[1].should.be.bignumber.equal(new BN(arr[1]));
+        cardsInPackage[2].should.be.bignumber.equal(new BN(arr[2]));
+        cardsInPackage[3].should.be.bignumber.equal(new BN(arr[3]));
     };
 
     const verifyCardMaxSupply = async (cardId, val) => {
@@ -463,6 +476,17 @@ contract("FxSaleRootTunnel", (accounts) => {
                 "Number of packages cannot be 0"
             );
         });
+        it("should fail when number of cards in package is 0", async () => {
+            await expectRevert(
+                registerChildPackage(0, tokenUnits(2), baseSaleQty, [
+                    new BN(0),
+                    new BN(0),
+                    new BN(0),
+                    new BN(0),
+                ]),
+                "Must contain at least one card"
+            );
+        });
 
         // Passing case
         it("should pass when params are valid", async () => {
@@ -476,6 +500,7 @@ contract("FxSaleRootTunnel", (accounts) => {
             // Ensure package was created
             await verifyPackagePrice(0, tokenUnits(2));
             await verifyRemainingForSale(0, baseSaleQty);
+            await verifyCardsInPackage(0, baseCardQty);
         });
     });
 
@@ -539,6 +564,21 @@ contract("FxSaleRootTunnel", (accounts) => {
                 purchasePackage(0, 1, 5),
                 "AffiliateMarketing: Campaign not active"
             );
+        });
+        it("should fail when number of cards remaining is not enough to fulfill package", async () => {
+            await setSaleInactive();
+
+            // Set max supplies to low values to ensure we can purchase all cards
+            await setCardMaxSupply(0, new BN(4));
+            await setCardMaxSupply(1, new BN(3));
+            await setCardMaxSupply(2, new BN(3));
+            await setCardMaxSupply(3, new BN(2));
+
+            await setPresaleActive();
+
+            await purchasePackage();
+
+            await expectRevert(purchasePackage(), "Not enough cards remaining");
         });
 
         // Passing case

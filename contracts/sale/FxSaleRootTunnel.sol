@@ -188,6 +188,23 @@ contract FxSaleRootTunnel is
     }
 
     /**
+     * @dev Getter for the number of each card type in presale package.
+     *
+     * Example:
+     * If the package has 3 pink text cards, 2 pink image cards,
+     * 1 white text card, and 0 blank white cards this function
+     * will return [3, 2, 1, 0].
+     * @param _packageID ID of the package to query
+     */
+    function getCardsInPackage(uint256 _packageID)
+        public
+        view
+        returns (uint32[4] memory)
+    {
+        return _packages[_packageID].numCards;
+    }
+
+    /**
      * @dev Getter for max supply of a specific card.
      * @param _cardID ID of the card to query
      */
