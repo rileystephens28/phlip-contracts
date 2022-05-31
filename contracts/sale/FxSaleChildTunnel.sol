@@ -42,8 +42,8 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     }
 
     struct CardBundle {
-        uint128 cardID;
-        uint128 numCards;
+        uint256 cardID;
+        uint256 numCards;
         uint256[] scheduleIDs;
     }
 
@@ -60,18 +60,18 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
     uint256 private immutable _vestingDuration;
 
     // Card IDs to use in _cards mapping
-    uint128 private constant _pinkTextCard = 0;
-    uint128 private constant _pinkImageCard = 1;
-    uint128 private constant _whiteTextCard = 2;
-    uint128 private constant _whiteBlankCard = 3;
+    uint256 private constant _pinkTextCard = 0;
+    uint256 private constant _pinkImageCard = 1;
+    uint256 private constant _whiteTextCard = 2;
+    uint256 private constant _whiteBlankCard = 3;
 
     Counters.Counter internal _packageIds;
 
     // Mapping of IDs to card info
-    mapping(uint128 => CardInfo) private _cards;
+    mapping(uint256 => CardInfo) private _cards;
 
     // Card IDs => array of vesting schedule IDs
-    mapping(uint128 => uint256[]) private _cardVestingSchedules;
+    mapping(uint256 => uint256[]) private _cardVestingSchedules;
 
     // package IDs => card bundle array for the package
     mapping(uint256 => CardBundle[]) private _packages;
@@ -141,15 +141,15 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
 
     /**
      * @dev Getter for vesting schedules used by a card
-     * @param _cardId ID of the card to query
+     * @param _cardID ID of the card to query
      * @return Array of vesting schedule IDs
      */
-    function getCardVestingInfo(uint128 _cardId)
+    function getCardVestingInfo(uint256 _cardID)
         public
         view
         returns (uint256[] memory)
     {
-        return _cardVestingSchedules[_cardId];
+        return _cardVestingSchedules[_cardID];
     }
 
     /***********************************|
@@ -168,7 +168,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
      * @param _scheduleIDs Array containing vesting schedule IDs.
      */
     function setCardVestingInfo(
-        uint128 _cardID,
+        uint256 _cardID,
         uint256[] calldata _scheduleIDs
     ) public onlyOwner {
         require(_cardID < 4, "Invalid card ID");
@@ -196,7 +196,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
      * Should equal number of expected packages that will be created.
      */
     function createSingleCardPackage(
-        uint128 _cardID,
+        uint256 _cardID,
         uint128 _numCards,
         uint256 _daoAmount,
         uint256 _p2eAmount,
@@ -215,7 +215,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
         // Add vesting info with card info and number of card in package
         bundle.push(
             _createCardBundle(
-                _cardID,
+                uint128(_cardID),
                 _numCards,
                 _daoAmount,
                 _p2eAmount,
@@ -234,7 +234,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
      * Should equal number of expected packages that will be created.
      */
     function createMultiCardPackage(
-        uint128[] calldata _cardIDs,
+        uint256[] calldata _cardIDs,
         uint128[] calldata _numCards,
         uint256[] calldata _daoAmounts,
         uint256[] calldata _p2eAmounts,
@@ -249,7 +249,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
             // Add vesting info with card info and number of card in package
             bundle.push(
                 _createCardBundle(
-                    _cardIDs[i],
+                    uint128(_cardIDs[i]),
                     _numCards[i],
                     _daoAmounts[i],
                     _p2eAmounts[i],
@@ -301,9 +301,9 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
      * @param _purchaseData ABI encoded data about the purchase from root contract
      */
     function _executeCardPurchase(bytes memory _purchaseData) internal {
-        (address purchaser, uint128 cardId) = abi.decode(
+        (address purchaser, uint256 cardId) = abi.decode(
             _purchaseData,
-            (address, uint128)
+            (address, uint256)
         );
 
         // These checks will also be performed by the root contract
@@ -377,7 +377,7 @@ contract FxSaleChildTunnel is Ownable, FxBaseChildTunnel {
      * @param _p2eAmount The amount of P2E tokens that will vest in card
      */
     function _createCardBundle(
-        uint128 _cardID,
+        uint256 _cardID,
         uint128 _numCards,
         uint256 _daoAmount,
         uint256 _p2eAmount,

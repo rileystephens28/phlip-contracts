@@ -52,10 +52,10 @@ contract FxSaleRootTunnel is
     SaleState private _saleStatus;
 
     // Card IDs to use in _cards mapping
-    uint128 private immutable _pinkTextCard = 0;
-    uint128 private immutable _pinkImageCard = 1;
-    uint128 private immutable _whiteTextCard = 2;
-    uint128 private immutable _whiteBlankCard = 3;
+    uint256 private constant _pinkTextCard = 0;
+    uint256 private constant _pinkImageCard = 1;
+    uint256 private constant _whiteTextCard = 2;
+    uint256 private constant _whiteBlankCard = 3;
 
     /**
      * @dev Structures information required to sell and
