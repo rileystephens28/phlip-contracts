@@ -294,7 +294,7 @@ contract FxSaleRootTunnel is
      *
      * @param _saleID ID of the sale to set as active
      */
-    function updateWhitelist(uint256 _saleID, bytes32 _merkleRoot)
+    function setWhitelist(uint256 _saleID, bytes32 _merkleRoot)
         public
         onlyOwner
     {
@@ -493,11 +493,13 @@ contract FxSaleRootTunnel is
      * @param _packageID ID of the package to purchase.
      * @param _campaignID ID of the campaign the purchase occurred as a result of.
      * @param _affiliateID ID of the affiliate that referred the buyer
+     * @param _merkleProof Proof used to verify address exists in merkle tree whitelist
      */
     function purchasePackage(
         uint256 _packageID,
         uint256 _campaignID,
-        uint256 _affiliateID
+        uint256 _affiliateID,
+        bytes32[] calldata _merkleProof
     ) public payable nonReentrant {
         PackageInfo storage package = _packages[_packageID];
         SaleInfo storage sale = _sales[_currentSale];
@@ -528,6 +530,11 @@ contract FxSaleRootTunnel is
                     card.mintedSupply += numCards[i];
                 }
             }
+        }
+
+        // Validate merkle proof if sale has a whitelist and proof is provided
+        if (sale.merkleRootWhitelist != bytes32(0) && _merkleProof.length > 0) {
+            _validateWhitelistProof(sale.merkleRootWhitelist, _merkleProof);
         }
 
         // Attribute sale to affiliate if necessary
@@ -571,11 +578,13 @@ contract FxSaleRootTunnel is
      * @param _cardID ID of the card to purchase.
      * @param _campaignID ID of the campaign the purchase occurred as a result of.
      * @param _affiliateID ID of the affiliate that referred the buyer
+     * @param _merkleProof Proof used to verify address exists in merkle tree whitelist
      */
     function purchaseCard(
         uint256 _cardID,
         uint256 _campaignID,
-        uint256 _affiliateID
+        uint256 _affiliateID,
+        bytes32[] calldata _merkleProof
     ) public payable nonReentrant {
         CardInfo storage card = _cards[_cardID];
         SaleInfo storage sale = _sales[_currentSale];
@@ -589,6 +598,11 @@ contract FxSaleRootTunnel is
             purchases.cardCount < sale.cardLimit,
             "Max card purchases reached"
         );
+
+        // Validate merkle proof if sale has a whitelist
+        if (sale.merkleRootWhitelist != bytes32(0)) {
+            _validateWhitelistProof(sale.merkleRootWhitelist, _merkleProof);
+        }
 
         // Attribute sale to affiliate if necessary
         if (_campaignID != 0 && _affiliateID != 0) {
@@ -668,6 +682,23 @@ contract FxSaleRootTunnel is
         if (refundAmount > 0) {
             payable(msg.sender).transfer(refundAmount);
         }
+    }
+
+    /**
+     * @dev Check that the proof is valid and merkle tree whitelist contains
+     * the msg.sender.
+     * @param _root Root of the merkle tree containing whitelisted addresses.
+     * @param _proof Proof used to verify address exists in merkle tree
+     * @return True if address and proof are valid, false otherwise.
+     */
+    function _validateWhitelistProof(bytes32 _root, bytes32[] calldata _proof)
+        internal
+        view
+        returns (bool)
+    {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(MerkleProof.verify(_proof, _root, leaf), "Incorrect proof");
+        return true;
     }
 
     // exit processor
