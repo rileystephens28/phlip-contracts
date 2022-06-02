@@ -11,6 +11,10 @@ const {
 const { tokenUnits } = require("../helpers");
 require("chai").should();
 
+const { MerkleTree } = require("merkletreejs");
+const keccak256 = require("keccak256");
+const { web3 } = require("@openzeppelin/test-helpers/src/setup");
+
 contract("FxSaleRootTunnel", (accounts) => {
     let rootSaleInstance;
     const [
@@ -23,17 +27,73 @@ contract("FxSaleRootTunnel", (accounts) => {
         otherAccount,
     ] = accounts;
 
+    const whitelistedAddresses = accounts.slice(8);
+
     const baseSaleQty = new BN(2);
     const baseCardQty = [new BN(1), new BN(2), new BN(3), new BN(0)];
     const baseCommission = new BN(500); // 5%
     const customCommission = new BN(1000); // 10%
     const maxCommission = new BN(10000);
 
+    /***********************************|
+    |     SALE MANAGEMENT FUNCTIONS     |
+    |__________________________________*/
+
+    const createSale = async (
+        cardLimit = 5,
+        packageLimit = 5,
+        merkleRoot = constants.ZERO_BYTES32,
+        from = owner
+    ) => {
+        const gasEstimate = await rootSaleInstance.createSale.estimateGas(
+            merkleRoot,
+            new BN(cardLimit),
+            new BN(packageLimit),
+            { from: from }
+        );
+        return await rootSaleInstance.createSale(
+            merkleRoot,
+            new BN(cardLimit),
+            new BN(packageLimit),
+            {
+                from: from,
+                gas: gasEstimate,
+            }
+        );
+    };
+
+    const setWhitelist = async (
+        saleID = 0,
+        _merkleRoot = constants.ZERO_BYTES32,
+        from = owner
+    ) => {
+        const gasEstimate = await rootSaleInstance.setWhitelist.estimateGas(
+            saleID,
+            _merkleRoot,
+            { from: from }
+        );
+        return await rootSaleInstance.setWhitelist(saleID, _merkleRoot, {
+            from: from,
+            gas: gasEstimate,
+        });
+    };
+
+    const setActiveSale = async (saleID = 1, from = owner) => {
+        return await rootSaleInstance.setActiveSale(saleID, {
+            from: from,
+        });
+    };
+
+    /***********************************|
+    | CARD/PACKAGE MANAGEMENT FUNCTIONS |
+    |__________________________________*/
+
     const registerChildPackage = async (
         packageID = 0,
         weiPrice = tokenUnits(2),
         numForSale = baseSaleQty,
         numCards = baseCardQty,
+        saleIds = [new BN(1)],
         from = owner
     ) => {
         const gasEstimate =
@@ -42,6 +102,7 @@ contract("FxSaleRootTunnel", (accounts) => {
                 weiPrice,
                 new BN(numForSale),
                 numCards,
+                saleIds,
                 {
                     from: from,
                 }
@@ -51,6 +112,7 @@ contract("FxSaleRootTunnel", (accounts) => {
             weiPrice,
             new BN(numForSale),
             numCards,
+            saleIds,
             {
                 from: from,
                 gas: gasEstimate,
@@ -90,23 +152,30 @@ contract("FxSaleRootTunnel", (accounts) => {
         });
     };
 
+    /***********************************|
+    |        PURCHASE FUNCTIONS         |
+    |__________________________________*/
+
     const purchaseCard = async (
         cardID = 0,
         campaignId = 0,
         affiliateId = 0,
         msgValue = tokenUnits(2),
+        merkleProof = [],
         from = otherAccount
     ) => {
         const gasEstimate = await rootSaleInstance.purchaseCard.estimateGas(
             cardID,
             campaignId,
             affiliateId,
+            merkleProof,
             { from: from, value: msgValue }
         );
         return await rootSaleInstance.purchaseCard(
             cardID,
             campaignId,
             affiliateId,
+            merkleProof,
             {
                 from: from,
                 value: msgValue,
@@ -120,18 +189,21 @@ contract("FxSaleRootTunnel", (accounts) => {
         campaignId = 0,
         affiliateId = 0,
         msgValue = tokenUnits(2),
+        merkleProof = [],
         from = otherAccount
     ) => {
         const gasEstimate = await rootSaleInstance.purchasePackage.estimateGas(
             packageID,
             campaignId,
             affiliateId,
+            merkleProof,
             { from: from, value: msgValue }
         );
         return await rootSaleInstance.purchasePackage(
             packageID,
             campaignId,
             affiliateId,
+            merkleProof,
             {
                 from: from,
                 value: msgValue,
@@ -140,23 +212,9 @@ contract("FxSaleRootTunnel", (accounts) => {
         );
     };
 
-    const setSaleStatus = async (val, from = owner) => {
-        return await rootSaleInstance.setSaleStatus(val, {
-            from: from,
-        });
-    };
-
-    const setSaleInactive = async (from = owner) => {
-        return await setSaleStatus(0, from);
-    };
-
-    const setPresaleActive = async (from = owner) => {
-        return await setSaleStatus(1, from);
-    };
-
-    const setGeneralSaleActive = async (from = owner) => {
-        return await setSaleStatus(2, from);
-    };
+    /***********************************|
+    |    AFFILIATE CAMPAIGN FUNCTIONS   |
+    |__________________________________*/
 
     const createCampaign = async (
         from = owner,
@@ -213,9 +271,28 @@ contract("FxSaleRootTunnel", (accounts) => {
         });
     };
 
-    const verifySaleStatus = async (val) => {
-        const status = await rootSaleInstance.saleStatus();
-        status.should.be.bignumber.equal(new BN(val));
+    /***********************************|
+    |       VALIDATION FUNCTIONS        |
+    |__________________________________*/
+
+    const verifyActiveSale = async (val) => {
+        const activeSale = await rootSaleInstance.getActiveSale();
+        activeSale.should.be.bignumber.equal(new BN(val));
+    };
+
+    const verifySaleInfo = async (
+        saleId,
+        cardLimit,
+        packageLimit,
+        merkleRootWhitelist
+    ) => {
+        merkleRootWhitelist = web3.utils.isHex(merkleRootWhitelist)
+            ? merkleRootWhitelist
+            : web3.utils.toHex(merkleRootWhitelist);
+        const sale = await rootSaleInstance.getSaleInfo(saleId);
+        sale["cardLimit"].should.be.bignumber.equal(new BN(cardLimit));
+        sale["packageLimit"].should.be.bignumber.equal(new BN(packageLimit));
+        sale["merkleRootWhitelist"].should.equal(merkleRootWhitelist);
     };
 
     const verifyCardPrice = async (cardId, val) => {
@@ -257,6 +334,29 @@ contract("FxSaleRootTunnel", (accounts) => {
         rewards.should.be.bignumber.equal(new BN(val));
     };
 
+    /***********************************|
+    |         HELPER FUNCTIONS          |
+    |__________________________________*/
+
+    const getMerkleTree = (addresses) => {
+        const leafNodes = addresses.map((addr) => keccak256(addr));
+        return new MerkleTree(leafNodes, keccak256, {
+            sortPairs: true,
+        });
+    };
+
+    const getMerkleRoot = (addresses) => {
+        const merkleTree = getMerkleTree(addresses);
+        return merkleTree.getRoot();
+    };
+
+    const getMerkleProof = (addresses, claimingAddress) => {
+        const merkleTree = getMerkleTree(addresses);
+
+        const hashedAddress = keccak256(claimingAddress);
+        return merkleTree.getHexProof(hashedAddress);
+    };
+
     beforeEach(async () => {
         // Must use fxRoot mock contract rather than basic EOA address
         // because EOA addresses will revert when _sendMessageToChild is called
@@ -271,39 +371,109 @@ contract("FxSaleRootTunnel", (accounts) => {
         await rootSaleInstance.setFxChildTunnel(fxChildTunnel);
     });
 
-    describe("Setting Sale Status", async () => {
+    describe("Creating Sales", async () => {
+        const merkleRoot = getMerkleRoot(whitelistedAddresses);
+
         // Failure case
         it("should fail when caller is not contract owner", async () => {
             await expectRevert(
-                setSaleStatus(1, otherAccount),
+                createSale(5, 5, merkleRoot, otherAccount),
                 "Ownable: caller is not the owner"
             );
         });
-        it("should fail when status is not valid", async () => {
-            await expectRevert(setSaleStatus(4), "Invalid sale status");
+
+        // Passing case
+        it("should pass when card limit is 0", async () => {
+            await createSale(0, 5, merkleRoot);
+            await verifySaleInfo(1, 0, 5, merkleRoot);
+        });
+        it("should pass when package limit is 0", async () => {
+            await createSale(5, 0, merkleRoot);
+            await verifySaleInfo(1, 5, 0, merkleRoot);
+        });
+        it("should pass when merkle root is not provided", async () => {
+            await createSale(5, 5, constants.ZERO_BYTES32);
+            await verifySaleInfo(1, 5, 5, constants.ZERO_BYTES32);
+        });
+    });
+
+    describe("Setting Active Sale", async () => {
+        beforeEach(async () => {
+            await createSale();
+        });
+
+        // Failure case
+        it("should fail when caller is not contract owner", async () => {
+            await expectRevert(
+                setActiveSale(1, otherAccount),
+                "Ownable: caller is not the owner"
+            );
+        });
+        it("should fail when sale ID is not valid", async () => {
+            await expectRevert(setActiveSale(4), "Invalid sale ID");
         });
 
         // Passing case
-        it("should pass when setting presale to active", async () => {
-            await setPresaleActive();
-            await verifySaleStatus(1);
+        it("should pass when setting active sale from non-active (0) sale", async () => {
+            await setActiveSale(1);
+            await verifyActiveSale(1);
         });
-        it("should pass when setting general sale to active", async () => {
-            await setGeneralSaleActive();
-            await verifySaleStatus(2);
+        it("should pass when setting active sale to non-active (0) sale", async () => {
+            await setActiveSale(1);
+            await setActiveSale(0);
+            await verifyActiveSale(0);
         });
-        it("should pass when changing pre/general sale from active to inactive", async () => {
-            await setPresaleActive();
-            await verifySaleStatus(1);
+        it("should pass when changing active sales", async () => {
+            await createSale();
 
-            await setSaleInactive();
-            await verifySaleStatus(0);
+            await setActiveSale(1);
+            await setActiveSale(2);
+            await verifyActiveSale(2);
+        });
+    });
 
-            await setGeneralSaleActive();
-            await verifySaleStatus(2);
+    describe("Setting Sale Whitelist", async () => {
+        const baseWhitelistRoot = getMerkleRoot(whitelistedAddresses);
 
-            await setSaleInactive();
-            await verifySaleStatus(0);
+        beforeEach(async () => {
+            await createSale();
+        });
+
+        // Failure case
+        it("should fail when caller is not contract owner", async () => {
+            await expectRevert(
+                setWhitelist(1, baseWhitelistRoot, otherAccount),
+                "Ownable: caller is not the owner"
+            );
+        });
+        it("should fail when sale ID is not valid", async () => {
+            await expectRevert(
+                setWhitelist(4, baseWhitelistRoot),
+                "Invalid sale ID"
+            );
+        });
+
+        it("should fail when sale is currently active", async () => {
+            await setActiveSale(1);
+            await expectRevert(
+                setWhitelist(1, baseWhitelistRoot),
+                "Cannot update when sale is active"
+            );
+        });
+
+        // Passing case
+        it("should pass when whitelist was previously empty", async () => {
+            await setWhitelist(1, baseWhitelistRoot);
+            await verifySaleInfo(1, 5, 5, baseWhitelistRoot);
+        });
+        it("should pass when whitelist was previously populated", async () => {
+            await createSale(5, 5, baseWhitelistRoot);
+
+            const newWhitelist = [accounts[1], accounts[2]];
+            const newWhitelistRoot = getMerkleRoot(newWhitelist);
+
+            await setWhitelist(2, newWhitelistRoot);
+            await verifySaleInfo(2, 5, 5, newWhitelistRoot);
         });
     });
 
@@ -321,13 +491,9 @@ contract("FxSaleRootTunnel", (accounts) => {
                 "Supply must be greater than 0"
             );
         });
-        it("should fail when presale is active", async () => {
-            await setPresaleActive();
-            await expectRevert(setCardMaxSupply(), "Cannot change during sale");
-        });
-
-        it("should fail when general sale is active", async () => {
-            await setGeneralSaleActive();
+        it("should fail when a sale is active", async () => {
+            await createSale();
+            await setActiveSale(1);
             await expectRevert(setCardMaxSupply(), "Cannot change during sale");
         });
 
@@ -456,6 +622,10 @@ contract("FxSaleRootTunnel", (accounts) => {
     });
 
     describe("Registering Child Card Packages", async () => {
+        beforeEach(async () => {
+            await createSale();
+        });
+
         // Failure case
         it("should fail when caller is not owner", async () => {
             await expectRevert(registerChildPackage(0, 0), "Price cannot be 0");
@@ -487,6 +657,30 @@ contract("FxSaleRootTunnel", (accounts) => {
                 "Must contain at least one card"
             );
         });
+        it("should fail when no sale IDs are provided", async () => {
+            await expectRevert(
+                registerChildPackage(
+                    0,
+                    tokenUnits(2),
+                    baseSaleQty,
+                    baseCardQty,
+                    []
+                ),
+                "No sale IDs provided"
+            );
+        });
+        it("should fail when an invalid sale ID is provided", async () => {
+            await expectRevert(
+                registerChildPackage(
+                    0,
+                    tokenUnits(2),
+                    baseSaleQty,
+                    baseCardQty,
+                    [new BN(5)]
+                ),
+                "Invalid sale ID"
+            );
+        });
 
         // Passing case
         it("should pass when params are valid", async () => {
@@ -506,7 +700,12 @@ contract("FxSaleRootTunnel", (accounts) => {
 
     describe("Purchasing Card Packages", async () => {
         let startTime;
+        const packageLimit = 1;
+        const whitelistRoot = getMerkleRoot(whitelistedAddresses);
+
         beforeEach(async () => {
+            await createSale(2, packageLimit);
+
             await registerChildPackage();
 
             // Create presale campaign
@@ -514,8 +713,7 @@ contract("FxSaleRootTunnel", (accounts) => {
             startTime = startTime.add(time.duration.days(1));
             await createCampaign(owner, baseCommission, startTime);
 
-            // Activate presale
-            await setPresaleActive();
+            await setActiveSale(1);
         });
 
         // Failure case
@@ -526,16 +724,18 @@ contract("FxSaleRootTunnel", (accounts) => {
             );
         });
         it("should fail when sale is not active", async () => {
-            await setSaleInactive();
-            await expectRevert(purchasePackage(), "Presale is not active");
-        });
-        it("should fail when general sale is active", async () => {
-            await setGeneralSaleActive();
-            await expectRevert(purchasePackage(), "Presale is not active");
+            await setActiveSale(0);
+            await expectRevert(
+                purchasePackage(),
+                "Not available for current sale"
+            );
         });
         it("should fail when package sold out", async () => {
-            for (let i = 0; i < baseSaleQty; i++) {
-                await purchasePackage();
+            for (let i = 0; i < baseSaleQty.div(new BN(2)); i++) {
+                await purchasePackage(0, 0, 0, tokenUnits(2), [], accounts[8]);
+            }
+            for (let i = 0; i < baseSaleQty.div(new BN(2)); i++) {
+                await purchasePackage(0, 0, 0, tokenUnits(2), [], accounts[9]);
             }
             await expectRevert(purchasePackage(), "Package not available");
         });
@@ -565,8 +765,17 @@ contract("FxSaleRootTunnel", (accounts) => {
                 "AffiliateMarketing: Campaign not active"
             );
         });
+        it("should fail when sale package limit is reached", async () => {
+            for (let i = 0; i < packageLimit; i++) {
+                await purchasePackage();
+            }
+            await expectRevert(
+                purchasePackage(),
+                "Max package purchases reached"
+            );
+        });
         it("should fail when number of cards remaining is not enough to fulfill package", async () => {
-            await setSaleInactive();
+            await setActiveSale(0);
 
             // Set max supplies to low values to ensure we can purchase all cards
             await setCardMaxSupply(0, new BN(4));
@@ -574,14 +783,51 @@ contract("FxSaleRootTunnel", (accounts) => {
             await setCardMaxSupply(2, new BN(3));
             await setCardMaxSupply(3, new BN(2));
 
-            await setPresaleActive();
+            await setActiveSale(1);
 
-            await purchasePackage();
+            await purchasePackage(0, 0, 0, tokenUnits(2), [], accounts[8]);
 
             await expectRevert(purchasePackage(), "Not enough cards remaining");
         });
+        it("should fail when buyer is not on sale whitelist", async () => {
+            await setActiveSale(0);
+            await setWhitelist(1, whitelistRoot);
+            await setActiveSale(1);
+
+            const proof = getMerkleProof(whitelistedAddresses, otherAccount);
+
+            await expectRevert(
+                purchasePackage(0, 0, 0, tokenUnits(2), proof),
+                "Invalid proof"
+            );
+        });
 
         // Passing case
+        it("should pass when buyer is on sale whitelist", async () => {
+            await setActiveSale(0);
+            await setWhitelist(1, whitelistRoot);
+            await setActiveSale(1);
+
+            // accounts[8] is on the whitelist
+            const buyer = accounts[8];
+            const proof = getMerkleProof(whitelistedAddresses, buyer);
+
+            const receipt = await purchasePackage(
+                0,
+                0,
+                0,
+                tokenUnits(2),
+                proof,
+                buyer
+            );
+            expectEvent(receipt, "PurchasePackage", {
+                id: new BN(0),
+                purchaser: buyer,
+            });
+
+            // Ensure package was marked as sold
+            await verifyRemainingForSale(0, baseSaleQty - 1);
+        });
         it("should pass when referred by standard affiliate", async () => {
             await affiliateSignUp();
 
@@ -626,6 +872,9 @@ contract("FxSaleRootTunnel", (accounts) => {
     });
 
     describe("Purchasing Cards", async () => {
+        const cardLimit = 1;
+        const whitelistRoot = getMerkleRoot(whitelistedAddresses);
+
         beforeEach(async () => {
             // Set max supplies to low values to ensure we can purchase all cards
             await setCardMaxSupply(0, new BN(2));
@@ -643,7 +892,9 @@ contract("FxSaleRootTunnel", (accounts) => {
             startTime = startTime.add(time.duration.days(1));
             await createCampaign(owner, baseCommission, startTime);
 
-            await setGeneralSaleActive();
+            await createSale(cardLimit);
+
+            await setActiveSale(1);
         });
 
         // Failure case
@@ -651,12 +902,8 @@ contract("FxSaleRootTunnel", (accounts) => {
             await expectRevert(purchaseCard(5), "Invalid card ID");
         });
         it("should fail when sale is not active", async () => {
-            await setSaleInactive();
-            await expectRevert(purchaseCard(), "General sale is not active");
-        });
-        it("should fail when presale is active", async () => {
-            await setPresaleActive();
-            await expectRevert(purchaseCard(), "General sale is not active");
+            await setActiveSale(0);
+            await expectRevert(purchaseCard(), "No active sale");
         });
         it("should fail when caller sends less ETH than card price", async () => {
             await expectRevert(
@@ -667,8 +914,12 @@ contract("FxSaleRootTunnel", (accounts) => {
         it("should fail when max supply is reached", async () => {
             // Purchase both available pink text cards
             const totalSupply = await rootSaleInstance.maxSupplyOf(0);
-            for (let i = 0; i < totalSupply; i++) {
-                await purchaseCard(0);
+
+            for (let i = 0; i < totalSupply.div(new BN(2)); i++) {
+                await purchaseCard(0, 0, 0, tokenUnits(2), [], accounts[8]);
+            }
+            for (let i = 0; i < totalSupply.div(new BN(2)); i++) {
+                await purchaseCard(0, 0, 0, tokenUnits(2), [], accounts[9]);
             }
 
             // Attempt to purchase another card
@@ -692,6 +943,23 @@ contract("FxSaleRootTunnel", (accounts) => {
             await expectRevert(
                 purchaseCard(0, 1, 5),
                 "AffiliateMarketing: Campaign not active"
+            );
+        });
+        it("should fail when sale card limit is reached", async () => {
+            for (let i = 0; i < cardLimit; i++) {
+                await purchaseCard();
+            }
+            await expectRevert(purchaseCard(), "Max card purchases reached");
+        });
+        it("should fail when buyer is not on sale whitelist", async () => {
+            await createSale(5, 5, whitelistRoot);
+            await setActiveSale(2);
+
+            const proof = getMerkleProof(whitelistedAddresses, otherAccount);
+
+            await expectRevert(
+                purchaseCard(0, 0, 0, tokenUnits(2), proof),
+                "Invalid proof"
             );
         });
 
@@ -728,6 +996,24 @@ contract("FxSaleRootTunnel", (accounts) => {
             // Ensure card was marked as sold
             await verifyCardMintedSupply(2, 1);
         });
+        it("should pass when buyer is on sale whitelist", async () => {
+            await createSale(5, 5, whitelistRoot);
+            await setActiveSale(2);
+
+            // accounts[8] is on the whitelist
+            const buyer = accounts[8];
+            const proof = getMerkleProof(whitelistedAddresses, buyer);
+
+            const price = await rootSaleInstance.getCardPrice(2);
+            const receipt = await purchaseCard(0, 0, 0, price, proof, buyer);
+            expectEvent(receipt, "PurchaseCard", {
+                id: new BN(0),
+                purchaser: buyer,
+            });
+
+            // Ensure card was marked as sold
+            await verifyCardMintedSupply(0, 1);
+        });
         it("should pass when referred by standard affiliate", async () => {
             await affiliateSignUp();
 
@@ -747,7 +1033,6 @@ contract("FxSaleRootTunnel", (accounts) => {
 
             await verifyUnclaimedRewards(1, expectedReward);
         });
-
         it("should pass when referred by custom affiliate", async () => {
             await addCustomAffiliate();
 
@@ -779,7 +1064,8 @@ contract("FxSaleRootTunnel", (accounts) => {
             await createCampaign(owner, baseCommission, startTime);
             await affiliateSignUp();
 
-            await setGeneralSaleActive();
+            await createSale();
+            await setActiveSale(1);
 
             time.increaseTo(startTime.add(time.duration.minutes(1)));
 

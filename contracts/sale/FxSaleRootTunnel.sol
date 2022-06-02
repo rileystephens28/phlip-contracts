@@ -533,7 +533,7 @@ contract FxSaleRootTunnel is
         }
 
         // Validate merkle proof if sale has a whitelist and proof is provided
-        if (sale.merkleRootWhitelist != bytes32(0) && _merkleProof.length > 0) {
+        if (sale.merkleRootWhitelist != bytes32(0)) {
             _validateWhitelistProof(sale.merkleRootWhitelist, _merkleProof);
         }
 
@@ -697,7 +697,7 @@ contract FxSaleRootTunnel is
         returns (bool)
     {
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
-        require(MerkleProof.verify(_proof, _root, leaf), "Incorrect proof");
+        require(MerkleProof.verify(_proof, _root, leaf), "Invalid proof");
         return true;
     }
 
