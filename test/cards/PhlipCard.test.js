@@ -209,6 +209,12 @@ contract("PhlipCard", (accounts) => {
         wallet.should.be.equal(address);
     };
 
+    const verifyRoyaltyInfo = async (saleAmount, val, addr) => {
+        const royalty = await cardInstance.royaltyInfo(0, new BN(saleAmount));
+        royalty[0].should.be.equal(addr);
+        royalty[1].should.be.bignumber.equal(new BN(val));
+    };
+
     const verifyFreeUriChanges = async (val) => {
         const maxUriChanges = await cardInstance.FREE_URI_CHANGES();
         maxUriChanges.should.be.bignumber.equal(new BN(val));
@@ -379,6 +385,8 @@ contract("PhlipCard", (accounts) => {
         const newFreeUriChanges = new BN(10);
         const newUriChangeFee = tokenUnits(1.5);
         const newDevWallet = accounts[9];
+        const newRoyaltyReceiver = accounts[9];
+        const newRoyaltyAmount = new BN(500);
         const revertReason = getRoleRevertReason(otherAccount, SETTINGS_ADMIN);
 
         // Failing cases
@@ -424,6 +432,19 @@ contract("PhlipCard", (accounts) => {
             // Dev wallet address should still equal initial address
             await verifyDevWallet(baseDevWallet);
         });
+        it("should fail to set royalty info when caller is not settings admin", async () => {
+            await expectRevert(
+                cardInstance.setDefaultRoyalty(
+                    newRoyaltyReceiver,
+                    newRoyaltyAmount,
+                    {
+                        from: otherAccount,
+                    }
+                ),
+                revertReason
+            );
+            // Dev wallet address should still equal initial address
+        });
 
         // Passing cases
         it("should set base URI when caller is not settings admin", async () => {
@@ -460,6 +481,27 @@ contract("PhlipCard", (accounts) => {
 
             // Address should equal new address
             await verifyDevWallet(newDevWallet);
+        });
+        it("should set royalty info when caller is settings admin", async () => {
+            // Set dev wallet address
+            await cardInstance.setDefaultRoyalty(
+                newRoyaltyReceiver,
+                newRoyaltyAmount,
+                {
+                    from: admin,
+                }
+            );
+
+            const testSaleAmount = tokenUnits(2);
+            const expectedRoyalty = testSaleAmount
+                .mul(newRoyaltyAmount)
+                .div(new BN(10000));
+            // Address should equal new address
+            await verifyRoyaltyInfo(
+                testSaleAmount,
+                expectedRoyalty,
+                newRoyaltyReceiver
+            );
         });
     });
 

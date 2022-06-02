@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 import "../vesting/GuardedVestingCapsule.sol";
 import "../lockable/ERC721Lockable.sol";
 import "../vouchers/VoucherRegistry.sol";
@@ -35,6 +36,7 @@ import "../interfaces/IPhlipCard.sol";
  */
 contract PhlipCard is
     AccessControl,
+    ERC721Royalty,
     GuardedVestingCapsule,
     ERC721Lockable,
     VoucherRegistry,
@@ -225,6 +227,22 @@ contract PhlipCard is
      */
     function setUriChangeFee(uint256 _fee) external onlyRole(SETTINGS_ROLE) {
         URI_CHANGE_FEE = _fee;
+    }
+
+    /**
+     * @dev Allow Settings Admin to set the royalty information
+     * that all ids in this contract will default to.
+     *
+     * Requirements:
+     *
+     * - `receiver` cannot be the zero address.
+     * - `feeNumerator` cannot be greater than the fee denominator.
+     */
+    function setDefaultRoyalty(address receiver, uint96 feeNumerator)
+        external
+        onlyRole(SETTINGS_ROLE)
+    {
+        _setDefaultRoyalty(receiver, feeNumerator);
     }
 
     /**
@@ -572,11 +590,19 @@ contract PhlipCard is
         super._afterTokenTransfer(_from, _to, _tokenId);
     }
 
+    function _burn(uint256 tokenId)
+        internal
+        virtual
+        override(ERC721, ERC721Royalty)
+    {
+        super._burn(tokenId);
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view
         virtual
-        override(ERC721, GuardedVestingCapsule, AccessControl)
+        override(ERC721, ERC721Royalty, GuardedVestingCapsule, AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
