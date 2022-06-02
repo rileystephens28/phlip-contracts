@@ -8,6 +8,8 @@
         "@openzeppelin/contracts": "^4.6.0",
         "@openzeppelin/test-helpers": "^0.5.15",
         "ganache-core": "^2.13.2",
+        "keccak256": "^1.0.6",
+        "merkletreejs": "^0.2.31",
         "solc": "^0.8.13",
         "solidity-docgen": "^0.5.16"
     },

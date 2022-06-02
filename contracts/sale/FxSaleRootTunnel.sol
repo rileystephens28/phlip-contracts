@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@maticnetwork/fx-portal/contracts/tunnel/FxBaseRootTunnel.sol";
 
 import "../marketing/AffiliateMarketing.sol";
@@ -35,6 +36,8 @@ contract FxSaleRootTunnel is
     bytes32 public constant PURCHASE_CARD = keccak256("PURCHASE_CARD");
     bytes32 public constant PURCHASE_PACKAGE = keccak256("PURCHASE_PACKAGE");
 
+    address payable public _proceedsWalletAddress;
+
     event PurchaseCard(uint256 indexed id, address purchaser);
     event PurchasePackage(uint256 indexed id, address purchaser);
     event RegisterPackage(
@@ -43,13 +46,45 @@ contract FxSaleRootTunnel is
         uint256 numForSale
     );
 
-    enum SaleState {
-        INACTIVE,
-        PRESALE_ACTIVE,
-        SALE_ACTIVE
+    /***********************************|
+    |          Sale Variables           |
+    |__________________________________*/
+
+    /**
+     * @dev Stores information about a presale/sale period.
+     * @param merkleRootWhitelist (Optional) Root of the merkle tree containing whitelisted addresses.
+     * @param cardLimit Max number of cards that an address can purchase.
+     * @param packageLimit Max number of packages that an address can purchase.
+     */
+    struct SaleInfo {
+        bytes32 merkleRootWhitelist;
+        uint128 cardLimit;
+        uint128 packageLimit;
     }
 
-    SaleState private _saleStatus;
+    /**
+     * @dev Stores number of cards and packages that have been purchased.
+     * @param cardCount Number of cards that an address has purchased.
+     * @param packageCount Number of packages that an address has purchased.
+     */
+    struct SalePurchases {
+        uint128 cardCount;
+        uint128 packageCount;
+    }
+
+    Counters.Counter private _saleIdCounter;
+
+    uint256 private _currentSale;
+
+    // Sale IDs => sale info
+    mapping(uint256 => SaleInfo) private _sales;
+
+    // Sale IDs => purchaser address => purchase counts
+    mapping(uint256 => mapping(address => SalePurchases)) private _purchases;
+
+    /***********************************|
+    |          Card Variables           |
+    |__________________________________*/
 
     // Card IDs to use in _cards mapping
     uint256 private constant _pinkTextCard = 0;
@@ -70,6 +105,13 @@ contract FxSaleRootTunnel is
         uint128 mintedSupply;
     }
 
+    // Card IDs => card info
+    mapping(uint256 => CardInfo) private _cards;
+
+    /***********************************|
+    |         Package Variables          |
+    |__________________________________*/
+
     /**
      * @dev Structures information required to sell and
      * mint several cards at once during the presale period.
@@ -86,16 +128,14 @@ contract FxSaleRootTunnel is
         uint32[4] numCards;
     }
 
-    // Card IDs => card info
-    mapping(uint256 => CardInfo) private _cards;
-
     // Child contract package IDs => presale package info
     mapping(uint256 => PackageInfo) private _packages;
 
     // Package IDs => if the package has been registered
     mapping(uint256 => bool) private _registeredPackages;
 
-    address payable public _proceedsWalletAddress;
+    // Package IDs => sale ID => whether package can be purchased
+    mapping(uint256 => mapping(uint256 => bool)) private _saleAvailability;
 
     constructor(
         address _checkpointManager,
@@ -123,28 +163,9 @@ contract FxSaleRootTunnel is
 
         // ID 0 is reserved for "no campaign"
         _campaignIdCounter.increment();
-    }
 
-    /**
-     * @dev Ensures the presale is active and reverts if not.
-     */
-    modifier onlyPresale() {
-        require(
-            _saleStatus == SaleState.PRESALE_ACTIVE,
-            "Presale is not active"
-        );
-        _;
-    }
-
-    /**
-     * @dev Ensures the presale is active and reverts if not.
-     */
-    modifier onlyGeneralSale() {
-        require(
-            _saleStatus == SaleState.SALE_ACTIVE,
-            "General sale is not active"
-        );
-        _;
+        // ID 0 is reserved for "no sale"
+        _saleIdCounter.increment();
     }
 
     /***********************************|
@@ -152,10 +173,22 @@ contract FxSaleRootTunnel is
     |__________________________________*/
 
     /**
-     * @dev Getter for current sale status.
+     * @dev Getter for current sale ID.
      */
-    function saleStatus() public view returns (uint8) {
-        return uint8(_saleStatus);
+    function getActiveSale() public view returns (uint256) {
+        return _currentSale;
+    }
+
+    /**
+     * @dev Getter for sale info for given ID.
+     * @param _saleID ID of the sale to query
+     */
+    function getSaleInfo(uint256 _saleID)
+        public
+        view
+        returns (SaleInfo memory)
+    {
+        return _sales[_saleID];
     }
 
     /**
@@ -227,17 +260,64 @@ contract FxSaleRootTunnel is
     |__________________________________*/
 
     /**
-     * @dev Allows contract owner to set presale active state.
+     * @dev Allows contract owner to set the ID of the current active sale.
+     * Setting the ID to 0 will disable the sale.
      *
      * Requirements:
      * - Must be called by the contract owner
-     * - `_state` must be 0, 1, or 2
      *
-     * @param _state New sale state.
+     * @param _merkleRoot Merkle root of the sale whitelist
+     * @param _cardLimit Max number of cards an address can purchase during sale.
+     * @param _packageLimit Max number of packages an address can purchase during sale.
      */
-    function setSaleStatus(uint8 _state) public onlyOwner {
-        require(_state < 3, "Invalid sale status");
-        _saleStatus = SaleState(_state);
+    function createSale(
+        bytes32 _merkleRoot,
+        uint128 _cardLimit,
+        uint128 _packageLimit
+    ) public onlyOwner {
+        uint256 saleID = _saleIdCounter.current();
+        _saleIdCounter.increment();
+
+        SaleInfo storage sale = _sales[saleID];
+        sale.merkleRootWhitelist = _merkleRoot;
+        sale.cardLimit = _cardLimit;
+        sale.packageLimit = _packageLimit;
+    }
+
+    /**
+     * @dev Allows contract owner to update the whitelist merkle root of a sale
+     *
+     * Requirements:
+     * - Must be called by the contract owner
+     * - `_saleID` < `_saleIdCounter`
+     * - `_currentSale` != `_saleID`
+     *
+     * @param _saleID ID of the sale to set as active
+     */
+    function setWhitelist(uint256 _saleID, bytes32 _merkleRoot)
+        public
+        onlyOwner
+    {
+        require(_saleID < _saleIdCounter.current(), "Invalid sale ID");
+        require(_currentSale != _saleID, "Cannot update when sale is active");
+
+        SaleInfo storage sale = _sales[_saleID];
+        sale.merkleRootWhitelist = _merkleRoot;
+    }
+
+    /**
+     * @dev Allows contract owner to set the ID of the current active sale.
+     * Setting the ID to 0 will disable the sale.
+     *
+     * Requirements:
+     * - Must be called by the contract owner
+     * - `_saleID` < `_saleIdCounter`
+     *
+     * @param _saleID ID of the sale to set as active
+     */
+    function setActiveSale(uint256 _saleID) public onlyOwner {
+        require(_saleID < _saleIdCounter.current(), "Invalid sale ID");
+        _currentSale = _saleID;
     }
 
     /**
@@ -248,6 +328,7 @@ contract FxSaleRootTunnel is
      *
      * Requirements:
      * - Must be called by the contract owner
+     * - `_currentSale` must be 0
      * - `_cardID` must be 0, 1, 2, or 3
      * - `_supply` must be greater than 0
      *
@@ -258,7 +339,7 @@ contract FxSaleRootTunnel is
         public
         onlyOwner
     {
-        require(_saleStatus == SaleState.INACTIVE, "Cannot change during sale");
+        require(_currentSale == 0, "Cannot change during sale");
         require(_cardID < 4, "Invalid card ID");
         require(_supply > 0, "Supply must be greater than 0");
 
@@ -294,16 +375,22 @@ contract FxSaleRootTunnel is
      * - `_price` must be greater than 0
      * - `_numForSale` must be greater than 0
      * - `_numCards` must contain at least 1 item with value greater than 0
+     * - `_saleIDs.length` > 0
+     * - `_saleIDs` item values > 0
+     * - `_saleIDs` item values < `_saleIdCounter`
      *
      * @param _packageID ID of the package in child tunnel contract
      * @param _price The price of the package in wei
      * @param _numForSale Number of packages that can be bought
+     * @param _numCards Array of where each index is card id and value is number of cards
+     * @param _saleIDs Array of sale IDs that the package is available during
      */
     function registerChildPackage(
         uint256 _packageID,
         uint256 _price,
         uint128 _numForSale,
-        uint32[4] calldata _numCards
+        uint32[4] calldata _numCards,
+        uint256[] calldata _saleIDs
     ) public onlyOwner {
         require(!_registeredPackages[_packageID], "Package already registered");
         require(_price > 0, "Price cannot be 0");
@@ -315,6 +402,15 @@ contract FxSaleRootTunnel is
                 _numCards[3] > 0,
             "Must contain at least one card"
         );
+
+        require(_saleIDs.length > 0, "No sale IDs provided");
+        for (uint256 i = 0; i < _saleIDs.length; i++) {
+            require(
+                _saleIDs[i] > 0 && _saleIDs[i] < _saleIdCounter.current(),
+                "Invalid sale ID"
+            );
+            _saleAvailability[_packageID][_saleIDs[i]] = true;
+        }
 
         _registeredPackages[_packageID] = true;
         PackageInfo storage package = _packages[_packageID];
@@ -334,7 +430,7 @@ contract FxSaleRootTunnel is
      * - `_standardCommission` must be between 0 and 10000
      *
      * @param _startTime The time when the campaign becomes active
-     * @param _endTime The time the campaign becomes inactive
+     * @param _endTime The time the campaign becomes NOT_STARTED
      * @param _standardCommission Percentage of sales generated by affiliates that will be paid to the affiliate
      * @param _uri (Optional) URI containing the new campaign's information
      */
@@ -389,6 +485,7 @@ contract FxSaleRootTunnel is
      * - `_campaignID` is active.
      * - `_affiliateID` must exist.
      * - `_affiliateID` is registered with campaign.
+     * - `_packageID` must be purchasable during `_currentSale`.
      * - `msg.value` >= `package.price`.
      * - `package.numSold` <= `package.numForSale`.
      * - For all cards in package, `card.mintedSupply` + `package.numCards' <= `card.totalSupply`.
@@ -396,39 +493,58 @@ contract FxSaleRootTunnel is
      * @param _packageID ID of the package to purchase.
      * @param _campaignID ID of the campaign the purchase occurred as a result of.
      * @param _affiliateID ID of the affiliate that referred the buyer
+     * @param _merkleProof Proof used to verify address exists in merkle tree whitelist
      */
     function purchasePackage(
         uint256 _packageID,
         uint256 _campaignID,
-        uint256 _affiliateID
-    ) public payable onlyPresale nonReentrant {
-        require(_registeredPackages[_packageID], "Package does not exist");
-
+        uint256 _affiliateID,
+        bytes32[] calldata _merkleProof
+    ) public payable nonReentrant {
         PackageInfo storage package = _packages[_packageID];
+        SaleInfo storage sale = _sales[_currentSale];
+        SalePurchases storage purchases = _purchases[_currentSale][msg.sender];
+
+        require(_registeredPackages[_packageID], "Package does not exist");
         require(msg.value > package.price - 1, "Not enough ETH to cover cost");
         require(package.numSold < package.numForSale, "Package not available");
+        require(
+            _saleAvailability[_packageID][_currentSale],
+            "Not available for current sale"
+        );
+        require(
+            purchases.packageCount < sale.packageLimit,
+            "Max package purchases reached"
+        );
 
         // Check that enough cards are available to fulfill the package
+        uint32[4] memory numCards = package.numCards;
         for (uint256 i = 0; i < 4; i++) {
-            uint128 numCards = package.numCards[i];
-            CardInfo storage card = _cards[i];
-            if (numCards > 0) {
+            if (numCards[i] > 0) {
+                CardInfo storage card = _cards[i];
                 unchecked {
                     require(
-                        card.mintedSupply + numCards < card.totalSupply + 1,
+                        card.mintedSupply + numCards[i] < card.totalSupply + 1,
                         "Not enough cards remaining"
                     );
-                    card.mintedSupply += numCards;
+                    card.mintedSupply += numCards[i];
                 }
             }
         }
 
+        // Validate merkle proof if sale has a whitelist and proof is provided
+        if (sale.merkleRootWhitelist != bytes32(0)) {
+            _validateWhitelistProof(sale.merkleRootWhitelist, _merkleProof);
+        }
+
+        // Attribute sale to affiliate if necessary
         if (_campaignID != 0 && _affiliateID != 0) {
             _attributeSaleToAffiliate(_campaignID, _affiliateID, package.price);
         }
 
         unchecked {
             package.numSold += 1;
+            purchases.packageCount += 1;
         }
 
         // Craft message with purchaser address and package ID
@@ -450,6 +566,7 @@ contract FxSaleRootTunnel is
      * sent the correct amount of ETH to cover the cost.
      *
      * Requirements:
+     * - `_currentSale` != 0
      * - `_cardID` must be 0, 1, 2, or 3.
      * - `_campaignID` must exist.
      * - `_campaignID` is active.
@@ -461,23 +578,40 @@ contract FxSaleRootTunnel is
      * @param _cardID ID of the card to purchase.
      * @param _campaignID ID of the campaign the purchase occurred as a result of.
      * @param _affiliateID ID of the affiliate that referred the buyer
+     * @param _merkleProof Proof used to verify address exists in merkle tree whitelist
      */
     function purchaseCard(
         uint256 _cardID,
         uint256 _campaignID,
-        uint256 _affiliateID
-    ) public payable onlyGeneralSale nonReentrant {
+        uint256 _affiliateID,
+        bytes32[] calldata _merkleProof
+    ) public payable nonReentrant {
         CardInfo storage card = _cards[_cardID];
+        SaleInfo storage sale = _sales[_currentSale];
+        SalePurchases storage purchases = _purchases[_currentSale][msg.sender];
+
+        require(_currentSale != 0, "No active sale");
         require(_cardID < 4, "Invalid card ID");
         require(card.mintedSupply < card.totalSupply, "Max supply reached");
         require(msg.value > card.price - 1, "Not enough ETH to cover cost");
+        require(
+            purchases.cardCount < sale.cardLimit,
+            "Max card purchases reached"
+        );
 
+        // Validate merkle proof if sale has a whitelist
+        if (sale.merkleRootWhitelist != bytes32(0)) {
+            _validateWhitelistProof(sale.merkleRootWhitelist, _merkleProof);
+        }
+
+        // Attribute sale to affiliate if necessary
         if (_campaignID != 0 && _affiliateID != 0) {
             _attributeSaleToAffiliate(_campaignID, _affiliateID, card.price);
         }
 
         unchecked {
             card.mintedSupply += 1;
+            purchases.cardCount += 1;
         }
 
         // Craft message with purchaser address and package ID
@@ -548,6 +682,23 @@ contract FxSaleRootTunnel is
         if (refundAmount > 0) {
             payable(msg.sender).transfer(refundAmount);
         }
+    }
+
+    /**
+     * @dev Check that the proof is valid and merkle tree whitelist contains
+     * the msg.sender.
+     * @param _root Root of the merkle tree containing whitelisted addresses.
+     * @param _proof Proof used to verify address exists in merkle tree
+     * @return True if address and proof are valid, false otherwise.
+     */
+    function _validateWhitelistProof(bytes32 _root, bytes32[] calldata _proof)
+        internal
+        view
+        returns (bool)
+    {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(MerkleProof.verify(_proof, _root, leaf), "Invalid proof");
+        return true;
     }
 
     // exit processor
