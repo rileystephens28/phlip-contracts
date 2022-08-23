@@ -21,6 +21,9 @@ module.exports = {
             coinmarketcap: process.env.COINMARKETCAP_API_KEY,
             currency: "USD",
             showTimeSpent: true,
+            token: "MATIC",
+            gasPriceApi:
+                "https://api.polygonscan.com/api?module=proxy&action=eth_gasPrice",
         },
     },
     compilers: {
